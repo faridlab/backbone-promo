@@ -1,0 +1,206 @@
+# =============================================================================
+# Domain: Providers
+# Entity: ProviderPromo
+# Description: Promotions and discounts offered by provider
+# =============================================================================
+
+models:
+  - name: ProviderPromo
+    collection: provider_promos
+    description: "Provider promotion/discount"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique promo identifier"
+
+      provider_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Reference to provider"  # logical FK to bersihir.Provider.id
+
+      outlet_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Specific outlet (null = all outlets)"  # logical FK to bersihir.ProviderOutlet.id
+
+      # Promo identity
+      promo_name:
+        type: string
+        attributes: ["@required", "@max(100)"]
+        description: "Promo name"
+
+      promo_code:
+        type: string?
+        attributes: ["@max(20)", "@uppercase"]
+        description: "Promo code (if applicable)"
+
+      description:
+        type: string?
+        attributes: ["@max(500)"]
+        description: "Promo description"
+
+      # Promo type and value
+      promo_type:
+        type: PromoType
+        attributes: ["@required", "@default(percentage)"]
+        description: "Type of promotion"
+
+      discount_value:
+        type: decimal
+        attributes: ["@required", "@precision(12,2)", "@non_negative"]
+        description: "Discount value (percentage or fixed amount)"
+
+      max_discount:
+        type: decimal?
+        attributes: ["@precision(12,2)", "@non_negative"]
+        description: "Maximum discount amount (for percentage)"
+
+      currency:
+        type: string
+        attributes: ["@default('IDR')", "@length(3)"]
+        description: "Currency code"
+
+      # Conditions
+      min_order_amount:
+        type: decimal?
+        attributes: ["@precision(12,2)", "@non_negative"]
+        description: "Minimum order amount to use promo"
+
+      min_weight_kg:
+        type: decimal?
+        attributes: ["@precision(5,2)", "@non_negative"]
+        description: "Minimum weight to use promo"
+
+      # Applicable services
+      applicable_services:
+        type: json
+        attributes: ["@default('[]')"]
+        description: "Array of service IDs (empty = all services)"
+
+      applicable_categories:
+        type: json
+        attributes: ["@default('[]')"]
+        description: "Array of service categories (empty = all)"
+
+      # Validity
+      valid_from:
+        type: datetime
+        attributes: ["@required"]
+        description: "Promo start datetime"
+
+      valid_until:
+        type: datetime
+        attributes: ["@required"]
+        description: "Promo end datetime"
+
+      # Usage limits
+      usage_limit:
+        type: int?
+        attributes: ["@positive"]
+        description: "Total usage limit (null = unlimited)"
+
+      usage_limit_per_customer:
+        type: int?
+        attributes: ["@positive"]
+        description: "Usage limit per customer"
+
+      usage_count:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Current usage count"
+
+      # Customer eligibility
+      eligible_customers:
+        type: PromoEligibility
+        attributes: ["@default(all)"]
+        description: "Who can use this promo"
+
+      eligible_tiers:
+        type: json
+        attributes: ["@default('[]')"]
+        description: "Eligible loyalty tiers (empty = all)"
+
+      # Status
+      is_active:
+        type: bool
+        attributes: ["@default(true)"]
+        description: "Promo is active"
+
+      is_public:
+        type: bool
+        attributes: ["@default(true)"]
+        description: "Visible in promo list"
+
+      is_stackable:
+        type: bool
+        attributes: ["@default(false)"]
+        description: "Can be combined with other promos"
+
+      # Display
+      banner_url:
+        type: string?
+        attributes: ["@max(500)"]
+        description: "Promo banner image"
+
+      terms_conditions:
+        type: string?
+        attributes: ["@max(2000)"]
+        description: "Terms and conditions"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata (created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)"
+
+    indexes:
+      - type: index
+        fields: [provider_id, outlet_id, is_active, valid_from, valid_until]
+      - type: index
+        fields: [outlet_id, is_active, valid_from, valid_until]
+      - type: unique
+        fields: [provider_id, promo_code]
+        where: "promo_code IS NOT NULL AND deleted_at IS NULL"
+      - type: unique
+        fields: [outlet_id, promo_code]
+        where: "promo_code IS NOT NULL AND deleted_at IS NULL AND outlet_id IS NOT NULL"
+      - type: index
+        fields: [promo_type]
+      - type: index
+        fields: [valid_from, valid_until]
+      - type: index
+        fields: [is_public, is_active]
+
+enums:
+  - name: PromoType
+    description: "Type of promotion"
+    variants:
+      - name: percentage
+        description: "Percentage discount"
+        default: true
+      - name: fixed_amount
+        description: "Fixed amount discount"
+      - name: free_delivery
+        description: "Free delivery"
+      - name: free_pickup
+        description: "Free pickup"
+      - name: buy_x_get_y
+        description: "Buy X Get Y free"
+      - name: cashback
+        description: "Cashback"
+
+  - name: PromoEligibility
+    description: "Customer eligibility for promo"
+    variants:
+      - name: all
+        description: "All customers"
+        default: true
+      - name: new_customer
+        description: "New customers only"
+      - name: returning_customer
+        description: "Returning customers only"
+      - name: loyalty_member
+        description: "Loyalty program members"
+      - name: specific_tiers
+        description: "Specific loyalty tiers"

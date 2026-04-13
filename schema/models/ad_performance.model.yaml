@@ -1,0 +1,320 @@
+# =============================================================================
+# Module: Platform
+# Entity: AdPerformance
+# Description: Advertisement performance tracking
+# =============================================================================
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+enums:
+  - name: AdType
+    description: "Type of advertisement"
+    variants:
+      - name: banner
+        description: "Banner ad"
+        default: true
+      - name: featured
+        description: "Featured listing"
+      - name: promoted
+        description: "Promoted service"
+      - name: popup
+        description: "Popup ad"
+      - name: push
+        description: "Push notification"
+      - name: sms
+        description: "SMS campaign"
+      - name: email
+        description: "Email campaign"
+
+  - name: AdStatus
+    description: "Advertisement status"
+    variants:
+      - name: draft
+        description: "Draft"
+      - name: pending
+        description: "Pending approval"
+      - name: active
+        description: "Active"
+        default: true
+      - name: paused
+        description: "Paused"
+      - name: completed
+        description: "Completed"
+      - name: rejected
+        description: "Rejected"
+
+  - name: AdPlacement
+    description: "Ad placement location"
+    variants:
+      - name: home_top
+        description: "Home page top"
+        default: true
+      - name: home_middle
+        description: "Home page middle"
+      - name: search_results
+        description: "Search results"
+      - name: service_detail
+        description: "Service detail page"
+      - name: checkout
+        description: "Checkout page"
+      - name: order_complete
+        description: "Order complete page"
+
+# =============================================================================
+# Models
+# =============================================================================
+
+models:
+  - name: AdPerformance
+    collection: ad_performances
+    description: "Advertisement performance tracking"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique ad performance record identifier"
+
+      advertisement_id:
+        type: uuid
+        attributes: ["@required", "@foreign_key(Advertisement.id)"]
+        description: "Reference to advertisement"
+
+      # =======================================================================
+      # Provider
+      # =======================================================================
+      provider_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Provider (if provider-specific ad)"  # logical FK to bersihir.Provider.id
+
+      # =======================================================================
+      # Period
+      # =======================================================================
+      date:
+        type: date
+        attributes: ["@required"]
+        description: "Performance date"
+
+      hour:
+        type: int?
+        attributes: ["@range(0, 23)"]
+        description: "Hour (for hourly tracking)"
+
+      # =======================================================================
+      # Ad Details (snapshot)
+      # =======================================================================
+      ad_type:
+        type: AdType
+        attributes: ["@required"]
+        description: "Type of advertisement"
+
+      placement:
+        type: AdPlacement
+        attributes: ["@required"]
+        description: "Ad placement"
+
+      status:
+        type: AdStatus
+        attributes: ["@required"]
+        description: "Ad status during this period"
+
+      # =======================================================================
+      # Impressions
+      # =======================================================================
+      impressions:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Number of impressions"
+
+      unique_impressions:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Unique user impressions"
+
+      # =======================================================================
+      # Clicks
+      # =======================================================================
+      clicks:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Number of clicks"
+
+      unique_clicks:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Unique user clicks"
+
+      ctr:
+        type: decimal?
+        attributes: ["@precision(8,4)", "@range(0, 100)"]
+        description: "Click-through rate (%)"
+
+      # =======================================================================
+      # Conversions
+      # =======================================================================
+      conversions:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Number of conversions (orders)"
+
+      conversion_rate:
+        type: decimal?
+        attributes: ["@precision(8,4)", "@range(0, 100)"]
+        description: "Conversion rate (%)"
+
+      conversion_value:
+        type: decimal
+        attributes: ["@default(0)", "@precision(14,2)", "@non_negative"]
+        description: "Total conversion value (order value)"
+
+      # =======================================================================
+      # Cost
+      # =======================================================================
+      spend:
+        type: decimal
+        attributes: ["@default(0)", "@precision(12,2)", "@non_negative"]
+        description: "Amount spent"
+
+      budget_remaining:
+        type: decimal?
+        attributes: ["@precision(12,2)", "@non_negative"]
+        description: "Remaining budget"
+
+      cpc:
+        type: decimal?
+        attributes: ["@precision(10,2)", "@non_negative"]
+        description: "Cost per click"
+
+      cpm:
+        type: decimal?
+        attributes: ["@precision(10,2)", "@non_negative"]
+        description: "Cost per 1000 impressions"
+
+      cpa:
+        type: decimal?
+        attributes: ["@precision(10,2)", "@non_negative"]
+        description: "Cost per acquisition"
+
+      # =======================================================================
+      # ROI
+      # =======================================================================
+      roi:
+        type: decimal?
+        attributes: ["@precision(10,2)"]
+        description: "Return on investment (%)"
+
+      roas:
+        type: decimal?
+        attributes: ["@precision(10,2)"]
+        description: "Return on ad spend"
+
+      # =======================================================================
+      # Engagement
+      # =======================================================================
+      shares:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Number of shares"
+
+      saves:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Number of saves/favorites"
+
+      engagement_rate:
+        type: decimal?
+        attributes: ["@precision(8,4)", "@range(0, 100)"]
+        description: "Engagement rate (%)"
+
+      avg_view_duration_seconds:
+        type: int?
+        attributes: ["@non_negative"]
+        description: "Average view duration"
+
+      # =======================================================================
+      # Audience
+      # =======================================================================
+      reach:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Unique users reached"
+
+      frequency:
+        type: decimal?
+        attributes: ["@precision(6,2)", "@non_negative"]
+        description: "Average frequency per user"
+
+      audience_demographics:
+        type: json
+        attributes: ["@default('{}')"]
+        description: "Audience breakdown"
+
+      # =======================================================================
+      # Device/Platform
+      # =======================================================================
+      by_device:
+        type: json
+        attributes: ["@default('{}')"]
+        description: "Performance by device type"
+
+      by_platform:
+        type: json
+        attributes: ["@default('{}')"]
+        description: "Performance by platform"
+
+      by_region:
+        type: json
+        attributes: ["@default('{}')"]
+        description: "Performance by region"
+
+      # =======================================================================
+      # Quality
+      # =======================================================================
+      quality_score:
+        type: decimal?
+        attributes: ["@precision(4,2)", "@range(0, 10)"]
+        description: "Ad quality score"
+
+      relevance_score:
+        type: decimal?
+        attributes: ["@precision(4,2)", "@range(0, 10)"]
+        description: "Relevance score"
+
+      # =======================================================================
+      # Currency
+      # =======================================================================
+      currency:
+        type: string
+        attributes: ["@default('IDR')", "@length(3)"]
+        description: "Currency code"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata (created_at, updated_at, deleted_at, created_by, updated_by, deleted_by)"
+
+    relations:
+      advertisement:
+        type: Advertisement
+        attributes: ["@one", "@foreign_key(advertisement_id)"]
+        description: "Advertisement"
+        inverse: performances
+
+    indexes:
+      - type: unique
+        fields: [advertisement_id, date, hour]
+        where: "hour IS NOT NULL AND deleted_at IS NULL"
+      - type: unique
+        fields: [advertisement_id, date]
+        where: "hour IS NULL AND deleted_at IS NULL"
+      - type: index
+        fields: [advertisement_id, date]
+      - type: index
+        fields: [provider_id, date]
+      - type: index
+        fields: [ad_type, date]
+      - type: index
+        fields: [placement, date]
