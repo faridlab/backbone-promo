@@ -1,0 +1,58 @@
+server:
+  host: 0.0.0.0
+  port: 3000
+  grpc_port: 50051
+database:
+  url: postgresql://root:password@localhost:5432/backbonedb
+  max_connections: 20
+  min_connections: 5
+  connect_timeout: 30
+  idle_timeout: 600
+module:
+  name: promo
+  enabled: true
+features:
+  soft_delete: true
+  state_machines: true
+  workflows: true
+logging:
+  level: info
+  format: json
+  file: logs/promo.log
+tracing:
+  enabled: true
+  exporter: otlp
+  endpoint: http://localhost:4317
+metrics:
+  enabled: true
+  endpoint: /metrics
+  port: 9090
+entities:
+  ad_performance:
+    collection: ad_performances
+    enabled: true
+    cache_ttl: 300
+    pagination:
+      default_limit: 20
+      max_limit: 100
+  advertisement:
+    collection: advertisements
+    enabled: true
+    cache_ttl: 300
+    pagination:
+      default_limit: 20
+      max_limit: 100
+  provider_promo:
+    collection: provider_promos
+    enabled: true
+    cache_ttl: 300
+    pagination:
+      default_limit: 20
+      max_limit: 100
+  promo_campaign:
+    collection: promo_campaigns
+    enabled: true
+    cache_ttl: 300
+    pagination:
+      default_limit: 20
+      max_limit: 100
