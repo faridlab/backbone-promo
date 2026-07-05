@@ -42,6 +42,12 @@ pub use events::*;
 /// - `PricingRuleDto` - Data transfer object for PricingRule
 /// - `PricingRuleSummary` - Summary view of PricingRule
 /// - `PricingRuleId` - Type-safe ID wrapper
+/// - `PromoBundleDto` - Data transfer object for PromoBundle
+/// - `PromoBundleSummary` - Summary view of PromoBundle
+/// - `PromoBundleId` - Type-safe ID wrapper
+/// - `PromoBundleComponentDto` - Data transfer object for PromoBundleComponent
+/// - `PromoBundleComponentSummary` - Summary view of PromoBundleComponent
+/// - `PromoBundleComponentId` - Type-safe ID wrapper
 ///
 /// ## Public Services
 /// - `PromoQueryService` - Read-only queries
@@ -62,4 +68,10 @@ pub use events::*;
 /// - `PricingRuleCreatedEvent` - Published when PricingRule is created
 /// - `PricingRuleUpdatedEvent` - Published when PricingRule is updated
 /// - `PricingRuleDeletedEvent` - Published when PricingRule is deleted
+/// - `PromoBundleCreatedEvent` - Published when PromoBundle is created
+/// - `PromoBundleUpdatedEvent` - Published when PromoBundle is updated
+/// - `PromoBundleDeletedEvent` - Published when PromoBundle is deleted
+/// - `PromoBundleComponentCreatedEvent` - Published when PromoBundleComponent is created
+/// - `PromoBundleComponentUpdatedEvent` - Published when PromoBundleComponent is updated
+/// - `PromoBundleComponentDeletedEvent` - Published when PromoBundleComponent is deleted
 pub struct ExportSummary;

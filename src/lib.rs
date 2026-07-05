@@ -36,6 +36,8 @@ pub use application::service::CouponRedemptionService;
 pub use application::service::LoyaltyProgramService;
 pub use application::service::LoyaltyPointEntryService;
 pub use application::service::PricingRuleService;
+pub use application::service::PromoBundleService;
+pub use application::service::PromoBundleComponentService;
 
 use std::sync::Arc;
 use axum::Router;
@@ -59,6 +61,8 @@ pub struct PromoModule {
     pub loyalty_program_service: Arc<LoyaltyProgramService>,
     pub loyalty_point_entry_service: Arc<LoyaltyPointEntryService>,
     pub pricing_rule_service: Arc<PricingRuleService>,
+    pub promo_bundle_service: Arc<PromoBundleService>,
+    pub promo_bundle_component_service: Arc<PromoBundleComponentService>,
 }
 
 impl PromoModule {
@@ -79,6 +83,8 @@ impl PromoModule {
             create_loyalty_program_routes,
             create_loyalty_point_entry_routes,
             create_pricing_rule_routes,
+            create_promo_bundle_routes,
+            create_promo_bundle_component_routes,
         };
 
         Router::new()
@@ -87,6 +93,8 @@ impl PromoModule {
             .merge(create_loyalty_program_routes(self.loyalty_program_service.clone()))
             .merge(create_loyalty_point_entry_routes(self.loyalty_point_entry_service.clone()))
             .merge(create_pricing_rule_routes(self.pricing_rule_service.clone()))
+            .merge(create_promo_bundle_routes(self.promo_bundle_service.clone()))
+            .merge(create_promo_bundle_component_routes(self.promo_bundle_component_service.clone()))
     }
 
     /// Deprecated alias for [`Self::all_crud_routes`]. `routes()` reads like
@@ -147,6 +155,14 @@ impl PromoModuleBuilder {
         let pricing_rule_repository = Arc::new(PricingRuleRepository::new(db_pool.clone()));
         let pricing_rule_service = Arc::new(PricingRuleService::with_repository(pricing_rule_repository.clone()));
 
+        // PromoBundle service
+        let promo_bundle_repository = Arc::new(PromoBundleRepository::new(db_pool.clone()));
+        let promo_bundle_service = Arc::new(PromoBundleService::with_repository(promo_bundle_repository.clone()));
+
+        // PromoBundleComponent service
+        let promo_bundle_component_repository = Arc::new(PromoBundleComponentRepository::new(db_pool.clone()));
+        let promo_bundle_component_service = Arc::new(PromoBundleComponentService::with_repository(promo_bundle_component_repository.clone()));
+
         // <<< CUSTOM
         // END CUSTOM
 
@@ -156,6 +172,8 @@ impl PromoModuleBuilder {
             loyalty_program_service,
             loyalty_point_entry_service,
             pricing_rule_service,
+            promo_bundle_service,
+            promo_bundle_component_service,
             // <<< CUSTOM
             // END CUSTOM
         })

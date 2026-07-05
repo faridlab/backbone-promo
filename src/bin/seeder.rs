@@ -17,6 +17,8 @@ use backbone_promo::seeders::SeedCouponRedemptionSeeder;
 use backbone_promo::seeders::SeedLoyaltyProgramSeeder;
 use backbone_promo::seeders::SeedLoyaltyPointEntrySeeder;
 use backbone_promo::seeders::SeedPricingRuleSeeder;
+use backbone_promo::seeders::SeedPromoBundleSeeder;
+use backbone_promo::seeders::SeedPromoBundleComponentSeeder;
 use backbone_promo::seeders::Seeder;
 
 #[tokio::main]
@@ -50,6 +52,8 @@ async fn main() -> Result<()> {
     seeders.push(Box::new(SeedLoyaltyProgramSeeder::new()));
     seeders.push(Box::new(SeedLoyaltyPointEntrySeeder::new()));
     seeders.push(Box::new(SeedPricingRuleSeeder::new()));
+    seeders.push(Box::new(SeedPromoBundleSeeder::new()));
+    seeders.push(Box::new(SeedPromoBundleComponentSeeder::new()));
 
     // Sort by order
     seeders.sort_by_key(|s| s.order());

@@ -14,12 +14,16 @@ mod coupon_redemption_seeder;
 mod loyalty_program_seeder;
 mod loyalty_point_entry_seeder;
 mod pricing_rule_seeder;
+mod promo_bundle_seeder;
+mod promo_bundle_component_seeder;
 
 pub use coupon_code_seeder::SeedCouponCodeSeeder;
 pub use coupon_redemption_seeder::SeedCouponRedemptionSeeder;
 pub use loyalty_program_seeder::SeedLoyaltyProgramSeeder;
 pub use loyalty_point_entry_seeder::SeedLoyaltyPointEntrySeeder;
 pub use pricing_rule_seeder::SeedPricingRuleSeeder;
+pub use promo_bundle_seeder::SeedPromoBundleSeeder;
+pub use promo_bundle_component_seeder::SeedPromoBundleComponentSeeder;
 
 // ============================================================================
 // SEEDER TRAIT

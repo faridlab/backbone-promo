@@ -15,7 +15,9 @@ use crate::presentation::http::{
     create_coupon_redemption_routes,
     create_loyalty_program_routes,
     create_loyalty_point_entry_routes,
-    create_pricing_rule_routes
+    create_pricing_rule_routes,
+    create_promo_bundle_routes,
+    create_promo_bundle_component_routes
 };
 
 // Import AppState for stateful routes
@@ -44,6 +46,8 @@ pub fn create_stateless_routes(module: &crate::PromoModule) -> Router<()> {
         .merge(create_loyalty_program_routes(module.loyalty_program_service.clone()))
         .merge(create_loyalty_point_entry_routes(module.loyalty_point_entry_service.clone()))
         .merge(create_pricing_rule_routes(module.pricing_rule_service.clone()))
+        .merge(create_promo_bundle_routes(module.promo_bundle_service.clone()))
+        .merge(create_promo_bundle_component_routes(module.promo_bundle_component_service.clone()))
 }
 
 /// Get all routes (stateless) for the Promo module.

@@ -14,6 +14,8 @@ use crate::application::service::CouponRedemptionService;
 use crate::application::service::LoyaltyProgramService;
 use crate::application::service::LoyaltyPointEntryService;
 use crate::application::service::PricingRuleService;
+use crate::application::service::PromoBundleService;
+use crate::application::service::PromoBundleComponentService;
 
 /// Application state for dependency injection.
 ///
@@ -43,6 +45,10 @@ pub struct AppState {
     pub loyalty_point_entry_service: Arc<LoyaltyPointEntryService>,
     /// PricingRule service
     pub pricing_rule_service: Arc<PricingRuleService>,
+    /// PromoBundle service
+    pub promo_bundle_service: Arc<PromoBundleService>,
+    /// PromoBundleComponent service
+    pub promo_bundle_component_service: Arc<PromoBundleComponentService>,
 }
 
 impl AppState {
@@ -52,7 +58,9 @@ impl AppState {
         coupon_redemption_service: Arc<CouponRedemptionService>,
         loyalty_program_service: Arc<LoyaltyProgramService>,
         loyalty_point_entry_service: Arc<LoyaltyPointEntryService>,
-        pricing_rule_service: Arc<PricingRuleService>
+        pricing_rule_service: Arc<PricingRuleService>,
+        promo_bundle_service: Arc<PromoBundleService>,
+        promo_bundle_component_service: Arc<PromoBundleComponentService>
     ) -> Self {
         Self {
             coupon_code_service,
@@ -60,6 +68,8 @@ impl AppState {
             loyalty_program_service,
             loyalty_point_entry_service,
             pricing_rule_service,
+            promo_bundle_service,
+            promo_bundle_component_service,
         }
     }
 
@@ -71,6 +81,8 @@ impl AppState {
             loyalty_program_service: module.loyalty_program_service.clone(),
             loyalty_point_entry_service: module.loyalty_point_entry_service.clone(),
             pricing_rule_service: module.pricing_rule_service.clone(),
+            promo_bundle_service: module.promo_bundle_service.clone(),
+            promo_bundle_component_service: module.promo_bundle_component_service.clone(),
         }
     }
 }
@@ -85,6 +97,8 @@ pub struct AppStateBuilder {
     loyalty_program_service: Option<Arc<LoyaltyProgramService>>,
     loyalty_point_entry_service: Option<Arc<LoyaltyPointEntryService>>,
     pricing_rule_service: Option<Arc<PricingRuleService>>,
+    promo_bundle_service: Option<Arc<PromoBundleService>>,
+    promo_bundle_component_service: Option<Arc<PromoBundleComponentService>>,
 }
 
 impl AppStateBuilder {
@@ -123,6 +137,18 @@ impl AppStateBuilder {
         self
     }
 
+    /// Set the PromoBundle service.
+    pub fn with_promo_bundle_service(mut self, service: Arc<PromoBundleService>) -> Self {
+        self.promo_bundle_service = Some(service);
+        self
+    }
+
+    /// Set the PromoBundleComponent service.
+    pub fn with_promo_bundle_component_service(mut self, service: Arc<PromoBundleComponentService>) -> Self {
+        self.promo_bundle_component_service = Some(service);
+        self
+    }
+
     /// Build the AppState.
     ///
     /// # Panics
@@ -135,6 +161,8 @@ impl AppStateBuilder {
             loyalty_program_service: self.loyalty_program_service.expect("loyalty_program_service is required"),
             loyalty_point_entry_service: self.loyalty_point_entry_service.expect("loyalty_point_entry_service is required"),
             pricing_rule_service: self.pricing_rule_service.expect("pricing_rule_service is required"),
+            promo_bundle_service: self.promo_bundle_service.expect("promo_bundle_service is required"),
+            promo_bundle_component_service: self.promo_bundle_component_service.expect("promo_bundle_component_service is required"),
         }
     }
 }

@@ -10,6 +10,8 @@ pub mod coupon_redemption_dto;
 pub mod loyalty_program_dto;
 pub mod loyalty_point_entry_dto;
 pub mod pricing_rule_dto;
+pub mod promo_bundle_dto;
+pub mod promo_bundle_component_dto;
 
 // Re-exports
 pub use coupon_code_dto::{
@@ -51,6 +53,22 @@ pub use pricing_rule_dto::{
     PricingRuleResponseDto,
     PricingRuleListResponseDto,
     PricingRuleSummaryDto,
+};
+pub use promo_bundle_dto::{
+    CreatePromoBundleDto,
+    UpdatePromoBundleDto,
+    PatchPromoBundleDto,
+    PromoBundleResponseDto,
+    PromoBundleListResponseDto,
+    PromoBundleSummaryDto,
+};
+pub use promo_bundle_component_dto::{
+    CreatePromoBundleComponentDto,
+    UpdatePromoBundleComponentDto,
+    PatchPromoBundleComponentDto,
+    PromoBundleComponentResponseDto,
+    PromoBundleComponentListResponseDto,
+    PromoBundleComponentSummaryDto,
 };
 
 // Common pagination types

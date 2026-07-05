@@ -9,6 +9,8 @@ mod coupon_redemption_repository;
 mod loyalty_program_repository;
 mod loyalty_point_entry_repository;
 mod pricing_rule_repository;
+mod promo_bundle_repository;
+mod promo_bundle_component_repository;
 
 // Custom persistence modules
 // <<< CUSTOM
@@ -20,6 +22,8 @@ pub use coupon_redemption_repository::CouponRedemptionRepository;
 pub use loyalty_program_repository::LoyaltyProgramRepository;
 pub use loyalty_point_entry_repository::LoyaltyPointEntryRepository;
 pub use pricing_rule_repository::PricingRuleRepository;
+pub use promo_bundle_repository::PromoBundleRepository;
+pub use promo_bundle_component_repository::PromoBundleComponentRepository;
 
 // Re-export backbone-orm types
 pub use backbone_orm::repository::{

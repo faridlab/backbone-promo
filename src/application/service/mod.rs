@@ -12,11 +12,15 @@ pub mod coupon_redemption_service;
 pub mod loyalty_program_service;
 pub mod loyalty_point_entry_service;
 pub mod pricing_rule_service;
-
 // <<< CUSTOM
 pub mod promo_events;
 pub mod promo_ports;
 pub mod promo_write_service;
+// END CUSTOM
+pub mod promo_bundle_service;
+pub mod promo_bundle_component_service;
+
+// <<< CUSTOM
 // END CUSTOM
 
 pub use coupon_code_service::CouponCodeService;
@@ -35,4 +39,8 @@ pub use promo_ports::{
 pub use promo_write_service::{
     AccrualOutcome, PromoPriceResolver, PromoWriteService, RedemptionOutcome,
 };
+// END CUSTOM
+pub use promo_bundle_service::PromoBundleService;
+pub use promo_bundle_component_service::PromoBundleComponentService;
+// <<< CUSTOM
 // END CUSTOM

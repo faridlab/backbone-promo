@@ -11,6 +11,8 @@ pub mod coupon_redemption_repository;
 pub mod loyalty_program_repository;
 pub mod loyalty_point_entry_repository;
 pub mod pricing_rule_repository;
+pub mod promo_bundle_repository;
+pub mod promo_bundle_component_repository;
 
 // Re-exports
 pub use coupon_code_repository::{
@@ -42,4 +44,16 @@ pub use pricing_rule_repository::{
     PricingRulePaginationParams,
     PricingRulePaginatedResult,
     PricingRuleFilter,
+};
+pub use promo_bundle_repository::{
+    PromoBundleRepository,
+    PromoBundlePaginationParams,
+    PromoBundlePaginatedResult,
+    PromoBundleFilter,
+};
+pub use promo_bundle_component_repository::{
+    PromoBundleComponentRepository,
+    PromoBundleComponentPaginationParams,
+    PromoBundleComponentPaginatedResult,
+    PromoBundleComponentFilter,
 };

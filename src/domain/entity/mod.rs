@@ -7,10 +7,14 @@ pub mod coupon_redemption;
 pub mod loyalty_program;
 pub mod loyalty_point_entry;
 pub mod pricing_rule;
+pub mod promo_bundle;
+pub mod promo_bundle_component;
 pub mod loyalty_program_type;
 pub mod loyalty_entry_type;
+pub mod rule_scope;
 pub mod apply_on;
 pub mod rate_or_discount;
+pub mod bundle_match;
 
 // Re-exports
 pub use coupon_code::CouponCode;
@@ -28,10 +32,18 @@ pub use loyalty_point_entry::LoyaltyPointEntryId;
 pub use pricing_rule::PricingRule;
 pub use pricing_rule::PricingRuleBuilder;
 pub use pricing_rule::PricingRuleId;
+pub use promo_bundle::PromoBundle;
+pub use promo_bundle::PromoBundleBuilder;
+pub use promo_bundle::PromoBundleId;
+pub use promo_bundle_component::PromoBundleComponent;
+pub use promo_bundle_component::PromoBundleComponentBuilder;
+pub use promo_bundle_component::PromoBundleComponentId;
 pub use loyalty_program_type::LoyaltyProgramType;
 pub use loyalty_entry_type::LoyaltyEntryType;
+pub use rule_scope::RuleScope;
 pub use apply_on::ApplyOn;
 pub use rate_or_discount::RateOrDiscount;
+pub use bundle_match::BundleMatch;
 
 // ==========================================================================
 // Entity Trait

@@ -9,6 +9,8 @@ use crate::domain::event::CouponRedemptionEvent;
 use crate::domain::event::LoyaltyProgramEvent;
 use crate::domain::event::LoyaltyPointEntryEvent;
 use crate::domain::event::PricingRuleEvent;
+use crate::domain::event::PromoBundleEvent;
+use crate::domain::event::PromoBundleComponentEvent;
 
 /// Subscriber for CouponCode events.
 ///
@@ -34,6 +36,16 @@ pub type LoyaltyPointEntryEventSubscriber = GenericEventSubscriber<LoyaltyPointE
 ///
 /// Register handlers via `GenericEventSubscriber::new(topics, handlers)`.
 pub type PricingRuleEventSubscriber = GenericEventSubscriber<PricingRuleEvent>;
+
+/// Subscriber for PromoBundle events.
+///
+/// Register handlers via `GenericEventSubscriber::new(topics, handlers)`.
+pub type PromoBundleEventSubscriber = GenericEventSubscriber<PromoBundleEvent>;
+
+/// Subscriber for PromoBundleComponent events.
+///
+/// Register handlers via `GenericEventSubscriber::new(topics, handlers)`.
+pub type PromoBundleComponentEventSubscriber = GenericEventSubscriber<PromoBundleComponentEvent>;
 
 // <<< CUSTOM
 // END CUSTOM

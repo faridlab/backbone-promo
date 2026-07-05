@@ -7,12 +7,16 @@ pub mod coupon_redemption_auth;
 pub mod loyalty_program_auth;
 pub mod loyalty_point_entry_auth;
 pub mod pricing_rule_auth;
+pub mod promo_bundle_auth;
+pub mod promo_bundle_component_auth;
 
 pub use coupon_code_auth::{CouponCodePolicy, CouponCodeGuard, CouponCodeServiceGuard};
 pub use coupon_redemption_auth::{CouponRedemptionPolicy, CouponRedemptionGuard, CouponRedemptionServiceGuard};
 pub use loyalty_program_auth::{LoyaltyProgramPolicy, LoyaltyProgramGuard, LoyaltyProgramServiceGuard};
 pub use loyalty_point_entry_auth::{LoyaltyPointEntryPolicy, LoyaltyPointEntryGuard, LoyaltyPointEntryServiceGuard};
 pub use pricing_rule_auth::{PricingRulePolicy, PricingRuleGuard, PricingRuleServiceGuard};
+pub use promo_bundle_auth::{PromoBundlePolicy, PromoBundleGuard, PromoBundleServiceGuard};
+pub use promo_bundle_component_auth::{PromoBundleComponentPolicy, PromoBundleComponentGuard, PromoBundleComponentServiceGuard};
 
 // <<< CUSTOM
 // END CUSTOM

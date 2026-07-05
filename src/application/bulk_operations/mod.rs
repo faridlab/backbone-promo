@@ -10,12 +10,16 @@ pub mod coupon_redemption_bulk;
 pub mod loyalty_program_bulk;
 pub mod loyalty_point_entry_bulk;
 pub mod pricing_rule_bulk;
+pub mod promo_bundle_bulk;
+pub mod promo_bundle_component_bulk;
 
 pub use coupon_code_bulk::CouponCodeBulkService;
 pub use coupon_redemption_bulk::CouponRedemptionBulkService;
 pub use loyalty_program_bulk::LoyaltyProgramBulkService;
 pub use loyalty_point_entry_bulk::LoyaltyPointEntryBulkService;
 pub use pricing_rule_bulk::PricingRuleBulkService;
+pub use promo_bundle_bulk::PromoBundleBulkService;
+pub use promo_bundle_component_bulk::PromoBundleComponentBulkService;
 
 // <<< CUSTOM
 // END CUSTOM

@@ -12,6 +12,10 @@ pub mod loyalty_point_entry_events;
 pub mod loyalty_point_entry_event_handlers;
 pub mod pricing_rule_events;
 pub mod pricing_rule_event_handlers;
+pub mod promo_bundle_events;
+pub mod promo_bundle_event_handlers;
+pub mod promo_bundle_component_events;
+pub mod promo_bundle_component_event_handlers;
 
 pub use coupon_code_events::{CouponCodeEvent, CouponCodeEventPublisher, NoopCouponCodeEventPublisher};
 pub use coupon_code_event_handlers::CouponCodeEventHandler;
@@ -23,6 +27,10 @@ pub use loyalty_point_entry_events::{LoyaltyPointEntryEvent, LoyaltyPointEntryEv
 pub use loyalty_point_entry_event_handlers::LoyaltyPointEntryEventHandler;
 pub use pricing_rule_events::{PricingRuleEvent, PricingRuleEventPublisher, NoopPricingRuleEventPublisher};
 pub use pricing_rule_event_handlers::PricingRuleEventHandler;
+pub use promo_bundle_events::{PromoBundleEvent, PromoBundleEventPublisher, NoopPromoBundleEventPublisher};
+pub use promo_bundle_event_handlers::PromoBundleEventHandler;
+pub use promo_bundle_component_events::{PromoBundleComponentEvent, PromoBundleComponentEventPublisher, NoopPromoBundleComponentEventPublisher};
+pub use promo_bundle_component_event_handlers::PromoBundleComponentEventHandler;
 
 // <<< CUSTOM
 // END CUSTOM

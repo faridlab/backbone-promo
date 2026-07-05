@@ -146,6 +146,60 @@ pub struct PricingRuleDeletedEvent {
 }
 
 // ============================================================================
+// PROMOBUNDLE EVENTS
+// ============================================================================
+
+/// Event published when a PromoBundle is created
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleCreatedEvent {
+    pub id: PromoBundleId,
+    pub data: PromoBundleDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a PromoBundle is updated
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleUpdatedEvent {
+    pub id: PromoBundleId,
+    pub data: PromoBundleDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a PromoBundle is deleted
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleDeletedEvent {
+    pub id: PromoBundleId,
+    pub occurred_at: DateTime<Utc>,
+}
+
+// ============================================================================
+// PROMOBUNDLECOMPONENT EVENTS
+// ============================================================================
+
+/// Event published when a PromoBundleComponent is created
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleComponentCreatedEvent {
+    pub id: PromoBundleComponentId,
+    pub data: PromoBundleComponentDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a PromoBundleComponent is updated
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleComponentUpdatedEvent {
+    pub id: PromoBundleComponentId,
+    pub data: PromoBundleComponentDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a PromoBundleComponent is deleted
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleComponentDeletedEvent {
+    pub id: PromoBundleComponentId,
+    pub occurred_at: DateTime<Utc>,
+}
+
+// ============================================================================
 // MODULE EVENT ENUM
 // ============================================================================
 
@@ -168,6 +222,12 @@ pub enum PromoEvent {
     PricingRuleCreated(PricingRuleCreatedEvent),
     PricingRuleUpdated(PricingRuleUpdatedEvent),
     PricingRuleDeleted(PricingRuleDeletedEvent),
+    PromoBundleCreated(PromoBundleCreatedEvent),
+    PromoBundleUpdated(PromoBundleUpdatedEvent),
+    PromoBundleDeleted(PromoBundleDeletedEvent),
+    PromoBundleComponentCreated(PromoBundleComponentCreatedEvent),
+    PromoBundleComponentUpdated(PromoBundleComponentUpdatedEvent),
+    PromoBundleComponentDeleted(PromoBundleComponentDeletedEvent),
 }
 
 /// Metadata for module events

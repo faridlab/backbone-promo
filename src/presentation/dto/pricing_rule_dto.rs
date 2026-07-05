@@ -21,6 +21,7 @@ use crate::domain::entity::PricingRule;
 use crate::domain::entity::AuditMetadata;
 use crate::domain::entity::ApplyOn;
 use crate::domain::entity::RateOrDiscount;
+use crate::domain::entity::RuleScope;
 
 // =============================================================================
 // Create DTO
@@ -43,6 +44,11 @@ pub struct CreatePricingRuleDto {
     pub title: String,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
     pub priority: i32,
+    pub scope: RuleScope,
+    #[serde(alias = "min_order_amount")]
+    pub min_order_amount: Decimal,
+    #[cfg_attr(feature = "openapi", schema(example = true))]
+    pub stackable: bool,
     #[serde(alias = "apply_on")]
     pub apply_on: ApplyOn,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "item_id")]
@@ -105,6 +111,11 @@ pub struct UpdatePricingRuleDto {
     pub title: String,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
     pub priority: i32,
+    pub scope: RuleScope,
+    #[serde(alias = "min_order_amount")]
+    pub min_order_amount: Decimal,
+    #[cfg_attr(feature = "openapi", schema(example = true))]
+    pub stackable: bool,
     #[serde(alias = "apply_on")]
     pub apply_on: ApplyOn,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "item_id")]
@@ -169,6 +180,13 @@ pub struct PatchPricingRuleDto {
     #[cfg_attr(feature = "openapi", schema(example = 42))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<RuleScope>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "min_order_amount")]
+    pub min_order_amount: Option<Decimal>,
+    #[cfg_attr(feature = "openapi", schema(example = true))]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stackable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "apply_on")]
     pub apply_on: Option<ApplyOn>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "item_id")]
@@ -214,7 +232,7 @@ pub struct PatchPricingRuleDto {
 impl PatchPricingRuleDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.scope.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.is_active.is_some()
     }
 }
 
@@ -238,6 +256,10 @@ pub struct PricingRuleResponseDto {
     pub title: String,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
     pub priority: i32,
+    pub scope: RuleScope,
+    pub min_order_amount: Decimal,
+    #[cfg_attr(feature = "openapi", schema(example = true))]
+    pub stackable: bool,
     pub apply_on: ApplyOn,
     pub item_id: Option<Uuid>,
     pub item_group_id: Option<Uuid>,
@@ -334,6 +356,9 @@ impl From<PricingRule> for PricingRuleResponseDto {
             company_id: entity.company_id,
             title: entity.title,
             priority: entity.priority,
+            scope: entity.scope,
+            min_order_amount: entity.min_order_amount,
+            stackable: entity.stackable,
             apply_on: entity.apply_on,
             item_id: entity.item_id,
             item_group_id: entity.item_group_id,
@@ -377,6 +402,9 @@ impl From<CreatePricingRuleDto> for PricingRule {
             company_id: dto.company_id,
             title: dto.title,
             priority: dto.priority,
+            scope: dto.scope,
+            min_order_amount: dto.min_order_amount,
+            stackable: dto.stackable,
             apply_on: dto.apply_on,
             item_id: dto.item_id,
             item_group_id: dto.item_group_id,
@@ -407,6 +435,9 @@ impl From<&PricingRule> for PricingRuleResponseDto {
             company_id: entity.company_id.clone(),
             title: entity.title.clone(),
             priority: entity.priority.clone(),
+            scope: entity.scope.clone(),
+            min_order_amount: entity.min_order_amount.clone(),
+            stackable: entity.stackable.clone(),
             apply_on: entity.apply_on.clone(),
             item_id: entity.item_id.clone(),
             item_group_id: entity.item_group_id.clone(),
@@ -441,6 +472,9 @@ impl backbone_core::ApplyUpdateDto<UpdatePricingRuleDto> for PricingRule {
         self.company_id = dto.company_id;
         self.title = dto.title;
         self.priority = dto.priority;
+        self.scope = dto.scope;
+        self.min_order_amount = dto.min_order_amount;
+        self.stackable = dto.stackable;
         self.apply_on = dto.apply_on;
         self.item_id = dto.item_id;
         self.item_group_id = dto.item_group_id;

@@ -68,6 +68,24 @@ pub trait PromoQueryService: Send + Sync {
     /// Check if PricingRule exists
     async fn pricing_rule_exists(&self, id: PricingRuleId) -> Result<bool>;
 
+    /// Get PromoBundle by ID
+    async fn get_promo_bundle(&self, id: PromoBundleId) -> Result<Option<PromoBundleDto>>;
+
+    /// Get PromoBundle summary by ID
+    async fn get_promo_bundle_summary(&self, id: PromoBundleId) -> Result<Option<PromoBundleSummary>>;
+
+    /// Check if PromoBundle exists
+    async fn promo_bundle_exists(&self, id: PromoBundleId) -> Result<bool>;
+
+    /// Get PromoBundleComponent by ID
+    async fn get_promo_bundle_component(&self, id: PromoBundleComponentId) -> Result<Option<PromoBundleComponentDto>>;
+
+    /// Get PromoBundleComponent summary by ID
+    async fn get_promo_bundle_component_summary(&self, id: PromoBundleComponentId) -> Result<Option<PromoBundleComponentSummary>>;
+
+    /// Check if PromoBundleComponent exists
+    async fn promo_bundle_component_exists(&self, id: PromoBundleComponentId) -> Result<bool>;
+
 }
 
 // ============================================================================

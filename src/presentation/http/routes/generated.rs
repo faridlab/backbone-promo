@@ -14,6 +14,8 @@ use super::{
     loyalty_program_handler::create_loyalty_program_routes,
     loyalty_point_entry_handler::create_loyalty_point_entry_routes,
     pricing_rule_handler::create_pricing_rule_routes,
+    promo_bundle_handler::create_promo_bundle_routes,
+    promo_bundle_component_handler::create_promo_bundle_component_routes,
 };
 
 use crate::application::service::{
@@ -22,6 +24,8 @@ use crate::application::service::{
     LoyaltyProgramService,
     LoyaltyPointEntryService,
     PricingRuleService,
+    PromoBundleService,
+    PromoBundleComponentService,
 };
 
 /// Services collection for all CRUD endpoints
@@ -31,6 +35,8 @@ pub struct HttpServices {
     pub loyalty_program: Arc<LoyaltyProgramService>,
     pub loyalty_point_entry: Arc<LoyaltyPointEntryService>,
     pub pricing_rule: Arc<PricingRuleService>,
+    pub promo_bundle: Arc<PromoBundleService>,
+    pub promo_bundle_component: Arc<PromoBundleComponentService>,
 }
 
 /// Configure all HTTP routes for this module using Axum and BackboneCrudHandler.
@@ -60,6 +66,10 @@ pub fn configure_routes(services: HttpServices) -> Router {
         .merge(create_loyalty_point_entry_routes(services.loyalty_point_entry))
         // PricingRule routes (12 Backbone endpoints)
         .merge(create_pricing_rule_routes(services.pricing_rule))
+        // PromoBundle routes (12 Backbone endpoints)
+        .merge(create_promo_bundle_routes(services.promo_bundle))
+        // PromoBundleComponent routes (12 Backbone endpoints)
+        .merge(create_promo_bundle_component_routes(services.promo_bundle_component))
 }
 
 /// Create an individual entity's routes (for modular configuration)
@@ -84,6 +94,14 @@ pub mod individual {
 
     pub fn pricing_rule_routes(service: Arc<PricingRuleService>) -> Router {
         create_pricing_rule_routes(service)
+    }
+
+    pub fn promo_bundle_routes(service: Arc<PromoBundleService>) -> Router {
+        create_promo_bundle_routes(service)
+    }
+
+    pub fn promo_bundle_component_routes(service: Arc<PromoBundleComponentService>) -> Router {
+        create_promo_bundle_component_routes(service)
     }
 
 }

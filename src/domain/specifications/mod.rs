@@ -11,6 +11,8 @@ pub mod coupon_redemption_specification;
 pub mod loyalty_program_specification;
 pub mod loyalty_point_entry_specification;
 pub mod pricing_rule_specification;
+pub mod promo_bundle_specification;
+pub mod promo_bundle_component_specification;
 
 // <<< CUSTOM
 // END CUSTOM

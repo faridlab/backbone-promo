@@ -16,3 +16,5 @@ pub use handlers::CouponRedemptionEventSubscriber;
 pub use handlers::LoyaltyProgramEventSubscriber;
 pub use handlers::LoyaltyPointEntryEventSubscriber;
 pub use handlers::PricingRuleEventSubscriber;
+pub use handlers::PromoBundleEventSubscriber;
+pub use handlers::PromoBundleComponentEventSubscriber;

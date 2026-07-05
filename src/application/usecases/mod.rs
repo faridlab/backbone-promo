@@ -12,6 +12,8 @@ pub mod coupon_redemption_usecases;
 pub mod loyalty_program_usecases;
 pub mod loyalty_point_entry_usecases;
 pub mod pricing_rule_usecases;
+pub mod promo_bundle_usecases;
+pub mod promo_bundle_component_usecases;
 
 pub use coupon_code_usecases::{
     CreateCouponCodeUseCase, UpdateCouponCodeUseCase, GetCouponCodeUseCase,
@@ -32,6 +34,14 @@ pub use loyalty_point_entry_usecases::{
 pub use pricing_rule_usecases::{
     CreatePricingRuleUseCase, UpdatePricingRuleUseCase, GetPricingRuleUseCase,
     DeletePricingRuleUseCase, ListPricingRuleUseCase,
+};
+pub use promo_bundle_usecases::{
+    CreatePromoBundleUseCase, UpdatePromoBundleUseCase, GetPromoBundleUseCase,
+    DeletePromoBundleUseCase, ListPromoBundleUseCase,
+};
+pub use promo_bundle_component_usecases::{
+    CreatePromoBundleComponentUseCase, UpdatePromoBundleComponentUseCase, GetPromoBundleComponentUseCase,
+    DeletePromoBundleComponentUseCase, ListPromoBundleComponentUseCase,
 };
 
 // <<< CUSTOM

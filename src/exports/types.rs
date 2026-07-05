@@ -299,6 +299,9 @@ pub struct PricingRuleDto {
     pub company_id: Uuid,
     pub title: String,
     pub priority: i32,
+    pub scope: RuleScope,
+    pub min_order_amount: Decimal,
+    pub stackable: bool,
     pub apply_on: ApplyOn,
     pub item_id: Option<Uuid>,
     pub item_group_id: Option<Uuid>,
@@ -331,6 +334,134 @@ pub struct PricingRuleSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PricingRuleRef {
     pub id: PricingRuleId,
+}
+
+// ============================================================================
+// PROMOBUNDLE TYPES
+// ============================================================================
+
+/// Type-safe ID for PromoBundle
+///
+/// Use this instead of raw Uuid for type safety across modules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PromoBundleId(pub Uuid);
+
+impl PromoBundleId {
+    pub fn new(id: Uuid) -> Self {
+        Self(id)
+    }
+
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl From<Uuid> for PromoBundleId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<PromoBundleId> for Uuid {
+    fn from(id: PromoBundleId) -> Self {
+        id.0
+    }
+}
+
+/// Data transfer object for PromoBundle
+///
+/// This is the public representation of PromoBundle for other modules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleDto {
+    pub id: PromoBundleId,
+    pub company_id: Uuid,
+    pub title: String,
+    pub priority: i32,
+    pub match_type: BundleMatch,
+    pub required_distinct: Option<i32>,
+    pub reward: RateOrDiscount,
+    pub discount_percentage: Option<Decimal>,
+    pub discount_amount: Option<Decimal>,
+    pub currency: String,
+    pub min_order_amount: Decimal,
+    pub stackable: bool,
+    pub valid_from: DateTime<Utc>,
+    pub valid_to: Option<DateTime<Utc>>,
+    pub is_active: bool,
+    pub metadata: serde_json::Value,
+}
+
+/// Summary view of PromoBundle for list displays
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleSummary {
+    pub id: PromoBundleId,
+    pub title: String,
+}
+
+/// Reference to PromoBundle for foreign key relationships
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleRef {
+    pub id: PromoBundleId,
+}
+
+// ============================================================================
+// PROMOBUNDLECOMPONENT TYPES
+// ============================================================================
+
+/// Type-safe ID for PromoBundleComponent
+///
+/// Use this instead of raw Uuid for type safety across modules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PromoBundleComponentId(pub Uuid);
+
+impl PromoBundleComponentId {
+    pub fn new(id: Uuid) -> Self {
+        Self(id)
+    }
+
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl From<Uuid> for PromoBundleComponentId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<PromoBundleComponentId> for Uuid {
+    fn from(id: PromoBundleComponentId) -> Self {
+        id.0
+    }
+}
+
+/// Data transfer object for PromoBundleComponent
+///
+/// This is the public representation of PromoBundleComponent for other modules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleComponentDto {
+    pub id: PromoBundleComponentId,
+    pub company_id: Uuid,
+    pub bundle_id: Uuid,
+    pub apply_on: ApplyOn,
+    pub item_id: Option<Uuid>,
+    pub item_group_id: Option<Uuid>,
+    pub brand_id: Option<Uuid>,
+    pub min_qty: Decimal,
+    pub metadata: serde_json::Value,
+}
+
+/// Summary view of PromoBundleComponent for list displays
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleComponentSummary {
+    pub id: PromoBundleComponentId,
+}
+
+/// Reference to PromoBundleComponent for foreign key relationships
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleComponentRef {
+    pub id: PromoBundleComponentId,
 }
 
 // ============================================================================

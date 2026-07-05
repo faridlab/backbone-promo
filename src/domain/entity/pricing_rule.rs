@@ -4,6 +4,7 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use rust_decimal::Decimal;
 
+use super::RuleScope;
 use super::ApplyOn;
 use super::RateOrDiscount;
 use super::AuditMetadata;
@@ -55,6 +56,9 @@ pub struct PricingRule {
     pub company_id: Uuid,
     pub title: String,
     pub priority: i32,
+    pub scope: RuleScope,
+    pub min_order_amount: Decimal,
+    pub stackable: bool,
     pub apply_on: ApplyOn,
     pub item_id: Option<Uuid>,
     pub item_group_id: Option<Uuid>,
@@ -85,12 +89,15 @@ impl PricingRule {
     }
 
     /// Create a new PricingRule with required fields
-    pub fn new(company_id: Uuid, title: String, priority: i32, apply_on: ApplyOn, min_qty: Decimal, min_amount: Decimal, rate_or_discount: RateOrDiscount, currency: String, valid_from: DateTime<Utc>, coupon_required: bool, is_active: bool) -> Self {
+    pub fn new(company_id: Uuid, title: String, priority: i32, scope: RuleScope, min_order_amount: Decimal, stackable: bool, apply_on: ApplyOn, min_qty: Decimal, min_amount: Decimal, rate_or_discount: RateOrDiscount, currency: String, valid_from: DateTime<Utc>, coupon_required: bool, is_active: bool) -> Self {
         Self {
             id: Uuid::new_v4(),
             company_id,
             title,
             priority,
+            scope,
+            min_order_amount,
+            stackable,
             apply_on,
             item_id: None,
             item_group_id: None,
@@ -245,6 +252,15 @@ impl PricingRule {
                 "priority" => {
                     if let Ok(v) = serde_json::from_value(value) { self.priority = v; }
                 }
+                "scope" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.scope = v; }
+                }
+                "min_order_amount" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.min_order_amount = v; }
+                }
+                "stackable" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.stackable = v; }
+                }
                 "apply_on" => {
                     if let Ok(v) = serde_json::from_value(value) { self.apply_on = v; }
                 }
@@ -359,6 +375,7 @@ impl backbone_orm::EntityRepoMeta for PricingRule {
         m.insert("brand_id".to_string(), "uuid".to_string());
         m.insert("customer_id".to_string(), "uuid".to_string());
         m.insert("customer_group_id".to_string(), "uuid".to_string());
+        m.insert("scope".to_string(), "rule_scope".to_string());
         m.insert("apply_on".to_string(), "apply_on".to_string());
         m.insert("rate_or_discount".to_string(), "rate_or_discount".to_string());
         m
@@ -377,6 +394,9 @@ pub struct PricingRuleBuilder {
     company_id: Option<Uuid>,
     title: Option<String>,
     priority: Option<i32>,
+    scope: Option<RuleScope>,
+    min_order_amount: Option<Decimal>,
+    stackable: Option<bool>,
     apply_on: Option<ApplyOn>,
     item_id: Option<Uuid>,
     item_group_id: Option<Uuid>,
@@ -413,6 +433,24 @@ impl PricingRuleBuilder {
     /// Set the priority field (default: `0`)
     pub fn priority(mut self, value: i32) -> Self {
         self.priority = Some(value);
+        self
+    }
+
+    /// Set the scope field (default: `RuleScope::default()`)
+    pub fn scope(mut self, value: RuleScope) -> Self {
+        self.scope = Some(value);
+        self
+    }
+
+    /// Set the min_order_amount field (default: `Decimal::from(0)`)
+    pub fn min_order_amount(mut self, value: Decimal) -> Self {
+        self.min_order_amount = Some(value);
+        self
+    }
+
+    /// Set the stackable field (default: `false`)
+    pub fn stackable(mut self, value: bool) -> Self {
+        self.stackable = Some(value);
         self
     }
 
@@ -537,6 +575,9 @@ impl PricingRuleBuilder {
             company_id,
             title,
             priority: self.priority.unwrap_or(0),
+            scope: self.scope.unwrap_or(RuleScope::default()),
+            min_order_amount: self.min_order_amount.unwrap_or(Decimal::from(0)),
+            stackable: self.stackable.unwrap_or(false),
             apply_on: self.apply_on.unwrap_or(ApplyOn::default()),
             item_id: self.item_id,
             item_group_id: self.item_group_id,
