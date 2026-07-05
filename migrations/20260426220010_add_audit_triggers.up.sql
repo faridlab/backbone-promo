@@ -143,3 +143,57 @@ DROP TRIGGER IF EXISTS pricing_rules_update_audit ON promo.pricing_rules;
 CREATE TRIGGER pricing_rules_update_audit BEFORE UPDATE ON promo.pricing_rules
     FOR EACH ROW EXECUTE FUNCTION promo.pricing_rules_audit_timestamp();
 
+-- ==============================================================================
+-- Table: PromoBundle (promo.promo_bundles)
+-- ==============================================================================
+
+-- Function to set metadata timestamps
+CREATE OR REPLACE FUNCTION promo.promo_bundles_audit_timestamp() RETURNS trigger AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        NEW.metadata = jsonb_set(NEW.metadata::jsonb, '{created_at}', to_jsonb(NOW()));
+        NEW.metadata = jsonb_set(NEW.metadata::jsonb, '{updated_at}', to_jsonb(NOW()));
+    ELSIF TG_OP = 'UPDATE' THEN
+        NEW.metadata = jsonb_set(NEW.metadata::jsonb, '{updated_at}', to_jsonb(NOW()));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to set timestamps on INSERT
+DROP TRIGGER IF EXISTS promo_bundles_insert_audit ON promo.promo_bundles;
+CREATE TRIGGER promo_bundles_insert_audit BEFORE INSERT ON promo.promo_bundles
+    FOR EACH ROW EXECUTE FUNCTION promo.promo_bundles_audit_timestamp();
+
+-- Trigger to set updated_at on UPDATE
+DROP TRIGGER IF EXISTS promo_bundles_update_audit ON promo.promo_bundles;
+CREATE TRIGGER promo_bundles_update_audit BEFORE UPDATE ON promo.promo_bundles
+    FOR EACH ROW EXECUTE FUNCTION promo.promo_bundles_audit_timestamp();
+
+-- ==============================================================================
+-- Table: PromoBundleComponent (promo.promo_bundle_components)
+-- ==============================================================================
+
+-- Function to set metadata timestamps
+CREATE OR REPLACE FUNCTION promo.promo_bundle_components_audit_timestamp() RETURNS trigger AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        NEW.metadata = jsonb_set(NEW.metadata::jsonb, '{created_at}', to_jsonb(NOW()));
+        NEW.metadata = jsonb_set(NEW.metadata::jsonb, '{updated_at}', to_jsonb(NOW()));
+    ELSIF TG_OP = 'UPDATE' THEN
+        NEW.metadata = jsonb_set(NEW.metadata::jsonb, '{updated_at}', to_jsonb(NOW()));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to set timestamps on INSERT
+DROP TRIGGER IF EXISTS promo_bundle_components_insert_audit ON promo.promo_bundle_components;
+CREATE TRIGGER promo_bundle_components_insert_audit BEFORE INSERT ON promo.promo_bundle_components
+    FOR EACH ROW EXECUTE FUNCTION promo.promo_bundle_components_audit_timestamp();
+
+-- Trigger to set updated_at on UPDATE
+DROP TRIGGER IF EXISTS promo_bundle_components_update_audit ON promo.promo_bundle_components;
+CREATE TRIGGER promo_bundle_components_update_audit BEFORE UPDATE ON promo.promo_bundle_components
+    FOR EACH ROW EXECUTE FUNCTION promo.promo_bundle_components_audit_timestamp();
+

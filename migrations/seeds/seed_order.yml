@@ -14,3 +14,7 @@
 
 # Newly added seeds (preserve manual order above):
 - coupon_redemption_seed
+
+# Newly added seeds (preserve manual order above):
+- promo_bundle_seed
+- promo_bundle_component_seed

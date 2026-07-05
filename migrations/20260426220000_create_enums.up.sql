@@ -19,6 +19,15 @@ BEGIN
 END
 $$;
 
+-- Create rule_scope enum type
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rule_scope') THEN
+        CREATE TYPE rule_scope AS ENUM ('line', 'order');
+    END IF;
+END
+$$;
+
 -- Create apply_on enum type
 DO $$
 BEGIN
@@ -33,6 +42,15 @@ DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rate_or_discount') THEN
         CREATE TYPE rate_or_discount AS ENUM ('rate', 'discount_percentage', 'discount_amount');
+    END IF;
+END
+$$;
+
+-- Create bundle_match enum type
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'bundle_match') THEN
+        CREATE TYPE bundle_match AS ENUM ('all_of', 'any_n');
     END IF;
 END
 $$;
