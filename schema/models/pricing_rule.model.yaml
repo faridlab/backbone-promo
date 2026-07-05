@@ -1,0 +1,152 @@
+# =============================================================================
+# Domain: Promo
+# Entity: PricingRule
+# Description: The unit the price resolver evaluates. A rule targets a selector
+# (item / item_group / brand / all) under optional customer + quantity + amount +
+# date conditions, and carries ONE effect: a rate override, a discount percentage,
+# or a fixed discount amount. `resolve` picks the highest-priority applicable rule
+# (most-specific wins on ties). Region-neutral: no tax here (billing/tax's job).
+# Posts NO GL — a rule only shapes the price selling/POS charge.
+# =============================================================================
+
+models:
+  - name: PricingRule
+    collection: pricing_rules
+    description: "A conditional price/discount rule the resolver evaluates"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique rule id"
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Books owner # logical FK to organization.Company.id"
+      title:
+        type: string
+        attributes: ["@required", "@max(140)"]
+        description: "Human name for the rule"
+      priority:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Higher wins when multiple rules apply (ties broken by specificity)"
+
+      # --- Selector: what the rule applies to ---
+      apply_on:
+        type: ApplyOn
+        attributes: ["@required", "@default(item)"]
+        description: "Which dimension the rule targets"
+      item_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Target item when apply_on=item # logical FK to catalog.Product.id"
+      item_group_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Target group when apply_on=item_group # logical FK to catalog.ItemGroup.id"
+      brand_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Target brand when apply_on=brand # logical FK to catalog.Brand.id"
+
+      # --- Conditions (all optional; null = don't constrain) ---
+      customer_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Restrict to one customer # logical FK to party.Party.id"
+      customer_group_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Restrict to a customer group # logical FK to party.PartyGroup.id"
+      min_qty:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,4)", "@non_negative"]
+        description: "Minimum line quantity for the rule to apply"
+      max_qty:
+        type: decimal?
+        attributes: ["@precision(18,4)", "@non_negative"]
+        description: "Maximum line quantity (null = no ceiling)"
+      min_amount:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Minimum line gross (qty·list) for the rule to apply"
+
+      # --- Effect: exactly one of rate / discount_percentage / discount_amount ---
+      rate_or_discount:
+        type: RateOrDiscount
+        attributes: ["@required", "@default(discount_percentage)"]
+        description: "Which effect this rule carries"
+      rate:
+        type: decimal?
+        attributes: ["@precision(18,2)", "@non_negative"]
+        description: "Absolute unit price override (rate_or_discount=rate)"
+      discount_percentage:
+        type: decimal?
+        attributes: ["@precision(9,4)", "@non_negative"]
+        description: "Percent off list, 0..100 (rate_or_discount=discount_percentage)"
+      discount_amount:
+        type: decimal?
+        attributes: ["@precision(18,2)", "@non_negative"]
+        description: "Fixed amount off per unit (rate_or_discount=discount_amount)"
+      currency:
+        type: string
+        attributes: ["@default('IDR')", "@length(3)"]
+        description: "Currency code"
+
+      # --- Validity + coupon gate ---
+      valid_from:
+        type: datetime
+        attributes: ["@required"]
+        description: "Rule effective from"
+      valid_to:
+        type: datetime?
+        description: "Rule effective until (null = open-ended)"
+      coupon_required:
+        type: bool
+        attributes: ["@default(false)"]
+        description: "If true the rule applies only when a valid coupon for it is presented"
+      is_active:
+        type: bool
+        attributes: ["@default(true)"]
+        description: "Rule is enabled"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      - type: index
+        fields: [company_id, is_active, apply_on]
+      - type: index
+        fields: [company_id, item_id, is_active]
+      - type: index
+        fields: [company_id, priority]
+      - type: index
+        fields: [valid_from, valid_to]
+
+enums:
+  - name: ApplyOn
+    description: "Which dimension a pricing rule selects"
+    variants:
+      - name: item
+        description: "A specific item"
+        default: true
+      - name: item_group
+        description: "An item group / category"
+      - name: brand
+        description: "A brand"
+      - name: all
+        description: "Every line (company-wide, e.g. a storewide discount)"
+
+  - name: RateOrDiscount
+    description: "The single effect a pricing rule carries"
+    variants:
+      - name: rate
+        description: "Override the unit price to an absolute rate"
+      - name: discount_percentage
+        description: "Percent off the list price"
+        default: true
+      - name: discount_amount
+        description: "Fixed amount off per unit"

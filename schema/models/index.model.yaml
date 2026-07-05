@@ -1,17 +1,23 @@
 # =============================================================================
-# Promo Module - Schema Index
+# promo Module - Schema Index
 # =============================================================================
 # Version: 2.0
-# Description: Advertisements, promo campaigns, banners (extracted from bersihir)
+# Description: Pricing & promotions. `module:` and `schema:` are stamped from the
+# module name. `schema:` gives this module its OWN Postgres schema (migrations
+# emit `CREATE SCHEMA promo` and qualify tables as `promo.<table>`) — the
+# convention every backbone module follows (see backbone-sapiens, backbone-pos).
+# Do not remove it.
 #
-# Run `backbone schema generate promo --target all` to generate code.
+# This module POSTS NO GL. It resolves effective prices (the input seam consumed
+# by selling + POS) and runs the loyalty points ledger (the inbound seam fed by
+# billing/POS paid events). Money is region-neutral IDR; tax is billing/tax's job.
 # =============================================================================
 
 module: promo
 version: 2
-description: "Advertisements, promo campaigns, banners (extracted from bersihir)"
+schema: promo
+description: "pricing rules, coupons, and loyalty — resolves prices, posts no GL"
 
-# Module-level configuration
 config:
   database: postgresql
   soft_delete: true
@@ -22,14 +28,13 @@ config:
       - graphql
       - grpc
       - proto
-      - openapi
 
-# External imports - reuse sapiens for user identity (same pattern as bersihir)
+# Reuse sapiens for user identity (actors) — logical refs, no DB constraint.
 external_imports:
   - module: sapiens
     types: [User]
 
-# Shared types available to all models in this module
+# Shared value-object types available to all models in this module.
 shared_types:
   Timestamps:
     created_at:
@@ -60,9 +65,9 @@ shared_types:
 
   Metadata: [Timestamps, Actors]
 
-# Import all model files
+# Import each entity model.
 imports:
-  - advertisement.model.yaml
-  - ad_performance.model.yaml
-  - promo_campaign.model.yaml
-  - promo.model.yaml
+  - pricing_rule.model.yaml
+  - coupon_code.model.yaml
+  - coupon_redemption.model.yaml
+  - loyalty_program.model.yaml

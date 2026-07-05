@@ -1,0 +1,70 @@
+# =============================================================================
+# Domain: Promo
+# Entity: CouponCode
+# Description: A redeemable code that unlocks a coupon-gated PricingRule. Bounded:
+# `max_use` caps total redemptions; `used_count` is advanced atomically on redeem
+# so a code can't be spent past its cap under concurrency. A coupon carries its
+# own validity window (independent of the rule's). Posts NO GL.
+# =============================================================================
+
+models:
+  - name: CouponCode
+    collection: coupon_codes
+    description: "A redeemable code that unlocks a coupon-gated pricing rule"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique coupon id"
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Books owner # logical FK to organization.Company.id"
+      code:
+        type: string
+        attributes: ["@required", "@max(40)", "@uppercase"]
+        description: "The code a customer enters (unique per company)"
+      pricing_rule_id:
+        type: uuid
+        attributes: ["@required", "@foreign_key(PricingRule.id)"]
+        description: "The rule this coupon unlocks"
+      description:
+        type: string?
+        attributes: ["@max(280)"]
+        description: "What the coupon is for"
+
+      max_use:
+        type: int?
+        attributes: ["@positive"]
+        description: "Total redemptions allowed (null = unlimited)"
+      used_count:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Redemptions consumed so far (advanced atomically at redeem)"
+
+      valid_from:
+        type: datetime
+        attributes: ["@required"]
+        description: "Coupon usable from"
+      valid_upto:
+        type: datetime?
+        description: "Coupon usable until (null = open-ended)"
+      is_active:
+        type: bool
+        attributes: ["@default(true)"]
+        description: "Coupon is enabled"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      - type: unique
+        fields: [company_id, code]
+        where: "deleted_at IS NULL"
+      - type: index
+        fields: [pricing_rule_id]
+      - type: index
+        fields: [company_id, is_active]

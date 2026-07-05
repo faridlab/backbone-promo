@@ -1,0 +1,58 @@
+# =============================================================================
+# Domain: Promo
+# Entity: CouponRedemption
+# Description: The per-source redemption ledger. A coupon's `used_count` is a bare
+# counter; this table records WHICH source document consumed each use, so a retry
+# of the same sale is idempotent (not a second burn). One row per
+# (company, coupon, source_type, source_id) — the same partial-unique idempotency
+# key the loyalty accrual leg uses. Consumed in one transaction with the counter
+# bump: insert the ledger row (ON CONFLICT DO NOTHING) then advance `used_count`.
+# =============================================================================
+
+models:
+  - name: CouponRedemption
+    collection: coupon_redemptions
+    description: "One coupon use tied to the source document that consumed it (idempotency ledger)"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique redemption id"
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Books owner # logical FK to organization.Company.id"
+      coupon_id:
+        type: uuid
+        attributes: ["@required", "@foreign_key(CouponCode.id)"]
+        description: "The coupon consumed"
+      pricing_rule_id:
+        type: uuid
+        attributes: ["@required", "@foreign_key(PricingRule.id)"]
+        description: "The rule the coupon unlocked (denormalized for the ack)"
+      source_type:
+        type: string
+        attributes: ["@required", "@max(40)"]
+        description: "Consuming document kind, e.g. sales_order / pos_invoice"
+      source_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Consuming document id # logical FK (source module owns it)"
+      redeemed_at:
+        type: datetime
+        attributes: ["@required", "@default(now)"]
+        description: "When the use was consumed"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      # Idempotency: one source document consumes a given coupon at most once.
+      - type: unique
+        fields: [company_id, coupon_id, source_type, source_id]
+        where: "deleted_at IS NULL"
+      - type: index
+        fields: [coupon_id]
