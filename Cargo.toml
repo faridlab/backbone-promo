@@ -76,3 +76,10 @@ pretty_assertions = "1.0"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 jsonwebtoken = "9.3"
 rand = "0.8"
+
+# TEST-ONLY edges: the price-resolution seam feeds promo's resolved price into the REAL
+# backbone-selling write path (a live Sales Order priced from it), and the loyalty seam consumes
+# backbone-pos's REAL `PosInvoicePaid` event to accrue points. Dev-dependencies ONLY — the shipped
+# promo library has ZERO normal edges (verify: `cargo tree -e normal -i backbone-selling` is empty).
+backbone-selling = { path = "../backbone-selling" }
+backbone-pos = { path = "../backbone-pos" }
