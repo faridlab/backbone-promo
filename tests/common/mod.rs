@@ -115,6 +115,109 @@ pub async fn rule(pool: &PgPool, s: RuleSpec) -> Uuid {
     .expect("insert rule")
 }
 
+/// An order-scoped rule: fires once against the cart subtotal (≥ `min_order_amount`).
+/// `rate_or_discount` is "discount_percentage" or "discount_amount".
+#[allow(clippy::too_many_arguments)]
+pub async fn order_rule(
+    pool: &PgPool,
+    company: Uuid,
+    priority: i32,
+    min_order_amount: &str,
+    rate_or_discount: &str,
+    discount_percentage: Option<Decimal>,
+    discount_amount: Option<Decimal>,
+    stackable: bool,
+    customer_group: Option<Uuid>,
+) -> Uuid {
+    sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO promo.pricing_rules
+            (company_id, title, priority, scope, min_order_amount, stackable, apply_on,
+             customer_group_id, rate_or_discount, discount_percentage, discount_amount,
+             coupon_required, valid_from, is_active)
+        VALUES ($1,'test-order',$2,'order'::rule_scope,$3,$4,'all'::apply_on,$5,
+                $6::rate_or_discount,$7,$8,false,$9,true)
+        RETURNING id
+        "#,
+    )
+    .bind(company)
+    .bind(priority)
+    .bind(dec(min_order_amount))
+    .bind(stackable)
+    .bind(customer_group)
+    .bind(rate_or_discount)
+    .bind(discount_percentage)
+    .bind(discount_amount)
+    .bind(now() - chrono::Duration::days(1))
+    .fetch_one(pool)
+    .await
+    .expect("insert order rule")
+}
+
+/// A bundle with a reward effect. Add components with `bundle_component`.
+#[allow(clippy::too_many_arguments)]
+pub async fn bundle(
+    pool: &PgPool,
+    company: Uuid,
+    priority: i32,
+    match_type: &str,
+    required_distinct: Option<i32>,
+    reward: &str,
+    discount_percentage: Option<Decimal>,
+    discount_amount: Option<Decimal>,
+    min_order_amount: &str,
+    stackable: bool,
+) -> Uuid {
+    sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO promo.promo_bundles
+            (company_id, title, priority, match_type, required_distinct, reward,
+             discount_percentage, discount_amount, min_order_amount, stackable,
+             valid_from, is_active)
+        VALUES ($1,'test-bundle',$2,$3::bundle_match,$4,$5::rate_or_discount,
+                $6,$7,$8,$9,$10,true)
+        RETURNING id
+        "#,
+    )
+    .bind(company)
+    .bind(priority)
+    .bind(match_type)
+    .bind(required_distinct)
+    .bind(reward)
+    .bind(discount_percentage)
+    .bind(discount_amount)
+    .bind(dec(min_order_amount))
+    .bind(stackable)
+    .bind(now() - chrono::Duration::days(1))
+    .fetch_one(pool)
+    .await
+    .expect("insert bundle")
+}
+
+/// One item-selector component of a bundle (apply_on=item), needing `min_qty` per set.
+pub async fn bundle_component(
+    pool: &PgPool,
+    company: Uuid,
+    bundle_id: Uuid,
+    item: Uuid,
+    min_qty: &str,
+) {
+    sqlx::query(
+        r#"
+        INSERT INTO promo.promo_bundle_components
+            (company_id, bundle_id, apply_on, item_id, min_qty)
+        VALUES ($1,$2,'item'::apply_on,$3,$4)
+        "#,
+    )
+    .bind(company)
+    .bind(bundle_id)
+    .bind(item)
+    .bind(dec(min_qty))
+    .execute(pool)
+    .await
+    .expect("insert bundle component");
+}
+
 /// A coupon unlocking a rule, with a redemption cap.
 pub async fn coupon(
     pool: &PgPool,

@@ -53,10 +53,97 @@ impl ResolvedPrice {
     }
 }
 
+// ---- Cart-scoped resolution (ADR-002) --------------------------------------------------------
+//
+// `resolve` prices ONE line in isolation, so it can express neither a promotion whose condition
+// spans distinct lines (bundling: "buy A + B") nor one gated on the whole basket (cart-total
+// minimum: "spend 500k → 10% off"). `resolve_cart` takes the whole basket and returns, per line,
+// the same per-line result `resolve` gives PLUS any order-level discounts (order-scoped rules and
+// bundles) allocated back across the contributing lines. It stays a pure read — coupons are still
+// burned only by `commit_coupon_redemption`.
+
+/// One line the caller wants priced as part of a basket. `query.coupon_code` / `query.customer_*`
+/// are read from the cart, not the line, so per-line coupon/customer here are ignored.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CartLine {
+    /// The caller's stable identifier for this line (echoed back in `ResolvedLine` and allocations).
+    pub line_id: Uuid,
+    /// The line's pricing dimensions — same shape a single-line `resolve` takes.
+    pub query: PriceQuery,
+}
+
+/// The whole basket to price in one call. Customer, coupon and instant are cart-wide.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CartQuery {
+    pub company_id: Uuid,
+    pub customer_id: Option<Uuid>,
+    pub customer_group_id: Option<Uuid>,
+    /// A coupon code the customer presented (unlocks `coupon_required` line rules). Case-insensitive.
+    pub coupon_code: Option<String>,
+    pub lines: Vec<CartLine>,
+    /// The instant to evaluate every validity window against (the sale's posting time).
+    pub at: chrono::DateTime<chrono::Utc>,
+}
+
+/// One line's resolved result inside a cart: its per-line price (as `resolve` would give) plus the
+/// share of every order-level adjustment allocated to it. `net_line_total` already reflects both.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ResolvedLine {
+    pub line_id: Uuid,
+    pub item_id: Uuid,
+    pub quantity: Decimal,
+    /// Effective unit price after per-line rules (before order-level allocation).
+    pub unit_price: Decimal,
+    /// Per-unit discount from the winning per-line rule (0 if none).
+    pub line_discount_amount: Decimal,
+    /// The per-line rule that won, if any.
+    pub applied_rule_id: Option<Uuid>,
+    /// This line's share of all order-level adjustments (order rules + bundles).
+    pub order_discount_share: Decimal,
+    /// `unit_price·quantity − order_discount_share` (never negative).
+    pub net_line_total: Decimal,
+}
+
+/// What produced an order-level discount.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum AdjustmentSource {
+    /// A `scope=order` PricingRule fired on the cart subtotal.
+    OrderRule(Uuid),
+    /// A PromoBundle was satisfied by the basket.
+    Bundle(Uuid),
+}
+
+/// One order-level discount and how it was spread across lines (`allocated` sums to `discount_amount`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrderAdjustment {
+    pub source: AdjustmentSource,
+    pub discount_amount: Decimal,
+    /// `(line_id, share)` pairs; Σ share == `discount_amount` exactly (penny-reconciled).
+    pub allocated: Vec<(Uuid, Decimal)>,
+}
+
+/// The resolved basket: per-line results, the order-level adjustments that fired, and the totals.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ResolvedCart {
+    pub lines: Vec<ResolvedLine>,
+    pub order_adjustments: Vec<OrderAdjustment>,
+    /// Σ line unit_price·qty (after per-line rules, before order-level discounts).
+    pub subtotal: Decimal,
+    /// Σ order_adjustments.discount_amount (never exceeds `subtotal`).
+    pub order_discount_total: Decimal,
+    /// `subtotal − order_discount_total`.
+    pub total: Decimal,
+}
+
 /// The port a selling/POS caller depends on. A composing service implements it over `PricingService`.
 #[async_trait::async_trait]
 pub trait PriceResolverPort: Send + Sync {
+    /// Price one line in isolation (unchanged; existing callers keep using this).
     async fn resolve(&self, query: &PriceQuery) -> Result<ResolvedPrice, PricingError>;
+
+    /// Price a whole basket: per-line rules, then order-scoped rules and bundles, with every
+    /// order-level discount allocated back across the lines.
+    async fn resolve_cart(&self, query: &CartQuery) -> Result<ResolvedCart, PricingError>;
 }
 
 /// A request to accrue loyalty points for a settled purchase (the earn leg).

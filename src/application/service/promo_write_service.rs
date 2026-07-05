@@ -19,7 +19,8 @@ use super::promo_events::{
     CouponRedeemed, LoyaltyPointsEarned, LoyaltyPointsRedeemed, PromoEvent, PromoEventSink,
 };
 use super::promo_ports::{
-    AccrualRequest, PriceQuery, PriceResolverPort, PricingError, RedemptionRequest, ResolvedPrice,
+    AccrualRequest, AdjustmentSource, CartQuery, OrderAdjustment, PriceQuery, PriceResolverPort,
+    PricingError, RedemptionRequest, ResolvedCart, ResolvedLine, ResolvedPrice,
 };
 
 /// Round to 2dp, half away from zero (IDR money).
@@ -59,6 +60,206 @@ impl Candidate {
         base + if self.customer_id.is_some() { 2 } else { 0 }
             + if self.customer_group_id.is_some() { 1 } else { 0 }
     }
+}
+
+/// A `scope=order` rule pulled for the cart's order pass.
+struct OrderRuleCand {
+    id: Uuid,
+    priority: i32,
+    customer_id: Option<Uuid>,
+    customer_group_id: Option<Uuid>,
+    coupon_required: bool,
+    rate_or_discount: String,
+    discount_percentage: Option<Decimal>,
+    discount_amount: Option<Decimal>,
+    stackable: bool,
+    valid_from: chrono::DateTime<chrono::Utc>,
+}
+
+impl OrderRuleCand {
+    /// A narrower audience wins a priority tie: +2 for a customer match, +1 for a group match.
+    fn specificity(&self) -> i32 {
+        (if self.customer_id.is_some() { 2 } else { 0 })
+            + (if self.customer_group_id.is_some() { 1 } else { 0 })
+    }
+
+    /// The discount this order rule takes off `base` (the remaining order value). `rate` is not
+    /// meaningful at order scope and yields no discount.
+    fn discount_on(&self, base: Decimal) -> Decimal {
+        let hundred = Decimal::from(100);
+        match self.rate_or_discount.as_str() {
+            "discount_percentage" => {
+                let pct = self.discount_percentage.unwrap_or(Decimal::ZERO).min(hundred);
+                money(base * pct / hundred)
+            }
+            "discount_amount" => money(self.discount_amount.unwrap_or(Decimal::ZERO)),
+            _ => Decimal::ZERO,
+        }
+    }
+}
+
+/// One component of a bundle: a selector + how much of it a single satisfied set needs.
+struct BundleComponentCand {
+    apply_on: String,
+    item_id: Option<Uuid>,
+    item_group_id: Option<Uuid>,
+    brand_id: Option<Uuid>,
+    min_qty: Decimal,
+}
+
+impl BundleComponentCand {
+    /// Does this resolved line satisfy this component's selector?
+    fn matches(&self, l: &ResolvedLine, cart_line: &super::promo_ports::CartLine) -> bool {
+        match self.apply_on.as_str() {
+            "item" => self.item_id == Some(l.item_id),
+            "item_group" => {
+                self.item_group_id.is_some() && self.item_group_id == cart_line.query.item_group_id
+            }
+            "brand" => self.brand_id.is_some() && self.brand_id == cart_line.query.brand_id,
+            _ => false,
+        }
+    }
+}
+
+/// A bundle pulled for the cart's bundle pass, with its components.
+struct BundleCand {
+    id: Uuid,
+    match_type: String,
+    required_distinct: Option<i32>,
+    reward: String,
+    discount_percentage: Option<Decimal>,
+    discount_amount: Option<Decimal>,
+    stackable: bool,
+    components: Vec<BundleComponentCand>,
+}
+
+impl BundleCand {
+    /// Number of satisfied "sets" of this component in the cart, and the line ids that matched it.
+    fn component_fill(
+        &self,
+        comp: &BundleComponentCand,
+        cart: &CartQuery,
+        lines: &[ResolvedLine],
+    ) -> (Decimal, Vec<Uuid>) {
+        let mut qty = Decimal::ZERO;
+        let mut ids = Vec::new();
+        for (rl, cl) in lines.iter().zip(cart.lines.iter()) {
+            if comp.matches(rl, cl) {
+                qty += rl.quantity;
+                ids.push(rl.line_id);
+            }
+        }
+        let sets = if comp.min_qty > Decimal::ZERO {
+            (qty / comp.min_qty).floor()
+        } else {
+            Decimal::ZERO
+        };
+        (sets, ids)
+    }
+
+    /// Compute the reward discount and the lines that contributed to satisfying the bundle.
+    /// Returns `(discount, contributing_line_ids)`; discount is 0 when the bundle isn't satisfied.
+    fn reward(&self, cart: &CartQuery, lines: &[ResolvedLine]) -> (Decimal, Vec<Uuid>) {
+        let mut satisfied = 0i32; // components with ≥1 set
+        let mut min_sets: Option<Decimal> = None; // min sets across satisfied components (all_of)
+        let mut contributing: Vec<Uuid> = Vec::new();
+        for comp in &self.components {
+            let (sets, ids) = self.component_fill(comp, cart, lines);
+            if sets >= Decimal::ONE {
+                satisfied += 1;
+                min_sets = Some(min_sets.map_or(sets, |m| m.min(sets)));
+                for id in ids {
+                    if !contributing.contains(&id) {
+                        contributing.push(id);
+                    }
+                }
+            }
+        }
+
+        let sets = match self.match_type.as_str() {
+            // any_n: any `required_distinct` (default: all) distinct components present → one set.
+            "any_n" => {
+                let need = self.required_distinct.unwrap_or(self.components.len() as i32).max(1);
+                if satisfied >= need { Decimal::ONE } else { Decimal::ZERO }
+            }
+            // all_of: every component must be present; sets = min fill across them.
+            _ => {
+                if satisfied == self.components.len() as i32 {
+                    min_sets.unwrap_or(Decimal::ZERO)
+                } else {
+                    Decimal::ZERO
+                }
+            }
+        };
+        if sets < Decimal::ONE {
+            return (Decimal::ZERO, Vec::new());
+        }
+
+        let matched_value: Decimal = money(
+            lines
+                .iter()
+                .filter(|l| contributing.contains(&l.line_id))
+                .map(|l| l.unit_price * l.quantity)
+                .sum(),
+        );
+        let hundred = Decimal::from(100);
+        let disc = match self.reward.as_str() {
+            "discount_percentage" => {
+                let pct = self.discount_percentage.unwrap_or(Decimal::ZERO).min(hundred);
+                money(matched_value * pct / hundred)
+            }
+            // Fixed amount off, once per satisfied set.
+            "discount_amount" => money(self.discount_amount.unwrap_or(Decimal::ZERO) * sets),
+            _ => Decimal::ZERO,
+        };
+        (disc.min(matched_value), contributing)
+    }
+}
+
+/// Allocate `total` across `line_ids` proportional to each line's gross (unit_price·qty), rounded to
+/// money, with the rounding remainder folded onto the largest-gross line so Σ shares == `total`.
+fn allocate(
+    total: Decimal,
+    line_ids: &[Uuid],
+    lines: &[ResolvedLine],
+) -> Vec<(Uuid, Decimal)> {
+    if total <= Decimal::ZERO || line_ids.is_empty() {
+        return Vec::new();
+    }
+    let weight = |id: &Uuid| -> Decimal {
+        lines
+            .iter()
+            .find(|l| l.line_id == *id)
+            .map(|l| l.unit_price * l.quantity)
+            .unwrap_or(Decimal::ZERO)
+    };
+    let weight_sum: Decimal = line_ids.iter().map(weight).sum();
+    if weight_sum <= Decimal::ZERO {
+        // Degenerate (all-free lines): split evenly.
+        let n = Decimal::from(line_ids.len() as i64);
+        let each = money(total / n);
+        let mut shares: Vec<(Uuid, Decimal)> = line_ids.iter().map(|id| (*id, each)).collect();
+        let drift = total - each * n;
+        if let Some(first) = shares.first_mut() {
+            first.1 = money(first.1 + drift);
+        }
+        return shares;
+    }
+    let mut shares: Vec<(Uuid, Decimal)> = Vec::with_capacity(line_ids.len());
+    let mut running = Decimal::ZERO;
+    for id in line_ids {
+        let share = money(total * weight(id) / weight_sum);
+        running += share;
+        shares.push((*id, share));
+    }
+    // Fold the rounding remainder onto the largest-gross line so the shares tie out EXACTLY.
+    let remainder = total - running;
+    if remainder != Decimal::ZERO {
+        if let Some(idx) = (0..shares.len()).max_by(|&a, &b| weight(&shares[a].0).cmp(&weight(&shares[b].0))) {
+            shares[idx].1 = money(shares[idx].1 + remainder);
+        }
+    }
+    shares
 }
 
 /// Outcome of a loyalty accrual.
@@ -114,6 +315,7 @@ impl PromoWriteService {
             FROM promo.pricing_rules
             WHERE company_id = $1
               AND is_active = true
+              AND scope = 'line'
               AND (metadata->>'deleted_at') IS NULL
               AND valid_from <= $2
               AND (valid_to IS NULL OR valid_to >= $2)
@@ -228,6 +430,271 @@ impl PromoWriteService {
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|r| (r.get("id"), r.get("pricing_rule_id"))))
+    }
+
+    // ---- 1b. resolve_cart (cart-scoped read, ADR-002) -----------------------------------------
+
+    /// Resolve a whole basket. Runs a fixed pipeline that preserves single-line determinism:
+    ///   1. **line pass** — today's `resolve` per line, unchanged, yielding the subtotal.
+    ///   2. **bundle pass** — each satisfiable `PromoBundle` (priority DESC) rewards its matched lines.
+    ///   3. **order pass** — each `scope=order` PricingRule (priority DESC) gated on the subtotal.
+    ///   4. **reconcile** — every order-level discount is allocated back across its contributing lines
+    ///      (∝ line net value, penny-reconciled so shares sum EXACTLY), total capped at the subtotal.
+    /// Side-effect-free, exactly like `resolve` (coupons are burned only by `commit_coupon_redemption`).
+    pub async fn resolve_cart(&self, cart: &CartQuery) -> Result<ResolvedCart, PricingError> {
+        // A coupon-gated order rule / (future) bundle unlocks only when the cart's coupon maps to it.
+        let unlocked_rule: Option<Uuid> = match &cart.coupon_code {
+            Some(code) => self
+                .lookup_valid_coupon(cart.company_id, code, cart.at)
+                .await?
+                .map(|(_, rule_id)| rule_id),
+            None => None,
+        };
+
+        // ---- 1. LINE PASS: price each line exactly as the single-line seam would. ----
+        let mut lines: Vec<ResolvedLine> = Vec::with_capacity(cart.lines.len());
+        for cl in &cart.lines {
+            // Cart-wide customer/coupon/instant win over anything on the line's own query.
+            let q = PriceQuery {
+                company_id: cart.company_id,
+                customer_id: cart.customer_id,
+                customer_group_id: cart.customer_group_id,
+                coupon_code: cart.coupon_code.clone(),
+                at: cart.at,
+                ..cl.query.clone()
+            };
+            let rp = self.resolve(&q).await?;
+            let gross = money(rp.unit_price * q.quantity);
+            lines.push(ResolvedLine {
+                line_id: cl.line_id,
+                item_id: q.item_id,
+                quantity: q.quantity,
+                unit_price: rp.unit_price,
+                line_discount_amount: rp.discount_amount,
+                applied_rule_id: rp.applied_rule_id,
+                order_discount_share: Decimal::ZERO,
+                net_line_total: gross,
+            });
+        }
+        let subtotal: Decimal = money(lines.iter().map(|l| l.unit_price * l.quantity).sum());
+
+        // `remaining` bounds the running order-level discount so Σ can never exceed the subtotal.
+        let mut remaining = subtotal;
+        // `locked` = an exclusive (non-stackable) adjustment has fired; nothing may stack on it.
+        let mut locked = false;
+        let mut adjustments: Vec<OrderAdjustment> = Vec::new();
+
+        // ---- 2. BUNDLE PASS ----
+        for bundle in self.load_active_bundles(cart, subtotal).await? {
+            if locked || remaining <= Decimal::ZERO {
+                break;
+            }
+            let (raw, contributing) = bundle.reward(cart, &lines);
+            let disc = money(raw.min(remaining));
+            if disc <= Decimal::ZERO {
+                continue;
+            }
+            // A non-stackable promotion is exclusive: it may fire only if nothing else has yet.
+            if !bundle.stackable && !adjustments.is_empty() {
+                continue;
+            }
+            let allocated = allocate(disc, &contributing, &lines);
+            adjustments.push(OrderAdjustment {
+                source: AdjustmentSource::Bundle(bundle.id),
+                discount_amount: disc,
+                allocated,
+            });
+            remaining -= disc;
+            if !bundle.stackable {
+                locked = true;
+            }
+        }
+
+        // ---- 3. ORDER PASS: scope=order rules gated on the subtotal. ----
+        if !locked {
+            let all_line_ids: Vec<Uuid> = lines.iter().map(|l| l.line_id).collect();
+            for rule in self.load_order_rules(cart, subtotal, unlocked_rule).await? {
+                if locked || remaining <= Decimal::ZERO {
+                    break;
+                }
+                let disc = money(rule.discount_on(remaining).min(remaining));
+                if disc <= Decimal::ZERO {
+                    continue;
+                }
+                if !rule.stackable && !adjustments.is_empty() {
+                    continue;
+                }
+                let allocated = allocate(disc, &all_line_ids, &lines);
+                adjustments.push(OrderAdjustment {
+                    source: AdjustmentSource::OrderRule(rule.id),
+                    discount_amount: disc,
+                    allocated,
+                });
+                remaining -= disc;
+                if !rule.stackable {
+                    locked = true;
+                }
+            }
+        }
+
+        // ---- 4. RECONCILE: fold each line's allocated shares into its net. ----
+        for adj in &adjustments {
+            for (line_id, share) in &adj.allocated {
+                if let Some(l) = lines.iter_mut().find(|l| l.line_id == *line_id) {
+                    l.order_discount_share += *share;
+                }
+            }
+        }
+        for l in &mut lines {
+            let gross = money(l.unit_price * l.quantity);
+            l.order_discount_share = money(l.order_discount_share);
+            l.net_line_total = (gross - l.order_discount_share).max(Decimal::ZERO);
+        }
+
+        let order_discount_total: Decimal =
+            money(adjustments.iter().map(|a| a.discount_amount).sum());
+        Ok(ResolvedCart {
+            lines,
+            order_adjustments: adjustments,
+            subtotal,
+            order_discount_total,
+            total: money(subtotal - order_discount_total),
+        })
+    }
+
+    /// Load active, in-window `scope=order` rules whose subtotal floor + audience + coupon gate all
+    /// pass, ordered priority DESC → specificity (customer > group) DESC → newest → id.
+    async fn load_order_rules(
+        &self,
+        cart: &CartQuery,
+        subtotal: Decimal,
+        unlocked_rule: Option<Uuid>,
+    ) -> Result<Vec<OrderRuleCand>, PricingError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, priority, customer_id, customer_group_id, coupon_required,
+                   rate_or_discount::text AS rate_or_discount,
+                   discount_percentage, discount_amount, stackable, valid_from
+            FROM promo.pricing_rules
+            WHERE company_id = $1
+              AND is_active = true
+              AND scope = 'order'
+              AND (metadata->>'deleted_at') IS NULL
+              AND valid_from <= $2
+              AND (valid_to IS NULL OR valid_to >= $2)
+              AND (customer_id IS NULL OR customer_id = $3)
+              AND (customer_group_id IS NULL OR customer_group_id = $4)
+              AND min_order_amount <= $5
+            "#,
+        )
+        .bind(cart.company_id)
+        .bind(cart.at)
+        .bind(cart.customer_id)
+        .bind(cart.customer_group_id)
+        .bind(subtotal)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut cands: Vec<OrderRuleCand> = rows
+            .into_iter()
+            .map(|r| OrderRuleCand {
+                id: r.get("id"),
+                priority: r.get("priority"),
+                customer_id: r.get("customer_id"),
+                customer_group_id: r.get("customer_group_id"),
+                coupon_required: r.get("coupon_required"),
+                rate_or_discount: r.get("rate_or_discount"),
+                discount_percentage: r.get("discount_percentage"),
+                discount_amount: r.get("discount_amount"),
+                stackable: r.get("stackable"),
+                valid_from: r.get("valid_from"),
+            })
+            .filter(|c| !c.coupon_required || unlocked_rule == Some(c.id))
+            .collect();
+        cands.sort_by(|a, b| {
+            b.priority
+                .cmp(&a.priority)
+                .then(b.specificity().cmp(&a.specificity()))
+                .then(b.valid_from.cmp(&a.valid_from))
+                .then(a.id.cmp(&b.id))
+        });
+        Ok(cands)
+    }
+
+    /// Load active, in-window bundles (with their components) whose subtotal floor passes, ordered
+    /// priority DESC → newest → id.
+    async fn load_active_bundles(
+        &self,
+        cart: &CartQuery,
+        subtotal: Decimal,
+    ) -> Result<Vec<BundleCand>, PricingError> {
+        let brows = sqlx::query(
+            r#"
+            SELECT id, priority, match_type::text AS match_type, required_distinct,
+                   reward::text AS reward, discount_percentage, discount_amount,
+                   stackable, valid_from
+            FROM promo.promo_bundles
+            WHERE company_id = $1
+              AND is_active = true
+              AND (metadata->>'deleted_at') IS NULL
+              AND valid_from <= $2
+              AND (valid_to IS NULL OR valid_to >= $2)
+              AND min_order_amount <= $3
+            ORDER BY priority DESC, valid_from DESC, id ASC
+            "#,
+        )
+        .bind(cart.company_id)
+        .bind(cart.at)
+        .bind(subtotal)
+        .fetch_all(&self.pool)
+        .await?;
+        if brows.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let bundle_ids: Vec<Uuid> = brows.iter().map(|r| r.get("id")).collect();
+        let crows = sqlx::query(
+            r#"
+            SELECT bundle_id, apply_on::text AS apply_on, item_id, item_group_id, brand_id, min_qty
+            FROM promo.promo_bundle_components
+            WHERE company_id = $1
+              AND bundle_id = ANY($2)
+              AND (metadata->>'deleted_at') IS NULL
+            "#,
+        )
+        .bind(cart.company_id)
+        .bind(&bundle_ids)
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut bundles: Vec<BundleCand> = brows
+            .into_iter()
+            .map(|r| BundleCand {
+                id: r.get("id"),
+                match_type: r.get("match_type"),
+                required_distinct: r.get("required_distinct"),
+                reward: r.get("reward"),
+                discount_percentage: r.get("discount_percentage"),
+                discount_amount: r.get("discount_amount"),
+                stackable: r.get("stackable"),
+                components: Vec::new(),
+            })
+            .collect();
+        for cr in crows {
+            let bid: Uuid = cr.get("bundle_id");
+            if let Some(b) = bundles.iter_mut().find(|b| b.id == bid) {
+                b.components.push(BundleComponentCand {
+                    apply_on: cr.get("apply_on"),
+                    item_id: cr.get("item_id"),
+                    item_group_id: cr.get("item_group_id"),
+                    brand_id: cr.get("brand_id"),
+                    min_qty: cr.get("min_qty"),
+                });
+            }
+        }
+        // A bundle with no components can never be satisfied — drop it.
+        bundles.retain(|b| !b.components.is_empty());
+        Ok(bundles)
     }
 
     // ---- 2. coupon redemption (bounded write) -------------------------------------------------
@@ -540,5 +1007,9 @@ pub struct PromoPriceResolver {
 impl PriceResolverPort for PromoPriceResolver {
     async fn resolve(&self, query: &PriceQuery) -> Result<ResolvedPrice, PricingError> {
         self.service.resolve(query).await
+    }
+
+    async fn resolve_cart(&self, query: &CartQuery) -> Result<ResolvedCart, PricingError> {
+        self.service.resolve_cart(query).await
     }
 }
