@@ -21,6 +21,10 @@ tags:
     description: LoyaltyPointEntry management endpoints
   - name: PricingRules
     description: PricingRule management endpoints
+  - name: PromoBundles
+    description: PromoBundle management endpoints
+  - name: PromoBundleComponents
+    description: PromoBundleComponent management endpoints
 
 paths:
   /api/v1/coupon_codes:
@@ -1853,6 +1857,738 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /api/v1/promo_bundles:
+    get:
+      tags:
+        - PromoBundles
+      summary: List PromoBundles
+      description: Get a paginated list of PromoBundles with optional filtering and sorting
+      operationId: listPromoBundles
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortOrderParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - PromoBundles
+      summary: Create PromoBundle
+      description: Create a new PromoBundle
+      operationId: createPromoBundle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePromoBundleRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/promo_bundles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+
+    get:
+      tags:
+        - PromoBundles
+      summary: Get PromoBundle by ID
+      operationId: getPromoBundle
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundle'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - PromoBundles
+      summary: Update PromoBundle (full)
+      operationId: updatePromoBundle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromoBundleRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundle'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - PromoBundles
+      summary: Update PromoBundle (partial)
+      operationId: patchPromoBundle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPromoBundleRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundle'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - PromoBundles
+      summary: Delete PromoBundle (soft)
+      operationId: deletePromoBundle
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/promo_bundles/bulk:
+    post:
+      tags:
+        - PromoBundles
+      summary: Bulk create PromoBundles
+      operationId: bulkCreatePromoBundles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CreatePromoBundleRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromoBundle'
+    put:
+      tags:
+        - PromoBundles
+      summary: Bulk update PromoBundles (full, atomic)
+      operationId: bulkUpdatePromoBundles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                allOf:
+                  - type: object
+                    required: [id]
+                    properties:
+                      id:
+                        type: string
+                  - $ref: '#/components/schemas/UpdatePromoBundleRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    patch:
+      tags:
+        - PromoBundles
+      summary: Bulk partial-update PromoBundles (atomic)
+      operationId: bulkPatchPromoBundles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [ids, patch]
+                  properties:
+                    ids:
+                      type: array
+                      items: { type: string }
+                    patch:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [items]
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, patch]
+                        properties:
+                          id: { type: string }
+                          patch: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundles/upsert:
+    post:
+      tags:
+        - PromoBundles
+      summary: Upsert PromoBundle
+      operationId: upsertPromoBundle
+      parameters:
+        - name: key_field
+          in: query
+          schema:
+            type: string
+        - name: key_value
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromoBundleRequest'
+      responses:
+        '200':
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundle'
+
+  /api/v1/promo_bundles/trash:
+    get:
+      tags:
+        - PromoBundles
+      summary: List deleted PromoBundles
+      operationId: listDeletedPromoBundles
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleList'
+
+  /api/v1/promo_bundles/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      tags:
+        - PromoBundles
+      summary: Restore deleted PromoBundle
+      operationId: restorePromoBundle
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundle'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/promo_bundles/empty:
+    delete:
+      tags:
+        - PromoBundles
+      summary: Empty trash for PromoBundles
+      operationId: emptyTrashPromoBundles
+      responses:
+        '200':
+          description: Trash emptied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_count:
+                    type: integer
+
+  /api/v1/promo_bundles/delete/bulk:
+    post:
+      tags:
+        - PromoBundles
+      summary: Bulk soft-delete PromoBundles by ids (atomic)
+      operationId: bulkDeletePromoBundles
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  soft_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundles/restore/bulk:
+    post:
+      tags:
+        - PromoBundles
+      summary: Bulk restore PromoBundles by ids (atomic)
+      operationId: bulkRestorePromoBundles
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundles/restore/all:
+    post:
+      tags:
+        - PromoBundles
+      summary: Restore all soft-deleted PromoBundles
+      operationId: restoreAllPromoBundles
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: integer }
+
+  /api/v1/promo_bundles/trash/bulk:
+    delete:
+      tags:
+        - PromoBundles
+      summary: Bulk permanently-delete PromoBundles from trash by ids (atomic)
+      operationId: bulkPermanentDeletePromoBundles
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Permanently deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permanently_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundle_components:
+    get:
+      tags:
+        - PromoBundleComponents
+      summary: List PromoBundleComponents
+      description: Get a paginated list of PromoBundleComponents with optional filtering and sorting
+      operationId: listPromoBundleComponents
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortOrderParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - PromoBundleComponents
+      summary: Create PromoBundleComponent
+      description: Create a new PromoBundleComponent
+      operationId: createPromoBundleComponent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePromoBundleComponentRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/promo_bundle_components/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+
+    get:
+      tags:
+        - PromoBundleComponents
+      summary: Get PromoBundleComponent by ID
+      operationId: getPromoBundleComponent
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - PromoBundleComponents
+      summary: Update PromoBundleComponent (full)
+      operationId: updatePromoBundleComponent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromoBundleComponentRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - PromoBundleComponents
+      summary: Update PromoBundleComponent (partial)
+      operationId: patchPromoBundleComponent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPromoBundleComponentRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - PromoBundleComponents
+      summary: Delete PromoBundleComponent (soft)
+      operationId: deletePromoBundleComponent
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/promo_bundle_components/bulk:
+    post:
+      tags:
+        - PromoBundleComponents
+      summary: Bulk create PromoBundleComponents
+      operationId: bulkCreatePromoBundleComponents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CreatePromoBundleComponentRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromoBundleComponent'
+    put:
+      tags:
+        - PromoBundleComponents
+      summary: Bulk update PromoBundleComponents (full, atomic)
+      operationId: bulkUpdatePromoBundleComponents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                allOf:
+                  - type: object
+                    required: [id]
+                    properties:
+                      id:
+                        type: string
+                  - $ref: '#/components/schemas/UpdatePromoBundleComponentRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponentBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    patch:
+      tags:
+        - PromoBundleComponents
+      summary: Bulk partial-update PromoBundleComponents (atomic)
+      operationId: bulkPatchPromoBundleComponents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [ids, patch]
+                  properties:
+                    ids:
+                      type: array
+                      items: { type: string }
+                    patch:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [items]
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, patch]
+                        properties:
+                          id: { type: string }
+                          patch: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponentBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundle_components/upsert:
+    post:
+      tags:
+        - PromoBundleComponents
+      summary: Upsert PromoBundleComponent
+      operationId: upsertPromoBundleComponent
+      parameters:
+        - name: key_field
+          in: query
+          schema:
+            type: string
+        - name: key_value
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromoBundleComponentRequest'
+      responses:
+        '200':
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponent'
+
+  /api/v1/promo_bundle_components/trash:
+    get:
+      tags:
+        - PromoBundleComponents
+      summary: List deleted PromoBundleComponents
+      operationId: listDeletedPromoBundleComponents
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponentList'
+
+  /api/v1/promo_bundle_components/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      tags:
+        - PromoBundleComponents
+      summary: Restore deleted PromoBundleComponent
+      operationId: restorePromoBundleComponent
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/promo_bundle_components/empty:
+    delete:
+      tags:
+        - PromoBundleComponents
+      summary: Empty trash for PromoBundleComponents
+      operationId: emptyTrashPromoBundleComponents
+      responses:
+        '200':
+          description: Trash emptied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_count:
+                    type: integer
+
+  /api/v1/promo_bundle_components/delete/bulk:
+    post:
+      tags:
+        - PromoBundleComponents
+      summary: Bulk soft-delete PromoBundleComponents by ids (atomic)
+      operationId: bulkDeletePromoBundleComponents
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  soft_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundle_components/restore/bulk:
+    post:
+      tags:
+        - PromoBundleComponents
+      summary: Bulk restore PromoBundleComponents by ids (atomic)
+      operationId: bulkRestorePromoBundleComponents
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleComponentBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundle_components/restore/all:
+    post:
+      tags:
+        - PromoBundleComponents
+      summary: Restore all soft-deleted PromoBundleComponents
+      operationId: restoreAllPromoBundleComponents
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: integer }
+
+  /api/v1/promo_bundle_components/trash/bulk:
+    delete:
+      tags:
+        - PromoBundleComponents
+      summary: Bulk permanently-delete PromoBundleComponents from trash by ids (atomic)
+      operationId: bulkPermanentDeletePromoBundleComponents
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Permanently deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permanently_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
 components:
   schemas:
     CouponCode:
@@ -2574,6 +3310,9 @@ components:
         - company_id
         - title
         - priority
+        - scope
+        - min_order_amount
+        - stackable
         - apply_on
         - min_qty
         - min_amount
@@ -2596,6 +3335,12 @@ components:
         priority:
           type: integer
           format: int32
+        scope:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
         apply_on:
           type: string
         item_id:
@@ -2671,6 +3416,9 @@ components:
         - company_id
         - title
         - priority
+        - scope
+        - min_order_amount
+        - stackable
         - apply_on
         - min_qty
         - min_amount
@@ -2690,6 +3438,12 @@ components:
         priority:
           type: integer
           format: int32
+        scope:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
         apply_on:
           type: string
         item_id:
@@ -2752,6 +3506,9 @@ components:
         - company_id
         - title
         - priority
+        - scope
+        - min_order_amount
+        - stackable
         - apply_on
         - min_qty
         - min_amount
@@ -2771,6 +3528,12 @@ components:
         priority:
           type: integer
           format: int32
+        scope:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
         apply_on:
           type: string
         item_id:
@@ -2839,6 +3602,12 @@ components:
         priority:
           type: integer
           format: int32
+        scope:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
         apply_on:
           type: string
         item_id:
@@ -2902,6 +3671,402 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PricingRule'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PromoBundle:
+      type: object
+      required:
+        - id
+        - company_id
+        - title
+        - priority
+        - match_type
+        - reward
+        - currency
+        - min_order_amount
+        - stackable
+        - valid_from
+        - is_active
+        - metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 140
+        priority:
+          type: integer
+          format: int32
+        match_type:
+          type: string
+        required_distinct:
+          nullable: true
+          type: integer
+          format: int32
+        reward:
+          type: string
+        discount_percentage:
+          nullable: true
+          type: string
+        discount_amount:
+          nullable: true
+          type: string
+        currency:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
+        valid_from:
+          type: string
+          format: date-time
+        valid_to:
+          nullable: true
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        metadata:
+          type: object
+
+    PromoBundleBulkResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromoBundle'
+        total: { type: integer }
+        failed: { type: integer }
+        errors:
+          type: array
+          items: { type: string }
+
+    CreatePromoBundleRequest:
+      type: object
+      required:
+        - company_id
+        - title
+        - priority
+        - match_type
+        - reward
+        - currency
+        - min_order_amount
+        - stackable
+        - valid_from
+        - is_active
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 140
+        priority:
+          type: integer
+          format: int32
+        match_type:
+          type: string
+        required_distinct:
+          nullable: true
+          type: integer
+          format: int32
+        reward:
+          type: string
+        discount_percentage:
+          nullable: true
+          type: string
+        discount_amount:
+          nullable: true
+          type: string
+        currency:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
+        valid_from:
+          type: string
+          format: date-time
+        valid_to:
+          nullable: true
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        metadata:
+          type: object
+
+    UpdatePromoBundleRequest:
+      type: object
+      required:
+        - company_id
+        - title
+        - priority
+        - match_type
+        - reward
+        - currency
+        - min_order_amount
+        - stackable
+        - valid_from
+        - is_active
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 140
+        priority:
+          type: integer
+          format: int32
+        match_type:
+          type: string
+        required_distinct:
+          nullable: true
+          type: integer
+          format: int32
+        reward:
+          type: string
+        discount_percentage:
+          nullable: true
+          type: string
+        discount_amount:
+          nullable: true
+          type: string
+        currency:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
+        valid_from:
+          type: string
+          format: date-time
+        valid_to:
+          nullable: true
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        metadata:
+          type: object
+
+    PatchPromoBundleRequest:
+      type: object
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 140
+        priority:
+          type: integer
+          format: int32
+        match_type:
+          type: string
+        required_distinct:
+          nullable: true
+          type: integer
+          format: int32
+        reward:
+          type: string
+        discount_percentage:
+          nullable: true
+          type: string
+        discount_amount:
+          nullable: true
+          type: string
+        currency:
+          type: string
+        min_order_amount:
+          type: string
+        stackable:
+          type: boolean
+        valid_from:
+          type: string
+          format: date-time
+        valid_to:
+          nullable: true
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        metadata:
+          type: object
+
+    PromoBundleList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromoBundle'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PromoBundleComponent:
+      type: object
+      required:
+        - id
+        - company_id
+        - bundle_id
+        - apply_on
+        - min_qty
+        - metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        apply_on:
+          type: string
+        item_id:
+          nullable: true
+          type: string
+          format: uuid
+        item_group_id:
+          nullable: true
+          type: string
+          format: uuid
+        brand_id:
+          nullable: true
+          type: string
+          format: uuid
+        min_qty:
+          type: string
+        metadata:
+          type: object
+
+    PromoBundleComponentBulkResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromoBundleComponent'
+        total: { type: integer }
+        failed: { type: integer }
+        errors:
+          type: array
+          items: { type: string }
+
+    CreatePromoBundleComponentRequest:
+      type: object
+      required:
+        - company_id
+        - bundle_id
+        - apply_on
+        - min_qty
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        apply_on:
+          type: string
+        item_id:
+          nullable: true
+          type: string
+          format: uuid
+        item_group_id:
+          nullable: true
+          type: string
+          format: uuid
+        brand_id:
+          nullable: true
+          type: string
+          format: uuid
+        min_qty:
+          type: string
+        metadata:
+          type: object
+
+    UpdatePromoBundleComponentRequest:
+      type: object
+      required:
+        - company_id
+        - bundle_id
+        - apply_on
+        - min_qty
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        apply_on:
+          type: string
+        item_id:
+          nullable: true
+          type: string
+          format: uuid
+        item_group_id:
+          nullable: true
+          type: string
+          format: uuid
+        brand_id:
+          nullable: true
+          type: string
+          format: uuid
+        min_qty:
+          type: string
+        metadata:
+          type: object
+
+    PatchPromoBundleComponentRequest:
+      type: object
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        apply_on:
+          type: string
+        item_id:
+          nullable: true
+          type: string
+          format: uuid
+        item_group_id:
+          nullable: true
+          type: string
+          format: uuid
+        brand_id:
+          nullable: true
+          type: string
+          format: uuid
+        min_qty:
+          type: string
+        metadata:
+          type: object
+
+    PromoBundleComponentList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromoBundleComponent'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 
