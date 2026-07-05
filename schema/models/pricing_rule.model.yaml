@@ -32,6 +32,20 @@ models:
         attributes: ["@default(0)", "@non_negative"]
         description: "Higher wins when multiple rules apply (ties broken by specificity)"
 
+      # --- Scope: does the rule match one line, or the whole cart? ---
+      scope:
+        type: RuleScope
+        attributes: ["@required", "@default(line)"]
+        description: "line = matched per line (today's behavior); order = evaluated once against the cart subtotal, producing an order-level discount allocated back over the lines"
+      min_order_amount:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Cart subtotal floor for a scope=order rule to fire (ignored when scope=line)"
+      stackable:
+        type: bool
+        attributes: ["@default(false)"]
+        description: "May a scope=order rule combine with other order-level discounts, or is it exclusive within the order pass?"
+
       # --- Selector: what the rule applies to ---
       apply_on:
         type: ApplyOn
@@ -127,6 +141,15 @@ models:
         fields: [valid_from, valid_to]
 
 enums:
+  - name: RuleScope
+    description: "Whether a pricing rule is matched per line or once against the whole cart"
+    variants:
+      - name: line
+        description: "Matched per line; the effect changes that line's unit price (unchanged behavior)"
+        default: true
+      - name: order
+        description: "Evaluated once against the cart subtotal; the effect is an order-level discount allocated back over the lines"
+
   - name: ApplyOn
     description: "Which dimension a pricing rule selects"
     variants:

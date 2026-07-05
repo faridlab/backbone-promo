@@ -68,6 +68,7 @@ shared_types:
 # Import each entity model.
 imports:
   - pricing_rule.model.yaml
+  - promo_bundle.model.yaml
   - coupon_code.model.yaml
   - coupon_redemption.model.yaml
   - loyalty_program.model.yaml

@@ -1,0 +1,158 @@
+# =============================================================================
+# Domain: Promo
+# Entities: PromoBundle + PromoBundleComponent
+# Description: A cart-scoped promotion whose condition spans DISTINCT lines — the
+# "buy A + B, get a discount" shape a per-line PricingRule cannot express. A bundle
+# is a SET of required components (each a reusable ApplyOn selector with a per-set
+# min_qty); when the cart satisfies the set it carries ONE reward effect (percent /
+# fixed amount off the matched lines' value). The resolver evaluates bundles in the
+# cart pass and allocates the reward back over the contributing lines. Region-neutral,
+# posts NO GL — like PricingRule it only shapes the price selling/POS charge.
+# Coupon-gating a bundle is deferred (see ADR-002); v1 bundles fire on cart contents.
+# =============================================================================
+
+models:
+  - name: PromoBundle
+    collection: promo_bundles
+    description: "A cart-scoped 'buy these together, get a discount' promotion"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique bundle id"
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Books owner # logical FK to organization.Company.id"
+      title:
+        type: string
+        attributes: ["@required", "@max(140)"]
+        description: "Human name for the bundle"
+      priority:
+        type: int
+        attributes: ["@default(0)", "@non_negative"]
+        description: "Higher wins first in the bundle pass (ties broken by newest)"
+
+      # --- Match semantics: how many of the components must be present ---
+      match_type:
+        type: BundleMatch
+        attributes: ["@required", "@default(all_of)"]
+        description: "all_of = every component required; any_n = any `required_distinct` of them"
+      required_distinct:
+        type: int?
+        attributes: ["@positive"]
+        description: "For match_type=any_n: how many distinct components must be present"
+
+      # --- Reward: exactly one of discount_percentage / discount_amount ---
+      reward:
+        type: RateOrDiscount
+        attributes: ["@required", "@default(discount_percentage)"]
+        description: "Which effect the bundle reward carries (rate is not meaningful for a set)"
+      discount_percentage:
+        type: decimal?
+        attributes: ["@precision(9,4)", "@non_negative"]
+        description: "Percent off the matched components' value, 0..100 (reward=discount_percentage)"
+      discount_amount:
+        type: decimal?
+        attributes: ["@precision(18,2)", "@non_negative"]
+        description: "Fixed amount off per satisfied set (reward=discount_amount)"
+      currency:
+        type: string
+        attributes: ["@default('IDR')", "@length(3)"]
+        description: "Currency code"
+
+      # --- Extra gate + validity ---
+      min_order_amount:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Optional cart-subtotal floor before the bundle fires"
+      stackable:
+        type: bool
+        attributes: ["@default(false)"]
+        description: "May the bundle combine with order-level rules / other bundles, or is it exclusive?"
+      valid_from:
+        type: datetime
+        attributes: ["@required"]
+        description: "Bundle effective from"
+      valid_to:
+        type: datetime?
+        description: "Bundle effective until (null = open-ended)"
+      is_active:
+        type: bool
+        attributes: ["@default(true)"]
+        description: "Bundle is enabled"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      - type: index
+        fields: [company_id, is_active]
+      - type: index
+        fields: [company_id, priority]
+      - type: index
+        fields: [valid_from, valid_to]
+
+  - name: PromoBundleComponent
+    collection: promo_bundle_components
+    description: "One required member of a bundle: an ApplyOn selector with a per-set quantity"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique component id"
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Books owner # logical FK to organization.Company.id"
+      bundle_id:
+        type: uuid
+        attributes: ["@required", "@foreign_key(PromoBundle.id)"]
+        description: "The bundle this component belongs to"
+
+      # --- Selector: what line satisfies this component (mirrors PricingRule) ---
+      apply_on:
+        type: ApplyOn
+        attributes: ["@required", "@default(item)"]
+        description: "Which dimension this component matches a line on"
+      item_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Target item when apply_on=item # logical FK to catalog.Product.id"
+      item_group_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Target group when apply_on=item_group # logical FK to catalog.ItemGroup.id"
+      brand_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Target brand when apply_on=brand # logical FK to catalog.Brand.id"
+      min_qty:
+        type: decimal
+        attributes: ["@default(1)", "@precision(18,4)", "@non_negative"]
+        description: "How much of this component is needed per satisfied bundle set"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      - type: index
+        fields: [bundle_id]
+      - type: index
+        fields: [company_id, bundle_id]
+
+enums:
+  - name: BundleMatch
+    description: "How many of a bundle's components must be present for it to fire"
+    variants:
+      - name: all_of
+        description: "Every component must be present (classic buy-A-and-B)"
+        default: true
+      - name: any_n
+        description: "Any `required_distinct` of the components must be present"
