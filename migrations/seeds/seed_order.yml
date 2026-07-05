@@ -7,7 +7,10 @@
 # Note: You can manually edit this file to customize the order.
 # Seeds not listed here will be executed after in alphabetical order.
 
-- ad_performance_seed
-- advertisement_seed
-- provider_promo_seed
-- promo_campaign_seed
+- coupon_code_seed
+- loyalty_program_seed
+- loyalty_point_entry_seed
+- pricing_rule_seed
+
+# Newly added seeds (preserve manual order above):
+- coupon_redemption_seed
