@@ -52,6 +52,11 @@ fn assert_shares_tie_out(cart_result: &backbone_promo::application::service::pro
     let line_sum: Decimal = cart_result.lines.iter().map(|l| l.order_discount_share).sum();
     assert_eq!(line_sum, cart_result.order_discount_total);
     assert_eq!(cart_result.total, cart_result.subtotal - cart_result.order_discount_total);
+    // CONSERVATION (council 2026-07-06): the per-line NETs selling/POS actually post must sum to the
+    // cart total. Capacity-aware allocation guarantees no line's share exceeds its gross, so nothing
+    // is lost to a clamp.
+    let net_sum: Decimal = cart_result.lines.iter().map(|l| l.net_line_total).sum();
+    assert_eq!(net_sum, cart_result.total, "Σ net_line_total must equal the cart total");
 }
 
 /// CART-1 — an order-total-minimum rule fires on the subtotal and is allocated ∝ line gross.
@@ -300,4 +305,83 @@ async fn cart10_order_rule_absent_from_single_line_resolve() {
     let r = svc.resolve(&q).await.unwrap();
     assert_eq!(r.unit_price, dec("100000")); // untouched by the order rule
     assert_eq!(r.applied_rule_id, None);
+}
+
+/// CART-15 (council 2026-07-06) — a 100%-off stackable bundle on ONE of two lines PLUS a stackable
+/// order rule. Before the capacity-aware allocation fix the order rule spread ∝ gross over both lines,
+/// over-allocating the bundle-zeroed line; reconcile clamped it and lost 25,000, so the per-line nets
+/// summed to 75,000 while the cart total was 50,000. Now allocation weights by REMAINING capacity, so
+/// the order discount lands entirely on the line that can hold it and Σ net == total.
+#[tokio::test]
+async fn cart15_bundle_plus_stackable_order_rule_conserves() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+
+    // 100%-off stackable bundle on item A alone.
+    let bid = bundle(&pool, company, 10, "all_of", None, "discount_percentage", Some(dec("100")), None, "0", true).await;
+    bundle_component(&pool, company, bid, a, "1").await;
+    // A stackable 50%-off order rule.
+    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("50")), None, true, None).await;
+
+    let line_a = line(company, a, "100000", "1");
+    let line_b = line(company, b, "100000", "1");
+    let (id_a, id_b) = (line_a.line_id, line_b.line_id);
+    let r = svc.resolve_cart(&cart(company, vec![line_a, line_b])).await.unwrap();
+
+    assert_eq!(r.subtotal, dec("200000.00"));
+    assert_eq!(r.order_discount_total, dec("150000.00")); // 100k bundle + 50k order rule
+    assert_eq!(r.total, dec("50000.00"));
+    let net = |id| r.lines.iter().find(|l| l.line_id == id).unwrap().net_line_total;
+    assert_eq!(net(id_a), dec("0.00"), "A: fully discounted by the bundle");
+    assert_eq!(net(id_b), dec("50000.00"), "B: absorbs the whole order-rule share");
+    assert_shares_tie_out(&r); // includes Σ net == total
+}
+
+/// Seed a buy-X-get-Y bundle: satisfying its components grants `reward_qty × sets` free `reward_item`.
+async fn free_bundle(
+    pool: &sqlx::PgPool,
+    company: Uuid,
+    reward_item: Uuid,
+    reward_qty: &str,
+) -> Uuid {
+    sqlx::query_scalar::<_, Uuid>(
+        r#"INSERT INTO promo.promo_bundles
+             (company_id, title, priority, match_type, reward, reward_item_id, reward_qty,
+              min_order_amount, stackable, valid_from, is_active)
+           VALUES ($1,'free-bundle',0,'all_of'::bundle_match,'discount_percentage'::rate_or_discount,
+                   $2,$3,'0',false,now() - interval '1 day', true)
+           RETURNING id"#,
+    )
+    .bind(company)
+    .bind(reward_item)
+    .bind(dec(reward_qty))
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// CART-16 (ADR-002 free-line, 2026-07-06) — buy A, get 1 free B: a satisfied buy-X-get-Y bundle emits
+/// a zero-priced reward line for the free item WITHOUT discounting the basket (the total is unchanged).
+#[tokio::test]
+async fn cart16_buy_x_get_y_free_line() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (item_a, free_b) = (Uuid::new_v4(), Uuid::new_v4());
+    let bid = free_bundle(&pool, company, free_b, "1").await;
+    bundle_component(&pool, company, bid, item_a, "1").await; // buy 1 A
+
+    let r = svc.resolve_cart(&cart(company, vec![line(company, item_a, "100000", "1")])).await.unwrap();
+
+    // A is charged in full; the bundle adds a free B, not a discount.
+    assert_eq!(r.subtotal, dec("100000.00"));
+    assert_eq!(r.order_discount_total, Decimal::ZERO);
+    assert_eq!(r.total, dec("100000.00"));
+    assert_eq!(r.reward_lines.len(), 1);
+    assert_eq!(r.reward_lines[0].item_id, free_b);
+    assert_eq!(r.reward_lines[0].quantity, dec("1.0000"));
+    assert_eq!(r.reward_lines[0].bundle_id, bid);
+    assert_shares_tie_out(&r); // conservation still holds (free line is separate)
 }

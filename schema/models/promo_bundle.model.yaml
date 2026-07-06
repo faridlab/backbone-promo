@@ -57,6 +57,17 @@ models:
         type: decimal?
         attributes: ["@precision(18,2)", "@non_negative"]
         description: "Fixed amount off per satisfied set (reward=discount_amount)"
+      # --- Free-item reward (buy-X-get-Y): orthogonal to the discount reward. When reward_item_id is
+      #     set, the bundle grants `reward_qty × satisfied_sets` FREE units of that item (a zero-priced
+      #     reward line the consumer adds to the basket) INSTEAD of a discount on the matched set. ---
+      reward_item_id:
+        type: uuid?
+        attributes: ["@exclude_from_foreign_key_check"]
+        description: "Free reward item (buy-X-get-Y) # logical FK to catalog.Product.id"
+      reward_qty:
+        type: decimal?
+        attributes: ["@precision(18,4)", "@non_negative"]
+        description: "Free units of reward_item_id granted per satisfied set"
       currency:
         type: string
         attributes: ["@default('IDR')", "@length(3)"]

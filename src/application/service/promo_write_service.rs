@@ -20,7 +20,7 @@ use super::promo_events::{
 };
 use super::promo_ports::{
     AccrualRequest, AdjustmentSource, CartQuery, OrderAdjustment, PriceQuery, PriceResolverPort,
-    PricingError, RedemptionRequest, ResolvedCart, ResolvedLine, ResolvedPrice,
+    PricingError, RedemptionRequest, ResolvedCart, ResolvedLine, ResolvedPrice, RewardLine,
 };
 
 /// Round to 2dp, half away from zero (IDR money).
@@ -129,6 +129,8 @@ struct BundleCand {
     reward: String,
     discount_percentage: Option<Decimal>,
     discount_amount: Option<Decimal>,
+    reward_item_id: Option<Uuid>,
+    reward_qty: Option<Decimal>,
     stackable: bool,
     components: Vec<BundleComponentCand>,
 }
@@ -157,9 +159,9 @@ impl BundleCand {
         (sets, ids)
     }
 
-    /// Compute the reward discount and the lines that contributed to satisfying the bundle.
-    /// Returns `(discount, contributing_line_ids)`; discount is 0 when the bundle isn't satisfied.
-    fn reward(&self, cart: &CartQuery, lines: &[ResolvedLine]) -> (Decimal, Vec<Uuid>) {
+    /// Number of satisfied "sets" of the WHOLE bundle and the contributing line ids. Shared by the
+    /// discount reward and the free-item reward.
+    fn satisfied_sets(&self, cart: &CartQuery, lines: &[ResolvedLine]) -> (Decimal, Vec<Uuid>) {
         let mut satisfied = 0i32; // components with ≥1 set
         let mut min_sets: Option<Decimal> = None; // min sets across satisfied components (all_of)
         let mut contributing: Vec<Uuid> = Vec::new();
@@ -175,7 +177,6 @@ impl BundleCand {
                 }
             }
         }
-
         let sets = match self.match_type.as_str() {
             // any_n: any `required_distinct` (default: all) distinct components present → one set.
             "any_n" => {
@@ -191,6 +192,29 @@ impl BundleCand {
                 }
             }
         };
+        (sets, contributing)
+    }
+
+    /// The free item this bundle grants, if it's a buy-X-get-Y bundle and it is satisfied:
+    /// `(reward_item, reward_qty × sets)`.
+    fn free_reward(&self, cart: &CartQuery, lines: &[ResolvedLine]) -> Option<(Uuid, Decimal)> {
+        let item = self.reward_item_id?;
+        let (sets, _) = self.satisfied_sets(cart, lines);
+        if sets < Decimal::ONE {
+            return None;
+        }
+        let per_set = self.reward_qty.unwrap_or(Decimal::ZERO);
+        let qty = per_set * sets;
+        if qty <= Decimal::ZERO {
+            return None;
+        }
+        Some((item, qty))
+    }
+
+    /// Compute the reward discount and the lines that contributed to satisfying the bundle.
+    /// Returns `(discount, contributing_line_ids)`; discount is 0 when the bundle isn't satisfied.
+    fn reward(&self, cart: &CartQuery, lines: &[ResolvedLine]) -> (Decimal, Vec<Uuid>) {
+        let (sets, contributing) = self.satisfied_sets(cart, lines);
         if sets < Decimal::ONE {
             return (Decimal::ZERO, Vec::new());
         }
@@ -216,50 +240,66 @@ impl BundleCand {
     }
 }
 
-/// Allocate `total` across `line_ids` proportional to each line's gross (unit_price·qty), rounded to
-/// money, with the rounding remainder folded onto the largest-gross line so Σ shares == `total`.
+/// Apply a pass's allocated shares onto the lines' running `order_discount_share`, so the next pass's
+/// `allocate` sees the reduced remaining capacity.
+fn apply_shares(lines: &mut [ResolvedLine], allocated: &[(Uuid, Decimal)]) {
+    for (line_id, share) in allocated {
+        if let Some(l) = lines.iter_mut().find(|l| l.line_id == *line_id) {
+            l.order_discount_share += *share;
+        }
+    }
+}
+
+/// Allocate `total` across `line_ids` proportional to each line's **remaining capacity**
+/// (gross − shares already taken), never assigning a line more than it can absorb, with the rounding
+/// remainder folded onto the line with the most remaining capacity so Σ shares ties out EXACTLY.
+///
+/// Returns `(actually_allocated, shares)`. `actually_allocated` may be **less** than `total` when the
+/// subset lacks capacity — a discount can never push a line below zero, so `Σ shares` can only cover
+/// what the lines are worth. Weighting by *remaining* capacity (not raw gross) is what keeps
+/// conservation intact when a bundle and a stackable order rule hit the same line: the second
+/// adjustment sees the first's draw and can't over-allocate, so `Σ net_line_total == total` holds
+/// without a lossy clamp (council 2026-07-06).
 fn allocate(
     total: Decimal,
     line_ids: &[Uuid],
     lines: &[ResolvedLine],
-) -> Vec<(Uuid, Decimal)> {
+) -> (Decimal, Vec<(Uuid, Decimal)>) {
     if total <= Decimal::ZERO || line_ids.is_empty() {
-        return Vec::new();
+        return (Decimal::ZERO, Vec::new());
     }
-    let weight = |id: &Uuid| -> Decimal {
+    // Remaining capacity of a line = its gross minus what prior adjustments already took.
+    let cap = |id: &Uuid| -> Decimal {
         lines
             .iter()
             .find(|l| l.line_id == *id)
-            .map(|l| l.unit_price * l.quantity)
+            .map(|l| (l.unit_price * l.quantity - l.order_discount_share).max(Decimal::ZERO))
             .unwrap_or(Decimal::ZERO)
     };
-    let weight_sum: Decimal = line_ids.iter().map(weight).sum();
-    if weight_sum <= Decimal::ZERO {
-        // Degenerate (all-free lines): split evenly.
-        let n = Decimal::from(line_ids.len() as i64);
-        let each = money(total / n);
-        let mut shares: Vec<(Uuid, Decimal)> = line_ids.iter().map(|id| (*id, each)).collect();
-        let drift = total - each * n;
-        if let Some(first) = shares.first_mut() {
-            first.1 = money(first.1 + drift);
-        }
-        return shares;
+    let cap_sum: Decimal = line_ids.iter().map(cap).sum();
+    if cap_sum <= Decimal::ZERO {
+        return (Decimal::ZERO, Vec::new());
     }
+    // Never allocate more than the subset can hold.
+    let disc = total.min(cap_sum);
+
     let mut shares: Vec<(Uuid, Decimal)> = Vec::with_capacity(line_ids.len());
     let mut running = Decimal::ZERO;
     for id in line_ids {
-        let share = money(total * weight(id) / weight_sum);
+        // Proportional share ≤ cap(id) since disc ≤ cap_sum; `.min` is a belt-and-braces guard.
+        let share = money(disc * cap(id) / cap_sum).min(cap(id));
         running += share;
         shares.push((*id, share));
     }
-    // Fold the rounding remainder onto the largest-gross line so the shares tie out EXACTLY.
-    let remainder = total - running;
+    // Fold the rounding remainder onto the line with the most SLACK so shares tie out and stay ≤ cap.
+    let remainder = disc - running;
     if remainder != Decimal::ZERO {
-        if let Some(idx) = (0..shares.len()).max_by(|&a, &b| weight(&shares[a].0).cmp(&weight(&shares[b].0))) {
+        let slack = |i: usize| cap(&shares[i].0) - shares[i].1;
+        if let Some(idx) = (0..shares.len()).max_by(|&a, &b| slack(a).cmp(&slack(b))) {
             shares[idx].1 = money(shares[idx].1 + remainder);
         }
     }
-    shares
+    (disc, shares)
 }
 
 /// Outcome of a loyalty accrual.
@@ -485,20 +525,34 @@ impl PromoWriteService {
         let mut adjustments: Vec<OrderAdjustment> = Vec::new();
 
         // ---- 2. BUNDLE PASS ----
+        let mut reward_lines: Vec<RewardLine> = Vec::new();
         for bundle in self.load_active_bundles(cart, subtotal).await? {
+            // Buy-X-get-Y: a satisfied free-item bundle grants extra goods, not a discount. It doesn't
+            // touch `remaining`/`locked` (a free line isn't an order-level discount on the basket).
+            if bundle.reward_item_id.is_some() {
+                if let Some((item_id, quantity)) = bundle.free_reward(cart, &lines) {
+                    reward_lines.push(RewardLine { bundle_id: bundle.id, item_id, quantity });
+                }
+                continue;
+            }
             if locked || remaining <= Decimal::ZERO {
                 break;
             }
             let (raw, contributing) = bundle.reward(cart, &lines);
-            let disc = money(raw.min(remaining));
-            if disc <= Decimal::ZERO {
+            let want = money(raw.min(remaining));
+            if want <= Decimal::ZERO {
                 continue;
             }
             // A non-stackable promotion is exclusive: it may fire only if nothing else has yet.
             if !bundle.stackable && !adjustments.is_empty() {
                 continue;
             }
-            let allocated = allocate(disc, &contributing, &lines);
+            // `disc` is what the contributing lines could actually absorb (≤ want).
+            let (disc, allocated) = allocate(want, &contributing, &lines);
+            if disc <= Decimal::ZERO {
+                continue;
+            }
+            apply_shares(&mut lines, &allocated);
             adjustments.push(OrderAdjustment {
                 source: AdjustmentSource::Bundle(bundle.id),
                 discount_amount: disc,
@@ -517,14 +571,18 @@ impl PromoWriteService {
                 if locked || remaining <= Decimal::ZERO {
                     break;
                 }
-                let disc = money(rule.discount_on(remaining).min(remaining));
-                if disc <= Decimal::ZERO {
+                let want = money(rule.discount_on(remaining).min(remaining));
+                if want <= Decimal::ZERO {
                     continue;
                 }
                 if !rule.stackable && !adjustments.is_empty() {
                     continue;
                 }
-                let allocated = allocate(disc, &all_line_ids, &lines);
+                let (disc, allocated) = allocate(want, &all_line_ids, &lines);
+                if disc <= Decimal::ZERO {
+                    continue;
+                }
+                apply_shares(&mut lines, &allocated);
                 adjustments.push(OrderAdjustment {
                     source: AdjustmentSource::OrderRule(rule.id),
                     discount_amount: disc,
@@ -537,14 +595,8 @@ impl PromoWriteService {
             }
         }
 
-        // ---- 4. RECONCILE: fold each line's allocated shares into its net. ----
-        for adj in &adjustments {
-            for (line_id, share) in &adj.allocated {
-                if let Some(l) = lines.iter_mut().find(|l| l.line_id == *line_id) {
-                    l.order_discount_share += *share;
-                }
-            }
-        }
+        // ---- 4. RECONCILE: shares were applied incrementally (capacity-aware), so no line's share
+        // can exceed its gross — net is exact, no lossy clamp, and Σ net_line_total == total. ----
         for l in &mut lines {
             let gross = money(l.unit_price * l.quantity);
             l.order_discount_share = money(l.order_discount_share);
@@ -556,6 +608,7 @@ impl PromoWriteService {
         Ok(ResolvedCart {
             lines,
             order_adjustments: adjustments,
+            reward_lines,
             subtotal,
             order_discount_total,
             total: money(subtotal - order_discount_total),
@@ -632,7 +685,7 @@ impl PromoWriteService {
             r#"
             SELECT id, priority, match_type::text AS match_type, required_distinct,
                    reward::text AS reward, discount_percentage, discount_amount,
-                   stackable, valid_from
+                   reward_item_id, reward_qty, stackable, valid_from
             FROM promo.promo_bundles
             WHERE company_id = $1
               AND is_active = true
@@ -676,6 +729,8 @@ impl PromoWriteService {
                 reward: r.get("reward"),
                 discount_percentage: r.get("discount_percentage"),
                 discount_amount: r.get("discount_amount"),
+                reward_item_id: r.get("reward_item_id"),
+                reward_qty: r.get("reward_qty"),
                 stackable: r.get("stackable"),
                 components: Vec::new(),
             })

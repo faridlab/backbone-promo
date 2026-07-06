@@ -122,11 +122,22 @@ pub struct OrderAdjustment {
     pub allocated: Vec<(Uuid, Decimal)>,
 }
 
+/// A free item a satisfied buy-X-get-Y bundle grants — a zero-priced line the consumer adds to the
+/// basket. It is NOT an order discount (it doesn't reduce `order_discount_total`); it's extra goods.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RewardLine {
+    pub bundle_id: Uuid,
+    pub item_id: Uuid,
+    pub quantity: Decimal,
+}
+
 /// The resolved basket: per-line results, the order-level adjustments that fired, and the totals.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ResolvedCart {
     pub lines: Vec<ResolvedLine>,
     pub order_adjustments: Vec<OrderAdjustment>,
+    /// Free items granted by satisfied buy-X-get-Y bundles (zero-priced; the consumer adds them).
+    pub reward_lines: Vec<RewardLine>,
     /// Σ line unit_price·qty (after per-line rules, before order-level discounts).
     pub subtotal: Decimal,
     /// Σ order_adjustments.discount_amount (never exceeds `subtotal`).
