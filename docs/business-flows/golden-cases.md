@@ -38,3 +38,21 @@ Mirrors `tests/promo_golden_cases.rs`, `tests/integrity_probes.rs`, and the cros
 - Resolution is deterministic (priority → specificity → newest → id) and side-effect-free.
 - Coupons are bounded (`used_count ≤ max_use`); loyalty accrual is idempotent per source; redemption is
   balance-bounded + serialized per member.
+
+## Cart-scoped resolution — `resolve_cart` (ADR-002; `tests/cart_resolution.rs`)
+
+| Case | Input | Expected |
+|------|-------|----------|
+| **CART-1** | order rule 10% off, spend ≥ 250k; lines 100k + 200k | 30k off, allocated ∝ gross → 10k / 20k; total 270k. |
+| **CART-3** | 10,000 fixed off, three equal 100k lines | shares 3333.33 / 3333.33 / 3333.34 (tie out exactly). |
+| **CART-4/5/6** | all_of / missing component / any_n bundles | fires on the matched set / doesn't fire / fires on `required_distinct` present. |
+| **CART-15** (council 2026-07-06) | 100%-off **stackable** bundle on 1 of 2 lines + stackable 50% order rule | net A = 0, net B = 50k, **Σ net == total (50k)** — capacity-aware allocation, no lost cents. |
+| **CART-16** (free-line) | buy A → 1 free B | A charged in full; `reward_lines = [{B, 1}]`; total unchanged. |
+
+## Cart seams — selling / POS (`tests/cart_selling_seam.rs`, `tests/cart_pos_seam.rs`)
+
+| Case | Input | Expected |
+|------|-------|----------|
+| **CSSEAM-1** | bundle 10% + order 5% (stackable), priced by promo → REAL Sales Order | subtotal 300k → 30k → 13.5k → **256.5k on the order**. |
+| **CSSEAM-3** / **CPSEAM-2** | buy-X-get-Y free item → real order / ticket | the free item is added as a **zero-priced line**; subtotal/net unchanged. |
+| **CPSEAM-1** | same bundle+order rule → REAL POS ticket | ticket net = **256.5k**. |

@@ -4,9 +4,10 @@
 > Pairs with `docs/business-flows/golden-cases.md`.
 
 ## Documents
-PricingRule (the resolver's unit) · CouponCode (a capped code that unlocks a gated rule) ·
-CouponRedemption (per-source redemption ledger — idempotency) · LoyaltyProgram (earn/burn rates) ·
-LoyaltyPointEntry (the signed points ledger).
+PricingRule (the resolver's unit; `scope` line/order) · CouponCode (a capped code that unlocks a gated
+rule) · CouponRedemption (per-source redemption ledger — idempotency) · PromoBundle (+ PromoBundleComponent)
+(a cart-scoped buy-these-together promotion) · LoyaltyProgram (earn/burn rates) · LoyaltyPointEntry (the
+signed points ledger).
 
 ## Business rules
 
@@ -46,6 +47,19 @@ discount worth `points · conversion_factor`. It serializes per `(company, custo
 advisory lock, rejects a request exceeding the member's **signed balance** (`Σ points`) as
 `insufficient_points`, and writes a negative `redeemed` entry. A replayed redemption source returns the
 same result without spending twice.
+
+**BR-7 (cart-scoped resolution — ADR-002).** `resolve_cart(cart)` prices a whole basket in a fixed
+pipeline: (1) **line pass** — each line via `resolve` (unchanged); (2) **bundle pass** — satisfied
+`PromoBundle`s (`all_of` = every component, sets = min fill; `any_n` = any `required_distinct` present);
+(3) **order pass** — `scope=order` rules gated on the subtotal; (4) **reconcile**. A `stackable=false`
+adjustment is exclusive (nothing may combine with it). Order/bundle discounts are allocated back across
+the contributing lines **∝ remaining capacity** (never below zero), rounded half-away-from-zero, remainder
+to the line with the most slack — so **`Σ net_line_total == total`** exactly (conservation; council
+2026-07-06). Pure read; coupons still burned only by `commit_coupon_redemption`.
+
+**BR-8 (buy-X-get-Y free line — ADR-002).** A `PromoBundle` with `reward_item_id` set grants
+`reward_qty × satisfied_sets` **free units** of that item as a `RewardLine` — extra goods, not a discount:
+the basket total is unchanged. Selling/POS append it as a **zero-priced line** on the order/ticket.
 
 ## Events
 `CouponRedeemed` (a use was consumed) · `LoyaltyPointsEarned` (accrual) · `LoyaltyPointsRedeemed` (burn).

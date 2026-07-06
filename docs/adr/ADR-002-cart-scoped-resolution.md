@@ -1,25 +1,40 @@
 # ADR-002 — Cart-scoped resolution: bundles and order-total thresholds
 
-Status: accepted (promo half implemented) · 2026-07-05 · Tier 2 (Financials pillar; pricing input, not a GL producer)
+Status: accepted — **fully implemented** (promo + both consumers + free-line) · 2026-07-05, completed 2026-07-06 · Tier 2 (Financials pillar; pricing input, not a GL producer)
 
 Supersedes the "Promotional schemes" parking-lot item in ADR-001.
 
-## Implementation status (2026-07-06)
+## Implementation status (2026-07-06 — complete)
 
-The **promo-internal half** of this decision is implemented and green:
+**Promo-internal (green):**
 - `PricingRule` gained `scope` (`line` | `order`), `min_order_amount`, `stackable`; new `PromoBundle`
-  + `PromoBundleComponent` entities (`match_type` = `all_of` | `any_n`) — all schema-first + regenerated.
-- `PriceResolverPort::resolve_cart` (new) sits beside the unchanged `resolve`; the pipeline
-  (line → bundle → order → reconcile) and the proportional penny-reconciled `allocate` live in the
-  hand-authored `promo_write_service.rs`. The per-line `resolve` query now filters `scope = 'line'`
-  so order rules can never leak into single-line pricing.
-- Covered by `tests/cart_resolution.rs` (11 cases: order-total minimum + gate, penny reconciliation,
-  all_of / any_n bundles, per-line-rule-in-cart, stacking exclusivity vs combine, group scoping,
-  scope isolation). The §5 regen round-trip still holds (seam files byte-identical).
+  + `PromoBundleComponent` entities (`match_type` = `all_of` | `any_n`) — schema-first + regenerated.
+- `PriceResolverPort::resolve_cart` sits beside the unchanged `resolve`; the pipeline
+  (line → bundle → order → reconcile) + allocation live in `promo_write_service.rs`. The per-line
+  `resolve` query filters `scope = 'line'` so order rules never leak into single-line pricing.
+- `tests/cart_resolution.rs` (13 cases incl. penny reconciliation, all_of / any_n bundles, stacking,
+  scope isolation, **CART-15 conservation**, **CART-16 free-line**). §5 regen round-trip holds.
 
-**Deferred (separate, cross-repo work):** selling / POS actually *calling* `resolve_cart` with the
-whole basket. Until they do, the capability ships but no live order consumes it. Coupon-gating a
-bundle is also deferred (v1 bundles fire on cart contents; see the not-in-scope list).
+**Maturity council (2026-07-06) — conservation fix.** `allocate` was weighted by *gross*, so a bundle
++ a stackable order rule on the same line could over-allocate; reconcile clamped and lost cents, and
+`Σ net_line_total ≠ total`. Fixed: allocation now weights by each line's **remaining capacity**
+(applied incrementally between passes), returns the *actually allocated* amount, and never over-fills a
+line — so `Σ net == total` by construction. Added the invariant to the harness + CART-15;
+proven-by-revert. (`docs/council/2026-07-06-module-promo-cart-maturity.md`.)
+
+**Cross-repo consumers (green) — the deferred half, now shipped:**
+- **backbone-selling** gained `CartPricingPort` + `create_sales_order_priced`; a real Sales Order is
+  priced by `resolve_cart` (`tests/cart_selling_seam.rs` CSSEAM-1/2/3).
+- **backbone-pos** gained the mirror `CartPricingPort` + `ring_sale_priced` (`tests/cart_pos_seam.rs`
+  CPSEAM-1/2). Both consumers depend only on their own port — **zero normal Cargo edge** to promo.
+
+**Buy-X-get-Y free-line (green) — the former not-in-scope item, now shipped:** `PromoBundle` gained
+`reward_item_id` + `reward_qty`; a satisfied free-item bundle emits a `RewardLine` (`reward_qty × sets`)
+in `ResolvedCart`, which selling/POS append as a **zero-priced line** (CSSEAM-3 / CPSEAM-2). It grants
+extra goods, not a discount — the basket total is unchanged.
+
+**Still deferred:** coupon-gating a bundle (v1 bundles fire on cart contents); cross-currency baskets;
+progressive/marginal quantity brackets (see the not-in-scope list, which remaining items still apply).
 
 ## Context
 
@@ -101,9 +116,9 @@ promotions on top of it.
 
 ## Not in scope (deliberately parked, each with a gate)
 
-- **Buy-X-get-Y / free-line rewards** (a bundle whose reward is a *free unit* rather than a discount on
-  the matched set) — needs a synthetic reward line, not just an allocation. Gate: bundle-discount path
-  shipped and proven first.
+- ~~**Buy-X-get-Y / free-line rewards**~~ — **SHIPPED 2026-07-06** (`reward_item_id`/`reward_qty` →
+  `RewardLine` → consumer appends a zero-priced line; CSSEAM-3 / CPSEAM-2). Was gated on the
+  bundle-discount path being proven; that gate is now met.
 - **Progressive / marginal quantity brackets** (line 1 full price, lines 2–4 at x, 5+ at y *within one
   line*) — today's `min_qty`/`max_qty` bands apply one winning bracket to the whole line; true marginal
   pricing is a separate effect shape. Gate: merchant demand.
