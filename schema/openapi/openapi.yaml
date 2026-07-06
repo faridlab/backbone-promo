@@ -3716,6 +3716,13 @@ components:
         discount_amount:
           nullable: true
           type: string
+        reward_item_id:
+          nullable: true
+          type: string
+          format: uuid
+        reward_qty:
+          nullable: true
+          type: string
         currency:
           type: string
         min_order_amount:
@@ -3785,6 +3792,13 @@ components:
         discount_amount:
           nullable: true
           type: string
+        reward_item_id:
+          nullable: true
+          type: string
+          format: uuid
+        reward_qty:
+          nullable: true
+          type: string
         currency:
           type: string
         min_order_amount:
@@ -3841,6 +3855,13 @@ components:
         discount_amount:
           nullable: true
           type: string
+        reward_item_id:
+          nullable: true
+          type: string
+          format: uuid
+        reward_qty:
+          nullable: true
+          type: string
         currency:
           type: string
         min_order_amount:
@@ -3883,6 +3904,13 @@ components:
           nullable: true
           type: string
         discount_amount:
+          nullable: true
+          type: string
+        reward_item_id:
+          nullable: true
+          type: string
+          format: uuid
+        reward_qty:
           nullable: true
           type: string
         currency:

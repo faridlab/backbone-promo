@@ -382,6 +382,8 @@ pub struct PromoBundleDto {
     pub reward: RateOrDiscount,
     pub discount_percentage: Option<Decimal>,
     pub discount_amount: Option<Decimal>,
+    pub reward_item_id: Option<Uuid>,
+    pub reward_qty: Option<Decimal>,
     pub currency: String,
     pub min_order_amount: Decimal,
     pub stackable: bool,

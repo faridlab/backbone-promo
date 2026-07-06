@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS promo.promo_bundles (
     reward rate_or_discount NOT NULL DEFAULT 'discount_percentage',
     discount_percentage NUMERIC,
     discount_amount NUMERIC,
+    reward_item_id UUID,
+    reward_qty NUMERIC,
     currency TEXT NOT NULL DEFAULT 'IDR',
     min_order_amount NUMERIC NOT NULL DEFAULT 0,
     stackable BOOLEAN NOT NULL DEFAULT FALSE,

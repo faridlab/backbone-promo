@@ -60,6 +60,8 @@ pub struct PromoBundle {
     pub reward: RateOrDiscount,
     pub discount_percentage: Option<Decimal>,
     pub discount_amount: Option<Decimal>,
+    pub reward_item_id: Option<Uuid>,
+    pub reward_qty: Option<Decimal>,
     pub currency: String,
     pub min_order_amount: Decimal,
     pub stackable: bool,
@@ -89,6 +91,8 @@ impl PromoBundle {
             reward,
             discount_percentage: None,
             discount_amount: None,
+            reward_item_id: None,
+            reward_qty: None,
             currency,
             min_order_amount,
             stackable,
@@ -172,6 +176,18 @@ impl PromoBundle {
         self
     }
 
+    /// Set the reward_item_id field (chainable)
+    pub fn with_reward_item_id(mut self, value: Uuid) -> Self {
+        self.reward_item_id = Some(value);
+        self
+    }
+
+    /// Set the reward_qty field (chainable)
+    pub fn with_reward_qty(mut self, value: Decimal) -> Self {
+        self.reward_qty = Some(value);
+        self
+    }
+
     /// Set the valid_to field (chainable)
     pub fn with_valid_to(mut self, value: DateTime<Utc>) -> Self {
         self.valid_to = Some(value);
@@ -209,6 +225,12 @@ impl PromoBundle {
                 }
                 "discount_amount" => {
                     if let Ok(v) = serde_json::from_value(value) { self.discount_amount = v; }
+                }
+                "reward_item_id" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.reward_item_id = v; }
+                }
+                "reward_qty" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.reward_qty = v; }
                 }
                 "currency" => {
                     if let Ok(v) = serde_json::from_value(value) { self.currency = v; }
@@ -283,6 +305,7 @@ impl backbone_orm::EntityRepoMeta for PromoBundle {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
         m.insert("company_id".to_string(), "uuid".to_string());
+        m.insert("reward_item_id".to_string(), "uuid".to_string());
         m.insert("match_type".to_string(), "bundle_match".to_string());
         m.insert("reward".to_string(), "rate_or_discount".to_string());
         m
@@ -306,6 +329,8 @@ pub struct PromoBundleBuilder {
     reward: Option<RateOrDiscount>,
     discount_percentage: Option<Decimal>,
     discount_amount: Option<Decimal>,
+    reward_item_id: Option<Uuid>,
+    reward_qty: Option<Decimal>,
     currency: Option<String>,
     min_order_amount: Option<Decimal>,
     stackable: Option<bool>,
@@ -363,6 +388,18 @@ impl PromoBundleBuilder {
         self
     }
 
+    /// Set the reward_item_id field (optional)
+    pub fn reward_item_id(mut self, value: Uuid) -> Self {
+        self.reward_item_id = Some(value);
+        self
+    }
+
+    /// Set the reward_qty field (optional)
+    pub fn reward_qty(mut self, value: Decimal) -> Self {
+        self.reward_qty = Some(value);
+        self
+    }
+
     /// Set the currency field (default: `"IDR".to_string()`)
     pub fn currency(mut self, value: String) -> Self {
         self.currency = Some(value);
@@ -417,6 +454,8 @@ impl PromoBundleBuilder {
             reward: self.reward.unwrap_or(RateOrDiscount::default()),
             discount_percentage: self.discount_percentage,
             discount_amount: self.discount_amount,
+            reward_item_id: self.reward_item_id,
+            reward_qty: self.reward_qty,
             currency: self.currency.unwrap_or("IDR".to_string()),
             min_order_amount: self.min_order_amount.unwrap_or(Decimal::from(0)),
             stackable: self.stackable.unwrap_or(false),

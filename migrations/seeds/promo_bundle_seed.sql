@@ -14,6 +14,8 @@
 --     reward,
 --     discount_percentage,
 --     discount_amount,
+--     reward_item_id,
+--     reward_qty,
 --     currency,
 --     min_order_amount,
 --     stackable,

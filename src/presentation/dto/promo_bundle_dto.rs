@@ -52,6 +52,10 @@ pub struct CreatePromoBundleDto {
     pub discount_percentage: Option<Decimal>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_amount")]
     pub discount_amount: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "reward_item_id")]
+    pub reward_item_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "reward_qty")]
+    pub reward_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub currency: String,
     #[serde(alias = "min_order_amount")]
@@ -98,6 +102,10 @@ pub struct UpdatePromoBundleDto {
     pub discount_percentage: Option<Decimal>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_amount")]
     pub discount_amount: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "reward_item_id")]
+    pub reward_item_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "reward_qty")]
+    pub reward_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub currency: String,
     #[serde(alias = "min_order_amount")]
@@ -147,6 +155,10 @@ pub struct PatchPromoBundleDto {
     pub discount_percentage: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "discount_amount")]
     pub discount_amount: Option<Decimal>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "reward_item_id")]
+    pub reward_item_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "reward_qty")]
+    pub reward_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
@@ -168,7 +180,7 @@ pub struct PatchPromoBundleDto {
 impl PatchPromoBundleDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.match_type.is_some() || self.required_distinct.is_some() || self.reward.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.currency.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.match_type.is_some() || self.required_distinct.is_some() || self.reward.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.reward_item_id.is_some() || self.reward_qty.is_some() || self.currency.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.is_active.is_some()
     }
 }
 
@@ -197,6 +209,8 @@ pub struct PromoBundleResponseDto {
     pub reward: RateOrDiscount,
     pub discount_percentage: Option<Decimal>,
     pub discount_amount: Option<Decimal>,
+    pub reward_item_id: Option<Uuid>,
+    pub reward_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub currency: String,
     pub min_order_amount: Decimal,
@@ -286,6 +300,8 @@ impl From<PromoBundle> for PromoBundleResponseDto {
             reward: entity.reward,
             discount_percentage: entity.discount_percentage,
             discount_amount: entity.discount_amount,
+            reward_item_id: entity.reward_item_id,
+            reward_qty: entity.reward_qty,
             currency: entity.currency,
             min_order_amount: entity.min_order_amount,
             stackable: entity.stackable,
@@ -322,6 +338,8 @@ impl From<CreatePromoBundleDto> for PromoBundle {
             reward: dto.reward,
             discount_percentage: dto.discount_percentage,
             discount_amount: dto.discount_amount,
+            reward_item_id: dto.reward_item_id,
+            reward_qty: dto.reward_qty,
             currency: dto.currency,
             min_order_amount: dto.min_order_amount,
             stackable: dto.stackable,
@@ -345,6 +363,8 @@ impl From<&PromoBundle> for PromoBundleResponseDto {
             reward: entity.reward.clone(),
             discount_percentage: entity.discount_percentage.clone(),
             discount_amount: entity.discount_amount.clone(),
+            reward_item_id: entity.reward_item_id.clone(),
+            reward_qty: entity.reward_qty.clone(),
             currency: entity.currency.clone(),
             min_order_amount: entity.min_order_amount.clone(),
             stackable: entity.stackable.clone(),
@@ -372,6 +392,8 @@ impl backbone_core::ApplyUpdateDto<UpdatePromoBundleDto> for PromoBundle {
         self.reward = dto.reward;
         self.discount_percentage = dto.discount_percentage;
         self.discount_amount = dto.discount_amount;
+        self.reward_item_id = dto.reward_item_id;
+        self.reward_qty = dto.reward_qty;
         self.currency = dto.currency;
         self.min_order_amount = dto.min_order_amount;
         self.stackable = dto.stackable;
