@@ -12,12 +12,19 @@ use std::sync::Arc;
 // Import handlers
 use crate::presentation::http::{
     create_coupon_code_routes,
+    create_coupon_code_read_routes,
     create_coupon_redemption_routes,
+    create_coupon_redemption_read_routes,
     create_loyalty_program_routes,
+    create_loyalty_program_read_routes,
     create_loyalty_point_entry_routes,
+    create_loyalty_point_entry_read_routes,
     create_pricing_rule_routes,
+    create_pricing_rule_read_routes,
     create_promo_bundle_routes,
-    create_promo_bundle_component_routes
+    create_promo_bundle_read_routes,
+    create_promo_bundle_component_routes,
+    create_promo_bundle_component_read_routes
 };
 
 // Import AppState for stateful routes
@@ -48,6 +55,22 @@ pub fn create_stateless_routes(module: &crate::PromoModule) -> Router<()> {
         .merge(create_pricing_rule_routes(module.pricing_rule_service.clone()))
         .merge(create_promo_bundle_routes(module.promo_bundle_service.clone()))
         .merge(create_promo_bundle_component_routes(module.promo_bundle_component_service.clone()))
+}
+
+/// Read-only routes for the Promo module — every entity mounted READ-ONLY (the guarded base).
+///
+/// The generic `create_stateless_routes` exposes full mutable CRUD with no domain
+/// validation; this exposes only reads, so generic mutation can't bypass a write
+/// service's invariants. Extend it: `create_readonly_promo_routes(m).merge(my_validated_writes)`.
+pub fn create_readonly_promo_routes(module: &crate::PromoModule) -> Router<()> {
+    Router::new()
+        .merge(create_coupon_code_read_routes(module.coupon_code_service.clone()))
+        .merge(create_coupon_redemption_read_routes(module.coupon_redemption_service.clone()))
+        .merge(create_loyalty_program_read_routes(module.loyalty_program_service.clone()))
+        .merge(create_loyalty_point_entry_read_routes(module.loyalty_point_entry_service.clone()))
+        .merge(create_pricing_rule_read_routes(module.pricing_rule_service.clone()))
+        .merge(create_promo_bundle_read_routes(module.promo_bundle_service.clone()))
+        .merge(create_promo_bundle_component_read_routes(module.promo_bundle_component_service.clone()))
 }
 
 /// Get all routes (stateless) for the Promo module.
