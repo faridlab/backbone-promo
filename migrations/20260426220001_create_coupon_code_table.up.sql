@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS promo.coupon_codes (
     pricing_rule_id UUID NOT NULL,
     description TEXT,
     max_use INTEGER,
-    used_count INTEGER NOT NULL DEFAULT 0,
+    used_count INTEGER NOT NULL DEFAULT 0 CHECK (used_count >= 0),
     valid_from TIMESTAMPTZ NOT NULL,
     valid_upto TIMESTAMPTZ,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,

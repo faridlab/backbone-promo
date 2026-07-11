@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS promo.promo_bundle_components (
     item_id UUID,
     item_group_id UUID,
     brand_id UUID,
-    min_qty NUMERIC NOT NULL DEFAULT 1,
+    min_qty NUMERIC(18, 4) NOT NULL DEFAULT 1 CHECK (min_qty >= 0),
     metadata JSONB NOT NULL DEFAULT '{"created_at":null,"updated_at":null,"deleted_at":null,"created_by":null,"updated_by":null,"deleted_by":null}'::jsonb,
     PRIMARY KEY (id)
 );
