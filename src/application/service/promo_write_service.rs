@@ -11,6 +11,7 @@
 //!
 //! Money is IDR, 2dp, half-away-from-zero. Points are whole (floored on accrual) and are NOT money.
 
+use backbone_orm::company_scope;
 use rust_decimal::{Decimal, RoundingStrategy};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
@@ -347,7 +348,10 @@ impl PromoWriteService {
         let unlocked_coupon = unlocked.map(|(coupon_id, _)| coupon_id);
 
         // Structural candidates: active, in-window, selector + audience + qty/amount all match.
-        let rows = sqlx::query(
+        // RLS scope (ADR-0008): the query carries its company — scope the read so it is fenced on
+        // `app.company_id` even off the request path. The explicit `company_id = $1` filter stays as
+        // defense-in-depth.
+        let rules_q = sqlx::query(
             r#"
             SELECT id, priority, apply_on::text AS apply_on, customer_id, customer_group_id,
                    coupon_required, rate_or_discount::text AS rate_or_discount,
@@ -380,8 +384,11 @@ impl PromoWriteService {
         .bind(q.customer_id)
         .bind(q.customer_group_id)
         .bind(q.quantity)
-        .bind(gross)
-        .fetch_all(&self.pool)
+        .bind(gross);
+        let rows = company_scope::with_company_scope(
+            Some(q.company_id),
+            company_scope::fetch_all_rows_scoped(&self.pool, rules_q),
+        )
         .await?;
 
         let mut candidates: Vec<Candidate> = rows
@@ -451,7 +458,8 @@ impl PromoWriteService {
         code: &str,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<(Uuid, Uuid)>, PricingError> {
-        let row = sqlx::query(
+        // RLS scope (ADR-0008): company on the parameter — scope the lookup.
+        let coupon_q = sqlx::query(
             r#"
             SELECT id, pricing_rule_id
             FROM promo.coupon_codes
@@ -466,8 +474,11 @@ impl PromoWriteService {
         )
         .bind(company_id)
         .bind(code.to_uppercase())
-        .bind(at)
-        .fetch_optional(&self.pool)
+        .bind(at);
+        let row = company_scope::with_company_scope(
+            Some(company_id),
+            company_scope::fetch_optional_row_scoped(&self.pool, coupon_q),
+        )
         .await?;
         Ok(row.map(|r| (r.get("id"), r.get("pricing_rule_id"))))
     }
@@ -623,7 +634,8 @@ impl PromoWriteService {
         subtotal: Decimal,
         unlocked_rule: Option<Uuid>,
     ) -> Result<Vec<OrderRuleCand>, PricingError> {
-        let rows = sqlx::query(
+        // RLS scope (ADR-0008): company on the cart — scope the read.
+        let order_rules_q = sqlx::query(
             r#"
             SELECT id, priority, customer_id, customer_group_id, coupon_required,
                    rate_or_discount::text AS rate_or_discount,
@@ -644,8 +656,11 @@ impl PromoWriteService {
         .bind(cart.at)
         .bind(cart.customer_id)
         .bind(cart.customer_group_id)
-        .bind(subtotal)
-        .fetch_all(&self.pool)
+        .bind(subtotal);
+        let rows = company_scope::with_company_scope(
+            Some(cart.company_id),
+            company_scope::fetch_all_rows_scoped(&self.pool, order_rules_q),
+        )
         .await?;
 
         let mut cands: Vec<OrderRuleCand> = rows
@@ -681,7 +696,8 @@ impl PromoWriteService {
         cart: &CartQuery,
         subtotal: Decimal,
     ) -> Result<Vec<BundleCand>, PricingError> {
-        let brows = sqlx::query(
+        // RLS scope (ADR-0008): company on the cart — scope both the bundle and component reads.
+        let bundles_q = sqlx::query(
             r#"
             SELECT id, priority, match_type::text AS match_type, required_distinct,
                    reward::text AS reward, discount_percentage, discount_amount,
@@ -698,15 +714,18 @@ impl PromoWriteService {
         )
         .bind(cart.company_id)
         .bind(cart.at)
-        .bind(subtotal)
-        .fetch_all(&self.pool)
+        .bind(subtotal);
+        let brows = company_scope::with_company_scope(
+            Some(cart.company_id),
+            company_scope::fetch_all_rows_scoped(&self.pool, bundles_q),
+        )
         .await?;
         if brows.is_empty() {
             return Ok(Vec::new());
         }
 
         let bundle_ids: Vec<Uuid> = brows.iter().map(|r| r.get("id")).collect();
-        let crows = sqlx::query(
+        let components_q = sqlx::query(
             r#"
             SELECT bundle_id, apply_on::text AS apply_on, item_id, item_group_id, brand_id, min_qty
             FROM promo.promo_bundle_components
@@ -716,8 +735,11 @@ impl PromoWriteService {
             "#,
         )
         .bind(cart.company_id)
-        .bind(&bundle_ids)
-        .fetch_all(&self.pool)
+        .bind(&bundle_ids);
+        let crows = company_scope::with_company_scope(
+            Some(cart.company_id),
+            company_scope::fetch_all_rows_scoped(&self.pool, components_q),
+        )
         .await?;
 
         let mut bundles: Vec<BundleCand> = brows
@@ -774,6 +796,9 @@ impl PromoWriteService {
         sink: &dyn PromoEventSink,
     ) -> Result<Uuid, PricingError> {
         let mut tx = self.pool.begin().await?;
+        // RLS scope (ADR-0008): company is an explicit argument — bind it onto our own transaction so the
+        // ledger claim and the guarded counter bump both pass the `app.company_id` fence.
+        company_scope::bind_company_on(&mut tx, company_id).await?;
 
         // Idempotency gate: claim this (coupon, source) exactly once. ON CONFLICT → already redeemed.
         let claimed = sqlx::query(
@@ -872,7 +897,9 @@ impl PromoWriteService {
         }
         let expiry = expiry_days.map(|d| req.at + chrono::Duration::days(d as i64));
 
-        let row = sqlx::query(
+        // RLS scope (ADR-0008): company on the accrual request — scope the insert so it passes the
+        // WITH CHECK fence (accrual is event-driven and has no ambient scope of its own).
+        let accrue_q = sqlx::query(
             r#"
             INSERT INTO promo.loyalty_point_entries
                 (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
@@ -892,8 +919,11 @@ impl PromoWriteService {
         .bind(&req.source_type)
         .bind(req.source_id)
         .bind(req.at)
-        .bind(expiry)
-        .fetch_optional(&self.pool)
+        .bind(expiry);
+        let row = company_scope::with_company_scope(
+            Some(req.company_id),
+            company_scope::fetch_optional_row_scoped(&self.pool, accrue_q),
+        )
         .await?;
 
         match row {
@@ -927,6 +957,9 @@ impl PromoWriteService {
             return Err(PricingError::Invalid("points to redeem must be positive".into()));
         }
         let mut tx = self.pool.begin().await?;
+        // RLS scope (ADR-0008): company on the redemption request — bind it so the advisory lock, the
+        // balance read, and the redeemed-entry insert all run inside this tenant's fence.
+        company_scope::bind_company_on(&mut tx, req.company_id).await?;
 
         // Serialize all balance-changing ops for this (company, customer, program).
         let lock_key = format!("{}:{}:{}", req.company_id, req.customer_id, req.loyalty_program_id);
@@ -1017,7 +1050,8 @@ impl PromoWriteService {
         program_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<(Decimal, Option<i32>), PricingError> {
-        let row = sqlx::query(
+        // RLS scope (ADR-0008): company on the parameter — scope the read.
+        let program_q = sqlx::query(
             r#"SELECT collection_factor, expiry_duration_days FROM promo.loyalty_programs
                WHERE id = $1 AND company_id = $2 AND is_active = true
                  AND (metadata->>'deleted_at') IS NULL
@@ -1025,8 +1059,11 @@ impl PromoWriteService {
         )
         .bind(program_id)
         .bind(company_id)
-        .bind(at)
-        .fetch_optional(&self.pool)
+        .bind(at);
+        let row = company_scope::with_company_scope(
+            Some(company_id),
+            company_scope::fetch_optional_row_scoped(&self.pool, program_q),
+        )
         .await?
         .ok_or(PricingError::ProgramInvalid)?;
         Ok((row.get("collection_factor"), row.get("expiry_duration_days")))
