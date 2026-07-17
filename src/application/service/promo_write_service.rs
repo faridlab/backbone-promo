@@ -13,8 +13,14 @@
 
 use backbone_orm::company_scope;
 use rust_decimal::{Decimal, RoundingStrategy};
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::infrastructure::persistence::{
+    CouponCodeRepository, CouponRedemptionRepository, LineRuleQuery, LoyaltyPointEntryRepository,
+    LoyaltyProgramRepository, NewAccrualRow, NewRedemptionRow, PricingRuleRepository,
+    PromoBundleComponentRepository, PromoBundleRepository,
+};
 
 use super::promo_events::{
     CouponRedeemed, LoyaltyPointsEarned, LoyaltyPointsRedeemed, PromoEvent, PromoEventSink,
@@ -29,9 +35,17 @@ fn money(v: Decimal) -> Decimal {
     v.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero)
 }
 
-/// The promo write service: a thin holder over the pool.
+/// The promo write service: orchestrates the repositories that hold the SQL, and owns the units of
+/// work (the coupon burn and the loyalty redemption each run in a transaction it opens).
 pub struct PromoWriteService {
     pool: PgPool,
+    rules: PricingRuleRepository,
+    coupons: CouponCodeRepository,
+    redemptions: CouponRedemptionRepository,
+    bundles: PromoBundleRepository,
+    bundle_components: PromoBundleComponentRepository,
+    programs: LoyaltyProgramRepository,
+    entries: LoyaltyPointEntryRepository,
 }
 
 /// A candidate rule pulled from the DB, with the fields resolution needs.
@@ -324,7 +338,14 @@ pub struct RedemptionOutcome {
 
 impl PromoWriteService {
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        let rules = PricingRuleRepository::new(pool.clone());
+        let coupons = CouponCodeRepository::new(pool.clone());
+        let redemptions = CouponRedemptionRepository::new(pool.clone());
+        let bundles = PromoBundleRepository::new(pool.clone());
+        let bundle_components = PromoBundleComponentRepository::new(pool.clone());
+        let programs = LoyaltyProgramRepository::new(pool.clone());
+        let entries = LoyaltyPointEntryRepository::new(pool.clone());
+        Self { pool, rules, coupons, redemptions, bundles, bundle_components, programs, entries }
     }
 
     // ---- 1. resolve (read-only) --------------------------------------------------------------
@@ -351,60 +372,36 @@ impl PromoWriteService {
         // RLS scope (ADR-0008): the query carries its company — scope the read so it is fenced on
         // `app.company_id` even off the request path. The explicit `company_id = $1` filter stays as
         // defense-in-depth.
-        let rules_q = sqlx::query(
-            r#"
-            SELECT id, priority, apply_on::text AS apply_on, customer_id, customer_group_id,
-                   coupon_required, rate_or_discount::text AS rate_or_discount,
-                   rate, discount_percentage, discount_amount, valid_from
-            FROM promo.pricing_rules
-            WHERE company_id = $1
-              AND is_active = true
-              AND scope = 'line'
-              AND (metadata->>'deleted_at') IS NULL
-              AND valid_from <= $2
-              AND (valid_to IS NULL OR valid_to >= $2)
-              AND (
-                    apply_on = 'all'
-                 OR (apply_on = 'item'       AND item_id = $3)
-                 OR (apply_on = 'item_group' AND item_group_id = $4)
-                 OR (apply_on = 'brand'      AND brand_id = $5)
-              )
-              AND (customer_id IS NULL OR customer_id = $6)
-              AND (customer_group_id IS NULL OR customer_group_id = $7)
-              AND min_qty <= $8
-              AND (max_qty IS NULL OR max_qty >= $8)
-              AND min_amount <= $9
-            "#,
-        )
-        .bind(q.company_id)
-        .bind(q.at)
-        .bind(q.item_id)
-        .bind(q.item_group_id)
-        .bind(q.brand_id)
-        .bind(q.customer_id)
-        .bind(q.customer_group_id)
-        .bind(q.quantity)
-        .bind(gross);
         let rows = company_scope::with_company_scope(
             Some(q.company_id),
-            company_scope::fetch_all_rows_scoped(&self.pool, rules_q),
+            self.rules.find_line_candidates(&self.pool, &LineRuleQuery {
+                company_id: q.company_id,
+                at: q.at,
+                item_id: q.item_id,
+                item_group_id: q.item_group_id,
+                brand_id: q.brand_id,
+                customer_id: q.customer_id,
+                customer_group_id: q.customer_group_id,
+                quantity: q.quantity,
+                gross,
+            }),
         )
         .await?;
 
         let mut candidates: Vec<Candidate> = rows
             .into_iter()
             .map(|r| Candidate {
-                id: r.get("id"),
-                priority: r.get("priority"),
-                apply_on: r.get("apply_on"),
-                customer_id: r.get("customer_id"),
-                customer_group_id: r.get("customer_group_id"),
-                coupon_required: r.get("coupon_required"),
-                rate_or_discount: r.get("rate_or_discount"),
-                rate: r.get("rate"),
-                discount_percentage: r.get("discount_percentage"),
-                discount_amount: r.get("discount_amount"),
-                valid_from: r.get("valid_from"),
+                id: r.id,
+                priority: r.priority,
+                apply_on: r.apply_on,
+                customer_id: r.customer_id,
+                customer_group_id: r.customer_group_id,
+                coupon_required: r.coupon_required,
+                rate_or_discount: r.rate_or_discount,
+                rate: r.rate,
+                discount_percentage: r.discount_percentage,
+                discount_amount: r.discount_amount,
+                valid_from: r.valid_from,
             })
             // A coupon-gated rule applies only if the presented coupon unlocks *this* rule.
             .filter(|c| !c.coupon_required || unlocked_rule == Some(c.id))
@@ -459,28 +456,11 @@ impl PromoWriteService {
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<(Uuid, Uuid)>, PricingError> {
         // RLS scope (ADR-0008): company on the parameter — scope the lookup.
-        let coupon_q = sqlx::query(
-            r#"
-            SELECT id, pricing_rule_id
-            FROM promo.coupon_codes
-            WHERE company_id = $1
-              AND code = $2
-              AND is_active = true
-              AND (metadata->>'deleted_at') IS NULL
-              AND valid_from <= $3
-              AND (valid_upto IS NULL OR valid_upto >= $3)
-              AND (max_use IS NULL OR used_count < max_use)
-            "#,
-        )
-        .bind(company_id)
-        .bind(code.to_uppercase())
-        .bind(at);
-        let row = company_scope::with_company_scope(
+        Ok(company_scope::with_company_scope(
             Some(company_id),
-            company_scope::fetch_optional_row_scoped(&self.pool, coupon_q),
+            self.coupons.find_usable(&self.pool, company_id, &code.to_uppercase(), at),
         )
-        .await?;
-        Ok(row.map(|r| (r.get("id"), r.get("pricing_rule_id"))))
+        .await?)
     }
 
     // ---- 1b. resolve_cart (cart-scoped read, ADR-002) -----------------------------------------
@@ -635,47 +615,32 @@ impl PromoWriteService {
         unlocked_rule: Option<Uuid>,
     ) -> Result<Vec<OrderRuleCand>, PricingError> {
         // RLS scope (ADR-0008): company on the cart — scope the read.
-        let order_rules_q = sqlx::query(
-            r#"
-            SELECT id, priority, customer_id, customer_group_id, coupon_required,
-                   rate_or_discount::text AS rate_or_discount,
-                   discount_percentage, discount_amount, stackable, valid_from
-            FROM promo.pricing_rules
-            WHERE company_id = $1
-              AND is_active = true
-              AND scope = 'order'
-              AND (metadata->>'deleted_at') IS NULL
-              AND valid_from <= $2
-              AND (valid_to IS NULL OR valid_to >= $2)
-              AND (customer_id IS NULL OR customer_id = $3)
-              AND (customer_group_id IS NULL OR customer_group_id = $4)
-              AND min_order_amount <= $5
-            "#,
-        )
-        .bind(cart.company_id)
-        .bind(cart.at)
-        .bind(cart.customer_id)
-        .bind(cart.customer_group_id)
-        .bind(subtotal);
         let rows = company_scope::with_company_scope(
             Some(cart.company_id),
-            company_scope::fetch_all_rows_scoped(&self.pool, order_rules_q),
+            self.rules.find_order_candidates(
+                &self.pool,
+                cart.company_id,
+                cart.at,
+                cart.customer_id,
+                cart.customer_group_id,
+                subtotal,
+            ),
         )
         .await?;
 
         let mut cands: Vec<OrderRuleCand> = rows
             .into_iter()
             .map(|r| OrderRuleCand {
-                id: r.get("id"),
-                priority: r.get("priority"),
-                customer_id: r.get("customer_id"),
-                customer_group_id: r.get("customer_group_id"),
-                coupon_required: r.get("coupon_required"),
-                rate_or_discount: r.get("rate_or_discount"),
-                discount_percentage: r.get("discount_percentage"),
-                discount_amount: r.get("discount_amount"),
-                stackable: r.get("stackable"),
-                valid_from: r.get("valid_from"),
+                id: r.id,
+                priority: r.priority,
+                customer_id: r.customer_id,
+                customer_group_id: r.customer_group_id,
+                coupon_required: r.coupon_required,
+                rate_or_discount: r.rate_or_discount,
+                discount_percentage: r.discount_percentage,
+                discount_amount: r.discount_amount,
+                stackable: r.stackable,
+                valid_from: r.valid_from,
             })
             .filter(|c| !c.coupon_required || unlocked_rule == Some(c.id))
             .collect();
@@ -697,75 +662,45 @@ impl PromoWriteService {
         subtotal: Decimal,
     ) -> Result<Vec<BundleCand>, PricingError> {
         // RLS scope (ADR-0008): company on the cart — scope both the bundle and component reads.
-        let bundles_q = sqlx::query(
-            r#"
-            SELECT id, priority, match_type::text AS match_type, required_distinct,
-                   reward::text AS reward, discount_percentage, discount_amount,
-                   reward_item_id, reward_qty, stackable, valid_from
-            FROM promo.promo_bundles
-            WHERE company_id = $1
-              AND is_active = true
-              AND (metadata->>'deleted_at') IS NULL
-              AND valid_from <= $2
-              AND (valid_to IS NULL OR valid_to >= $2)
-              AND min_order_amount <= $3
-            ORDER BY priority DESC, valid_from DESC, id ASC
-            "#,
-        )
-        .bind(cart.company_id)
-        .bind(cart.at)
-        .bind(subtotal);
         let brows = company_scope::with_company_scope(
             Some(cart.company_id),
-            company_scope::fetch_all_rows_scoped(&self.pool, bundles_q),
+            self.bundles.find_active(&self.pool, cart.company_id, cart.at, subtotal),
         )
         .await?;
         if brows.is_empty() {
             return Ok(Vec::new());
         }
 
-        let bundle_ids: Vec<Uuid> = brows.iter().map(|r| r.get("id")).collect();
-        let components_q = sqlx::query(
-            r#"
-            SELECT bundle_id, apply_on::text AS apply_on, item_id, item_group_id, brand_id, min_qty
-            FROM promo.promo_bundle_components
-            WHERE company_id = $1
-              AND bundle_id = ANY($2)
-              AND (metadata->>'deleted_at') IS NULL
-            "#,
-        )
-        .bind(cart.company_id)
-        .bind(&bundle_ids);
+        let bundle_ids: Vec<Uuid> = brows.iter().map(|r| r.id).collect();
         let crows = company_scope::with_company_scope(
             Some(cart.company_id),
-            company_scope::fetch_all_rows_scoped(&self.pool, components_q),
+            self.bundle_components.find_for_bundles(&self.pool, cart.company_id, &bundle_ids),
         )
         .await?;
 
         let mut bundles: Vec<BundleCand> = brows
             .into_iter()
             .map(|r| BundleCand {
-                id: r.get("id"),
-                match_type: r.get("match_type"),
-                required_distinct: r.get("required_distinct"),
-                reward: r.get("reward"),
-                discount_percentage: r.get("discount_percentage"),
-                discount_amount: r.get("discount_amount"),
-                reward_item_id: r.get("reward_item_id"),
-                reward_qty: r.get("reward_qty"),
-                stackable: r.get("stackable"),
+                id: r.id,
+                match_type: r.match_type,
+                required_distinct: r.required_distinct,
+                reward: r.reward,
+                discount_percentage: r.discount_percentage,
+                discount_amount: r.discount_amount,
+                reward_item_id: r.reward_item_id,
+                reward_qty: r.reward_qty,
+                stackable: r.stackable,
                 components: Vec::new(),
             })
             .collect();
         for cr in crows {
-            let bid: Uuid = cr.get("bundle_id");
-            if let Some(b) = bundles.iter_mut().find(|b| b.id == bid) {
+            if let Some(b) = bundles.iter_mut().find(|b| b.id == cr.bundle_id) {
                 b.components.push(BundleComponentCand {
-                    apply_on: cr.get("apply_on"),
-                    item_id: cr.get("item_id"),
-                    item_group_id: cr.get("item_group_id"),
-                    brand_id: cr.get("brand_id"),
-                    min_qty: cr.get("min_qty"),
+                    apply_on: cr.apply_on,
+                    item_id: cr.item_id,
+                    item_group_id: cr.item_group_id,
+                    brand_id: cr.brand_id,
+                    min_qty: cr.min_qty,
                 });
             }
         }
@@ -801,51 +736,20 @@ impl PromoWriteService {
         company_scope::bind_company_on(&mut tx, company_id).await?;
 
         // Idempotency gate: claim this (coupon, source) exactly once. ON CONFLICT → already redeemed.
-        let claimed = sqlx::query(
-            r#"
-            INSERT INTO promo.coupon_redemptions (company_id, coupon_id, pricing_rule_id,
-                source_type, source_id)
-            SELECT $1, $2, c.pricing_rule_id, $3, $4
-            FROM promo.coupon_codes c
-            WHERE c.id = $2 AND c.company_id = $1
-            ON CONFLICT (company_id, coupon_id, source_type, source_id)
-                WHERE (metadata->>'deleted_at') IS NULL
-            DO NOTHING
-            RETURNING pricing_rule_id
-            "#,
-        )
-        .bind(company_id)
-        .bind(coupon_id)
-        .bind(source_type)
-        .bind(source_id)
-        .fetch_optional(&mut *tx)
-        .await?;
+        let claimed = self
+            .redemptions
+            .claim(&mut tx, company_id, coupon_id, source_type, source_id)
+            .await?;
 
         let rule_id: Uuid = match claimed {
             // Fresh source: advance the counter, bounded. Exhausted → roll back the ledger claim.
-            Some(r) => {
-                let bumped = sqlx::query(
-                    r#"
-                    UPDATE promo.coupon_codes
-                    SET used_count = used_count + 1
-                    WHERE id = $1
-                      AND company_id = $2
-                      AND is_active = true
-                      AND (metadata->>'deleted_at') IS NULL
-                      AND (max_use IS NULL OR used_count < max_use)
-                    RETURNING pricing_rule_id
-                    "#,
-                )
-                .bind(coupon_id)
-                .bind(company_id)
-                .fetch_optional(&mut *tx)
-                .await?;
+            Some(rule_id) => {
+                let bumped = self.coupons.bump_used_count(&mut tx, coupon_id, company_id).await?;
                 if bumped.is_none() {
                     // No use remained (or the coupon is inactive) — undo the ledger claim.
                     return Err(PricingError::CouponExhausted);
                 }
                 tx.commit().await?;
-                let rule_id: Uuid = r.get("pricing_rule_id");
                 sink.publish(&PromoEvent::CouponRedeemed(CouponRedeemed {
                     coupon_id,
                     pricing_rule_id: rule_id,
@@ -857,17 +761,10 @@ impl PromoWriteService {
             }
             // Replayed source: this sale already consumed a use — return it, no second burn.
             None => {
-                let existing: Uuid = sqlx::query_scalar(
-                    r#"SELECT pricing_rule_id FROM promo.coupon_redemptions
-                       WHERE company_id = $1 AND coupon_id = $2 AND source_type = $3 AND source_id = $4
-                         AND (metadata->>'deleted_at') IS NULL"#,
-                )
-                .bind(company_id)
-                .bind(coupon_id)
-                .bind(source_type)
-                .bind(source_id)
-                .fetch_one(&mut *tx)
-                .await?;
+                let existing = self
+                    .redemptions
+                    .find_existing(&mut tx, company_id, coupon_id, source_type, source_id)
+                    .await?;
                 tx.commit().await?;
                 existing
             }
@@ -899,36 +796,24 @@ impl PromoWriteService {
 
         // RLS scope (ADR-0008): company on the accrual request — scope the insert so it passes the
         // WITH CHECK fence (accrual is event-driven and has no ambient scope of its own).
-        let accrue_q = sqlx::query(
-            r#"
-            INSERT INTO promo.loyalty_point_entries
-                (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
-                 source_type, source_id, posting_date, expiry_date)
-            VALUES ($1, $2, $3, 'earned', $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (company_id, source_type, source_id, entry_type)
-                WHERE (metadata->>'deleted_at') IS NULL
-            DO NOTHING
-            RETURNING id
-            "#,
-        )
-        .bind(req.company_id)
-        .bind(req.loyalty_program_id)
-        .bind(req.customer_id)
-        .bind(points)
-        .bind(money(req.purchase_amount))
-        .bind(&req.source_type)
-        .bind(req.source_id)
-        .bind(req.at)
-        .bind(expiry);
         let row = company_scope::with_company_scope(
             Some(req.company_id),
-            company_scope::fetch_optional_row_scoped(&self.pool, accrue_q),
+            self.entries.claim_accrual(&self.pool, &NewAccrualRow {
+                company_id: req.company_id,
+                loyalty_program_id: req.loyalty_program_id,
+                customer_id: req.customer_id,
+                points,
+                purchase_amount: money(req.purchase_amount),
+                source_type: &req.source_type,
+                source_id: req.source_id,
+                at: req.at,
+                expiry,
+            }),
         )
         .await?;
 
         match row {
-            Some(r) => {
-                let entry_id: Uuid = r.get("id");
+            Some(entry_id) => {
                 sink.publish(&PromoEvent::LoyaltyPointsEarned(LoyaltyPointsEarned {
                     entry_id,
                     loyalty_program_id: req.loyalty_program_id,
@@ -962,29 +847,21 @@ impl PromoWriteService {
         company_scope::bind_company_on(&mut tx, req.company_id).await?;
 
         // Serialize all balance-changing ops for this (company, customer, program).
-        let lock_key = format!("{}:{}:{}", req.company_id, req.customer_id, req.loyalty_program_id);
-        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
-            .bind(&lock_key)
-            .execute(&mut *tx)
+        self.entries
+            .lock_member_balance(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id)
             .await?;
 
         // Idempotent replay: a prior redemption for this exact source returns the same result.
-        if let Some(r) = sqlx::query(
-            r#"SELECT id, points FROM promo.loyalty_point_entries
-               WHERE company_id = $1 AND source_type = $2 AND source_id = $3 AND entry_type = 'redeemed'
-                 AND (metadata->>'deleted_at') IS NULL"#,
-        )
-        .bind(req.company_id)
-        .bind(&req.source_type)
-        .bind(req.source_id)
-        .fetch_optional(&mut *tx)
-        .await?
+        if let Some(r) = self
+            .entries
+            .find_redemption_by_source(&mut tx, req.company_id, &req.source_type, req.source_id)
+            .await?
         {
-            let prior_points: Decimal = r.get("points");
+            let prior_points = r.points;
             let conversion_factor = self.program_conversion(&mut tx, req).await?;
             tx.commit().await?;
             return Ok(RedemptionOutcome {
-                entry_id: r.get("id"),
+                entry_id: r.id,
                 points: -prior_points,
                 discount_value: money(-prior_points * conversion_factor),
                 already: true,
@@ -994,39 +871,25 @@ impl PromoWriteService {
         let conversion_factor = self.program_conversion(&mut tx, req).await?;
 
         // Balance = Σ signed points (earned +, redeemed/expired −).
-        let available: Decimal = sqlx::query_scalar(
-            r#"SELECT COALESCE(SUM(points), 0) FROM promo.loyalty_point_entries
-               WHERE company_id = $1 AND customer_id = $2 AND loyalty_program_id = $3
-                 AND (metadata->>'deleted_at') IS NULL"#,
-        )
-        .bind(req.company_id)
-        .bind(req.customer_id)
-        .bind(req.loyalty_program_id)
-        .fetch_one(&mut *tx)
-        .await?;
+        let available = self
+            .entries
+            .available_balance(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id)
+            .await?;
 
         if req.points > available {
             return Err(PricingError::InsufficientPoints { available, requested: req.points });
         }
 
         let discount_value = money(req.points * conversion_factor);
-        let entry_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO promo.loyalty_point_entries
-                (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
-                 source_type, source_id, posting_date)
-            VALUES ($1, $2, $3, 'redeemed', $4, 0, $5, $6, $7)
-            RETURNING id
-            "#,
-        )
-        .bind(req.company_id)
-        .bind(req.loyalty_program_id)
-        .bind(req.customer_id)
-        .bind(-req.points)
-        .bind(&req.source_type)
-        .bind(req.source_id)
-        .bind(req.at)
-        .fetch_one(&mut *tx)
+        let entry_id = self.entries.insert_redemption(&mut tx, &NewRedemptionRow {
+            company_id: req.company_id,
+            loyalty_program_id: req.loyalty_program_id,
+            customer_id: req.customer_id,
+            points: -req.points,
+            source_type: &req.source_type,
+            source_id: req.source_id,
+            at: req.at,
+        })
         .await?;
 
         tx.commit().await?;
@@ -1051,22 +914,12 @@ impl PromoWriteService {
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<(Decimal, Option<i32>), PricingError> {
         // RLS scope (ADR-0008): company on the parameter — scope the read.
-        let program_q = sqlx::query(
-            r#"SELECT collection_factor, expiry_duration_days FROM promo.loyalty_programs
-               WHERE id = $1 AND company_id = $2 AND is_active = true
-                 AND (metadata->>'deleted_at') IS NULL
-                 AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)"#,
-        )
-        .bind(program_id)
-        .bind(company_id)
-        .bind(at);
-        let row = company_scope::with_company_scope(
+        company_scope::with_company_scope(
             Some(company_id),
-            company_scope::fetch_optional_row_scoped(&self.pool, program_q),
+            self.programs.find_active_collection(&self.pool, company_id, program_id, at),
         )
         .await?
-        .ok_or(PricingError::ProgramInvalid)?;
-        Ok((row.get("collection_factor"), row.get("expiry_duration_days")))
+        .ok_or(PricingError::ProgramInvalid)
     }
 
     /// The program's conversion_factor (currency per point), read inside a redemption tx.
@@ -1075,18 +928,10 @@ impl PromoWriteService {
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         req: &RedemptionRequest,
     ) -> Result<Decimal, PricingError> {
-        sqlx::query_scalar(
-            r#"SELECT conversion_factor FROM promo.loyalty_programs
-               WHERE id = $1 AND company_id = $2 AND is_active = true
-                 AND (metadata->>'deleted_at') IS NULL
-                 AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)"#,
-        )
-        .bind(req.loyalty_program_id)
-        .bind(req.company_id)
-        .bind(req.at)
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or(PricingError::ProgramInvalid)
+        self.programs
+            .find_active_conversion(tx, req.company_id, req.loyalty_program_id, req.at)
+            .await?
+            .ok_or(PricingError::ProgramInvalid)
     }
 }
 

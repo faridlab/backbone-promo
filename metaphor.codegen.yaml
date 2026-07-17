@@ -14,6 +14,17 @@ user_owned:
   - "src/application/service/promo_events.rs"
   - "src/application/service/promo_ports.rs"
   - "src/application/service/promo_write_service.rs"
+  # Own the hand-written promo SQL (the structural rule/bundle searches behind resolve, the coupon
+  # lookup + its guarded redemption burn, and the loyalty accrual/balance/redemption ledger) that the
+  # write service orchestrates. Declared here — not renamed with a `_custom` suffix — so the generator
+  # skips them wholesale; this declaration is what makes editing them legitimate.
+  - "src/infrastructure/persistence/coupon_code_repository.rs"
+  - "src/infrastructure/persistence/coupon_redemption_repository.rs"
+  - "src/infrastructure/persistence/loyalty_point_entry_repository.rs"
+  - "src/infrastructure/persistence/loyalty_program_repository.rs"
+  - "src/infrastructure/persistence/pricing_rule_repository.rs"
+  - "src/infrastructure/persistence/promo_bundle_component_repository.rs"
+  - "src/infrastructure/persistence/promo_bundle_repository.rs"
   - "tests/cart_pos_seam.rs"
   - "tests/cart_resolution.rs"
   - "tests/cart_selling_seam.rs"

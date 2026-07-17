@@ -34,4 +34,10 @@ pub use backbone_orm::repository::{
 
 // Re-export custom persistence types
 // <<< CUSTOM
+// The hand-written promo SQL's parameter/projection types (see the seven repositories, all declared
+// `user_owned` in metaphor.codegen.yaml).
+pub use loyalty_point_entry_repository::{NewAccrualRow, NewRedemptionRow, PriorRedemptionRow};
+pub use pricing_rule_repository::{LineRuleQuery, LineRuleRow, OrderRuleRow};
+pub use promo_bundle_component_repository::BundleComponentRow;
+pub use promo_bundle_repository::BundleRow;
 // END CUSTOM
