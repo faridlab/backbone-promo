@@ -14,6 +14,7 @@ pub mod promo_bundle_handler;
 pub mod promo_bundle_component_handler;
 
 // <<< CUSTOM
+pub mod guarded_routes;
 // END CUSTOM
 
 // Re-exports
@@ -25,4 +26,5 @@ pub use pricing_rule_handler::{create_pricing_rule_routes, create_pricing_rule_r
 pub use promo_bundle_handler::{create_promo_bundle_routes, create_promo_bundle_read_routes, create_promo_bundle_write_routes};
 pub use promo_bundle_component_handler::{create_promo_bundle_component_routes, create_promo_bundle_component_read_routes, create_promo_bundle_component_write_routes};
 // <<< CUSTOM
+pub use guarded_routes::create_guarded_promo_routes;
 // END CUSTOM

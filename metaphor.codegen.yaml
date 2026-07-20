@@ -14,6 +14,9 @@ user_owned:
   - "src/application/service/promo_events.rs"
   - "src/application/service/promo_ports.rs"
   - "src/application/service/promo_write_service.rs"
+  # Guarded route composer: wraps the company-scoped entity read surface in company_auth (ADR-0008
+  # RLS fence). Hand-authored, mirrors backbone-pos/backbone-inventory guarded_routes.rs.
+  - "src/presentation/http/guarded_routes.rs"
   # Own the hand-written promo SQL (the structural rule/bundle searches behind resolve, the coupon
   # lookup + its guarded redemption burn, and the loyalty accrual/balance/redemption ledger) that the
   # write service orchestrates. Declared here — not renamed with a `_custom` suffix — so the generator
