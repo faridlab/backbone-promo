@@ -16,6 +16,13 @@ pub mod pricing_rule_service;
 pub mod promo_events;
 pub mod promo_ports;
 pub mod promo_write_service;
+// The write surface, chunked: each is an `impl PromoWriteService` block over the vocabulary that
+// stays in `promo_write_service` (so the `promo_write_service::{PromoWriteService, ...}` import
+// paths are unchanged).
+pub mod promo_resolve;
+pub mod promo_cart;
+pub mod promo_coupon;
+pub mod promo_loyalty;
 // END CUSTOM
 pub mod promo_bundle_service;
 pub mod promo_bundle_component_service;
