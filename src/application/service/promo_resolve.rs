@@ -30,6 +30,7 @@ struct Candidate {
     rate: Option<Decimal>,
     discount_percentage: Option<Decimal>,
     discount_amount: Option<Decimal>,
+    discount_upto: Option<Decimal>,
     valid_from: chrono::DateTime<chrono::Utc>,
 }
 
@@ -101,6 +102,7 @@ impl PromoWriteService {
                 rate: r.rate,
                 discount_percentage: r.discount_percentage,
                 discount_amount: r.discount_amount,
+                discount_upto: r.discount_upto,
                 valid_from: r.valid_from,
             })
             // A coupon-gated rule applies only if the presented coupon unlocks *this* rule.
@@ -121,8 +123,17 @@ impl PromoWriteService {
         });
         let win = &candidates[0];
 
-        let unit_price = self.apply_effect(win, q.list_price);
-        let discount = (q.list_price - unit_price).max(Decimal::ZERO);
+        let base_unit = self.apply_effect(win, q.list_price);
+        let mut discount = (q.list_price - base_unit).max(Decimal::ZERO);
+        // discount_upto caps the line's TOTAL discount (per-unit × qty); when it binds, back-compute
+        // the per-unit discount so ResolvedPrice stays per-unit while honoring an Rp ceiling on the line.
+        if let Some(cap) = win.discount_upto {
+            let line_total_disc = discount * q.quantity;
+            if line_total_disc > cap {
+                discount = money(cap / q.quantity);
+            }
+        }
+        let unit_price = (q.list_price - discount).max(Decimal::ZERO);
         Ok(ResolvedPrice {
             unit_price,
             discount_amount: money(discount),

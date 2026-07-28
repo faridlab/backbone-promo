@@ -41,6 +41,10 @@ models:
         type: decimal
         attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
         description: "Cart subtotal floor for a scope=order rule to fire (ignored when scope=line)"
+      min_order_qty:
+        type: decimal?
+        attributes: ["@precision(18,4)", "@non_negative"]
+        description: "Minimum total item quantity across the cart for a scope=order rule to fire (null = no item-count floor; ignored when scope=line)"
       stackable:
         type: bool
         attributes: ["@default(false)"]
@@ -103,6 +107,10 @@ models:
         type: decimal?
         attributes: ["@precision(18,2)", "@non_negative"]
         description: "Fixed amount off per unit (rate_or_discount=discount_amount)"
+      discount_upto:
+        type: decimal?
+        attributes: ["@precision(18,2)", "@non_negative"]
+        description: "Optional ceiling (currency) on the discount a rule grants; the resolved discount is clamped to at most this (null = no cap). Applies to discount_percentage and discount_amount; not meaningful for rate"
       currency:
         type: string
         attributes: ["@default('IDR')", "@length(3)"]

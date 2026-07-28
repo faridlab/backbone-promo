@@ -47,6 +47,8 @@ pub struct CreatePricingRuleDto {
     pub scope: RuleScope,
     #[serde(alias = "min_order_amount")]
     pub min_order_amount: Decimal,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "min_order_qty")]
+    pub min_order_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
     pub stackable: bool,
     #[serde(alias = "apply_on")]
@@ -75,6 +77,8 @@ pub struct CreatePricingRuleDto {
     pub discount_percentage: Option<Decimal>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_amount")]
     pub discount_amount: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_upto")]
+    pub discount_upto: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub currency: String,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
@@ -114,6 +118,8 @@ pub struct UpdatePricingRuleDto {
     pub scope: RuleScope,
     #[serde(alias = "min_order_amount")]
     pub min_order_amount: Decimal,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "min_order_qty")]
+    pub min_order_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
     pub stackable: bool,
     #[serde(alias = "apply_on")]
@@ -142,6 +148,8 @@ pub struct UpdatePricingRuleDto {
     pub discount_percentage: Option<Decimal>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_amount")]
     pub discount_amount: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_upto")]
+    pub discount_upto: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub currency: String,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
@@ -184,6 +192,8 @@ pub struct PatchPricingRuleDto {
     pub scope: Option<RuleScope>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "min_order_amount")]
     pub min_order_amount: Option<Decimal>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "min_order_qty")]
+    pub min_order_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stackable: Option<bool>,
@@ -213,6 +223,8 @@ pub struct PatchPricingRuleDto {
     pub discount_percentage: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "discount_amount")]
     pub discount_amount: Option<Decimal>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "discount_upto")]
+    pub discount_upto: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
@@ -232,7 +244,7 @@ pub struct PatchPricingRuleDto {
 impl PatchPricingRuleDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.scope.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.scope.is_some() || self.min_order_amount.is_some() || self.min_order_qty.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.discount_upto.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.is_active.is_some()
     }
 }
 
@@ -258,6 +270,7 @@ pub struct PricingRuleResponseDto {
     pub priority: i32,
     pub scope: RuleScope,
     pub min_order_amount: Decimal,
+    pub min_order_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
     pub stackable: bool,
     pub apply_on: ApplyOn,
@@ -273,6 +286,7 @@ pub struct PricingRuleResponseDto {
     pub rate: Option<Decimal>,
     pub discount_percentage: Option<Decimal>,
     pub discount_amount: Option<Decimal>,
+    pub discount_upto: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub currency: String,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
@@ -358,6 +372,7 @@ impl From<PricingRule> for PricingRuleResponseDto {
             priority: entity.priority,
             scope: entity.scope,
             min_order_amount: entity.min_order_amount,
+            min_order_qty: entity.min_order_qty,
             stackable: entity.stackable,
             apply_on: entity.apply_on,
             item_id: entity.item_id,
@@ -372,6 +387,7 @@ impl From<PricingRule> for PricingRuleResponseDto {
             rate: entity.rate,
             discount_percentage: entity.discount_percentage,
             discount_amount: entity.discount_amount,
+            discount_upto: entity.discount_upto,
             currency: entity.currency,
             valid_from: entity.valid_from,
             valid_to: entity.valid_to,
@@ -404,6 +420,7 @@ impl From<CreatePricingRuleDto> for PricingRule {
             priority: dto.priority,
             scope: dto.scope,
             min_order_amount: dto.min_order_amount,
+            min_order_qty: dto.min_order_qty,
             stackable: dto.stackable,
             apply_on: dto.apply_on,
             item_id: dto.item_id,
@@ -418,6 +435,7 @@ impl From<CreatePricingRuleDto> for PricingRule {
             rate: dto.rate,
             discount_percentage: dto.discount_percentage,
             discount_amount: dto.discount_amount,
+            discount_upto: dto.discount_upto,
             currency: dto.currency,
             valid_from: dto.valid_from,
             valid_to: dto.valid_to,
@@ -437,6 +455,7 @@ impl From<&PricingRule> for PricingRuleResponseDto {
             priority: entity.priority.clone(),
             scope: entity.scope.clone(),
             min_order_amount: entity.min_order_amount.clone(),
+            min_order_qty: entity.min_order_qty.clone(),
             stackable: entity.stackable.clone(),
             apply_on: entity.apply_on.clone(),
             item_id: entity.item_id.clone(),
@@ -451,6 +470,7 @@ impl From<&PricingRule> for PricingRuleResponseDto {
             rate: entity.rate.clone(),
             discount_percentage: entity.discount_percentage.clone(),
             discount_amount: entity.discount_amount.clone(),
+            discount_upto: entity.discount_upto.clone(),
             currency: entity.currency.clone(),
             valid_from: entity.valid_from.clone(),
             valid_to: entity.valid_to.clone(),
@@ -474,6 +494,7 @@ impl backbone_core::ApplyUpdateDto<UpdatePricingRuleDto> for PricingRule {
         self.priority = dto.priority;
         self.scope = dto.scope;
         self.min_order_amount = dto.min_order_amount;
+        self.min_order_qty = dto.min_order_qty;
         self.stackable = dto.stackable;
         self.apply_on = dto.apply_on;
         self.item_id = dto.item_id;
@@ -488,6 +509,7 @@ impl backbone_core::ApplyUpdateDto<UpdatePricingRuleDto> for PricingRule {
         self.rate = dto.rate;
         self.discount_percentage = dto.discount_percentage;
         self.discount_amount = dto.discount_amount;
+        self.discount_upto = dto.discount_upto;
         self.currency = dto.currency;
         self.valid_from = dto.valid_from;
         self.valid_to = dto.valid_to;

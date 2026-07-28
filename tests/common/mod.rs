@@ -154,6 +154,47 @@ pub async fn order_rule(
     .expect("insert order rule")
 }
 
+/// An order-scoped rule carrying the threshold-shape fields (ADR-003): a cart-wide item-count floor
+/// (`min_order_qty`) and/or a discount Rp ceiling (`discount_upto`). Either may be `None`.
+#[allow(clippy::too_many_arguments)]
+pub async fn order_rule_threshold(
+    pool: &PgPool,
+    company: Uuid,
+    priority: i32,
+    min_order_amount: &str,
+    min_order_qty: Option<Decimal>,
+    rate_or_discount: &str,
+    discount_percentage: Option<Decimal>,
+    discount_amount: Option<Decimal>,
+    discount_upto: Option<Decimal>,
+    stackable: bool,
+) -> Uuid {
+    sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO promo.pricing_rules
+            (company_id, title, priority, scope, min_order_amount, min_order_qty, stackable,
+             apply_on, rate_or_discount, discount_percentage, discount_amount, discount_upto,
+             coupon_required, valid_from, is_active)
+        VALUES ($1,'test-order-threshold',$2,'order'::rule_scope,$3,$4,$5,'all'::apply_on,
+                $6::rate_or_discount,$7,$8,$9,false,$10,true)
+        RETURNING id
+        "#,
+    )
+    .bind(company)
+    .bind(priority)
+    .bind(dec(min_order_amount))
+    .bind(min_order_qty)
+    .bind(stackable)
+    .bind(rate_or_discount)
+    .bind(discount_percentage)
+    .bind(discount_amount)
+    .bind(discount_upto)
+    .bind(now() - chrono::Duration::days(1))
+    .fetch_one(pool)
+    .await
+    .expect("insert threshold order rule")
+}
+
 /// A bundle with a reward effect. Add components with `bundle_component`.
 #[allow(clippy::too_many_arguments)]
 pub async fn bundle(

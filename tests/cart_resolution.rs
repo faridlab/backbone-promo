@@ -385,3 +385,71 @@ async fn cart16_buy_x_get_y_free_line() {
     assert_eq!(r.reward_lines[0].bundle_id, bid);
     assert_shares_tie_out(&r); // conservation still holds (free line is separate)
 }
+
+/// CART-17 (ADR-003) — `min_order_qty`: a scope=order rule with a cart-wide item-count floor fires
+/// only once the cart's total quantity clears it; below the floor it stays dormant (no discount).
+#[tokio::test]
+async fn cart17_order_min_qty_gate() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let item = Uuid::new_v4();
+
+    // 10% off the cart, but only when the cart holds ≥ 5 units in total.
+    order_rule_threshold(
+        &pool, company, 0, "0", Some(dec("5")),
+        "discount_percentage", Some(dec("10")), None, None, false,
+    )
+    .await;
+
+    // Below the floor: 2 lines × 2 units = 4 < 5 → rule does not fire.
+    let under = svc
+        .resolve_cart(&cart(company, vec![
+            line(company, item, "100000", "2"),
+            line(company, item, "100000", "2"),
+        ]))
+        .await
+        .unwrap();
+    assert_eq!(under.subtotal, dec("400000.00"));
+    assert_eq!(under.order_discount_total, Decimal::ZERO, "below min_order_qty: no discount");
+    assert_eq!(under.total, dec("400000.00"));
+
+    // At/above the floor: 2 lines × 3 units = 6 ≥ 5 → rule fires, 10% off.
+    let over = svc
+        .resolve_cart(&cart(company, vec![
+            line(company, item, "100000", "3"),
+            line(company, item, "100000", "3"),
+        ]))
+        .await
+        .unwrap();
+    assert_eq!(over.subtotal, dec("600000.00"));
+    assert_eq!(over.order_discount_total, dec("60000.00"), "above min_order_qty: 10% off");
+    assert_eq!(over.total, dec("540000.00"));
+    assert_shares_tie_out(&over);
+}
+
+/// CART-18 (ADR-003) — `discount_upto`: a percentage order discount is clamped at its Rp ceiling.
+/// 10% off a 1,000,000 subtotal would be 100,000, but the cap limits it to 50,000; conservation holds.
+#[tokio::test]
+async fn cart18_order_discount_upto_cap() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let item = Uuid::new_v4();
+
+    // 10% off the cart, capped at 50,000.
+    order_rule_threshold(
+        &pool, company, 0, "0", None,
+        "discount_percentage", Some(dec("10")), None, Some(dec("50000")), false,
+    )
+    .await;
+
+    let r = svc
+        .resolve_cart(&cart(company, vec![line(company, item, "1000000", "1")]))
+        .await
+        .unwrap();
+    assert_eq!(r.subtotal, dec("1000000.00"));
+    assert_eq!(r.order_discount_total, dec("50000.00"), "10% would be 100k; capped at 50k");
+    assert_eq!(r.total, dec("950000.00"));
+    assert_shares_tie_out(&r);
+}

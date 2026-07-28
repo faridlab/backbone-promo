@@ -58,6 +58,7 @@ pub struct PricingRule {
     pub priority: i32,
     pub scope: RuleScope,
     pub min_order_amount: Decimal,
+    pub min_order_qty: Option<Decimal>,
     pub stackable: bool,
     pub apply_on: ApplyOn,
     pub item_id: Option<Uuid>,
@@ -72,6 +73,7 @@ pub struct PricingRule {
     pub rate: Option<Decimal>,
     pub discount_percentage: Option<Decimal>,
     pub discount_amount: Option<Decimal>,
+    pub discount_upto: Option<Decimal>,
     pub currency: String,
     pub valid_from: DateTime<Utc>,
     pub valid_to: Option<DateTime<Utc>>,
@@ -97,6 +99,7 @@ impl PricingRule {
             priority,
             scope,
             min_order_amount,
+            min_order_qty: None,
             stackable,
             apply_on,
             item_id: None,
@@ -111,6 +114,7 @@ impl PricingRule {
             rate: None,
             discount_percentage: None,
             discount_amount: None,
+            discount_upto: None,
             currency,
             valid_from,
             valid_to: None,
@@ -396,6 +400,7 @@ pub struct PricingRuleBuilder {
     priority: Option<i32>,
     scope: Option<RuleScope>,
     min_order_amount: Option<Decimal>,
+    min_order_qty: Option<Decimal>,
     stackable: Option<bool>,
     apply_on: Option<ApplyOn>,
     item_id: Option<Uuid>,
@@ -410,6 +415,7 @@ pub struct PricingRuleBuilder {
     rate: Option<Decimal>,
     discount_percentage: Option<Decimal>,
     discount_amount: Option<Decimal>,
+    discount_upto: Option<Decimal>,
     currency: Option<String>,
     valid_from: Option<DateTime<Utc>>,
     valid_to: Option<DateTime<Utc>>,
@@ -445,6 +451,12 @@ impl PricingRuleBuilder {
     /// Set the min_order_amount field (default: `Decimal::from(0)`)
     pub fn min_order_amount(mut self, value: Decimal) -> Self {
         self.min_order_amount = Some(value);
+        self
+    }
+
+    /// Set the min_order_qty field (optional)
+    pub fn min_order_qty(mut self, value: Decimal) -> Self {
+        self.min_order_qty = Some(value);
         self
     }
 
@@ -532,6 +544,12 @@ impl PricingRuleBuilder {
         self
     }
 
+    /// Set the discount_upto field (optional)
+    pub fn discount_upto(mut self, value: Decimal) -> Self {
+        self.discount_upto = Some(value);
+        self
+    }
+
     /// Set the currency field (default: `"IDR".to_string()`)
     pub fn currency(mut self, value: String) -> Self {
         self.currency = Some(value);
@@ -577,6 +595,7 @@ impl PricingRuleBuilder {
             priority: self.priority.unwrap_or(0),
             scope: self.scope.unwrap_or(RuleScope::default()),
             min_order_amount: self.min_order_amount.unwrap_or(Decimal::from(0)),
+            min_order_qty: self.min_order_qty,
             stackable: self.stackable.unwrap_or(false),
             apply_on: self.apply_on.unwrap_or(ApplyOn::default()),
             item_id: self.item_id,
@@ -591,6 +610,7 @@ impl PricingRuleBuilder {
             rate: self.rate,
             discount_percentage: self.discount_percentage,
             discount_amount: self.discount_amount,
+            discount_upto: self.discount_upto,
             currency: self.currency.unwrap_or("IDR".to_string()),
             valid_from,
             valid_to: self.valid_to,

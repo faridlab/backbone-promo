@@ -29,6 +29,7 @@ struct OrderRuleCand {
     rate_or_discount: String,
     discount_percentage: Option<Decimal>,
     discount_amount: Option<Decimal>,
+    discount_upto: Option<Decimal>,
     stackable: bool,
     valid_from: chrono::DateTime<chrono::Utc>,
 }
@@ -44,13 +45,18 @@ impl OrderRuleCand {
     /// meaningful at order scope and yields no discount.
     fn discount_on(&self, base: Decimal) -> Decimal {
         let hundred = Decimal::from(100);
-        match self.rate_or_discount.as_str() {
+        let raw = match self.rate_or_discount.as_str() {
             "discount_percentage" => {
                 let pct = self.discount_percentage.unwrap_or(Decimal::ZERO).min(hundred);
                 money(base * pct / hundred)
             }
             "discount_amount" => money(self.discount_amount.unwrap_or(Decimal::ZERO)),
             _ => Decimal::ZERO,
+        };
+        // discount_upto caps the discount this rule may grant; null/zero = no cap.
+        match self.discount_upto {
+            Some(cap) if cap > Decimal::ZERO => raw.min(cap),
+            _ => raw,
         }
     }
 }
@@ -355,7 +361,8 @@ impl PromoWriteService {
         // ---- 3. ORDER PASS: scope=order rules gated on the subtotal. ----
         if !locked {
             let all_line_ids: Vec<Uuid> = lines.iter().map(|l| l.line_id).collect();
-            for rule in self.load_order_rules(cart, subtotal, unlocked_rule).await? {
+            let total_qty: Decimal = cart.lines.iter().map(|l| l.query.quantity).sum();
+            for rule in self.load_order_rules(cart, subtotal, total_qty, unlocked_rule).await? {
                 if locked || remaining <= Decimal::ZERO {
                     break;
                 }
@@ -409,6 +416,7 @@ impl PromoWriteService {
         &self,
         cart: &CartQuery,
         subtotal: Decimal,
+        total_qty: Decimal,
         unlocked_rule: Option<Uuid>,
     ) -> Result<Vec<OrderRuleCand>, PricingError> {
         // RLS scope (ADR-0008): company on the cart — scope the read.
@@ -421,6 +429,7 @@ impl PromoWriteService {
                 cart.customer_id,
                 cart.customer_group_id,
                 subtotal,
+                total_qty,
             ),
         )
         .await?;
@@ -436,6 +445,7 @@ impl PromoWriteService {
                 rate_or_discount: r.rate_or_discount,
                 discount_percentage: r.discount_percentage,
                 discount_amount: r.discount_amount,
+                discount_upto: r.discount_upto,
                 stackable: r.stackable,
                 valid_from: r.valid_from,
             })

@@ -66,6 +66,7 @@ pub struct LineRuleRow {
     pub rate: Option<Decimal>,
     pub discount_percentage: Option<Decimal>,
     pub discount_amount: Option<Decimal>,
+    pub discount_upto: Option<Decimal>,
     pub valid_from: chrono::DateTime<chrono::Utc>,
 }
 
@@ -79,6 +80,7 @@ pub struct OrderRuleRow {
     pub rate_or_discount: String,
     pub discount_percentage: Option<Decimal>,
     pub discount_amount: Option<Decimal>,
+    pub discount_upto: Option<Decimal>,
     pub stackable: bool,
     pub valid_from: chrono::DateTime<chrono::Utc>,
 }
@@ -104,7 +106,7 @@ impl PricingRuleRepository {
                 r#"
                 SELECT id, priority, apply_on::text AS apply_on, customer_id, customer_group_id,
                        coupon_required, rate_or_discount::text AS rate_or_discount,
-                       rate, discount_percentage, discount_amount, valid_from
+                       rate, discount_percentage, discount_amount, discount_upto, valid_from
                 FROM promo.pricing_rules
                 WHERE company_id = $1
                   AND is_active = true
@@ -149,6 +151,7 @@ impl PricingRuleRepository {
                 rate: r.get("rate"),
                 discount_percentage: r.get("discount_percentage"),
                 discount_amount: r.get("discount_amount"),
+                discount_upto: r.get("discount_upto"),
                 valid_from: r.get("valid_from"),
             })
             .collect())
@@ -165,6 +168,7 @@ impl PricingRuleRepository {
         customer_id: Option<Uuid>,
         customer_group_id: Option<Uuid>,
         subtotal: Decimal,
+        total_qty: Decimal,
     ) -> Result<Vec<OrderRuleRow>, sqlx::Error> {
         let rows = company_scope::fetch_all_rows_scoped(
             pool,
@@ -172,7 +176,7 @@ impl PricingRuleRepository {
                 r#"
                 SELECT id, priority, customer_id, customer_group_id, coupon_required,
                        rate_or_discount::text AS rate_or_discount,
-                       discount_percentage, discount_amount, stackable, valid_from
+                       discount_percentage, discount_amount, discount_upto, stackable, valid_from
                 FROM promo.pricing_rules
                 WHERE company_id = $1
                   AND is_active = true
@@ -183,13 +187,15 @@ impl PricingRuleRepository {
                   AND (customer_id IS NULL OR customer_id = $3)
                   AND (customer_group_id IS NULL OR customer_group_id = $4)
                   AND min_order_amount <= $5
+                  AND (min_order_qty IS NULL OR min_order_qty <= $6)
                 "#,
             )
             .bind(company_id)
             .bind(at)
             .bind(customer_id)
             .bind(customer_group_id)
-            .bind(subtotal),
+            .bind(subtotal)
+            .bind(total_qty),
         )
         .await?;
         Ok(rows
@@ -203,6 +209,7 @@ impl PricingRuleRepository {
                 rate_or_discount: r.get("rate_or_discount"),
                 discount_percentage: r.get("discount_percentage"),
                 discount_amount: r.get("discount_amount"),
+                discount_upto: r.get("discount_upto"),
                 stackable: r.get("stackable"),
                 valid_from: r.get("valid_from"),
             })
