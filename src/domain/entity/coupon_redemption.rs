@@ -219,6 +219,9 @@ impl backbone_orm::EntityRepoMeta for CouponRedemption {
     fn search_fields() -> &'static [&'static str] {
         &["source_type"]
     }
+    fn company_field() -> Option<&'static str> {
+        Some("company_id")
+    }
 }
 
 /// Builder for CouponRedemption entity

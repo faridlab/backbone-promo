@@ -3339,6 +3339,9 @@ components:
           type: string
         min_order_amount:
           type: string
+        min_order_qty:
+          nullable: true
+          type: string
         stackable:
           type: boolean
         apply_on:
@@ -3379,6 +3382,9 @@ components:
           nullable: true
           type: string
         discount_amount:
+          nullable: true
+          type: string
+        discount_upto:
           nullable: true
           type: string
         currency:
@@ -3442,6 +3448,9 @@ components:
           type: string
         min_order_amount:
           type: string
+        min_order_qty:
+          nullable: true
+          type: string
         stackable:
           type: boolean
         apply_on:
@@ -3482,6 +3491,9 @@ components:
           nullable: true
           type: string
         discount_amount:
+          nullable: true
+          type: string
+        discount_upto:
           nullable: true
           type: string
         currency:
@@ -3532,6 +3544,9 @@ components:
           type: string
         min_order_amount:
           type: string
+        min_order_qty:
+          nullable: true
+          type: string
         stackable:
           type: boolean
         apply_on:
@@ -3572,6 +3587,9 @@ components:
           nullable: true
           type: string
         discount_amount:
+          nullable: true
+          type: string
+        discount_upto:
           nullable: true
           type: string
         currency:
@@ -3606,6 +3624,9 @@ components:
           type: string
         min_order_amount:
           type: string
+        min_order_qty:
+          nullable: true
+          type: string
         stackable:
           type: boolean
         apply_on:
@@ -3646,6 +3667,9 @@ components:
           nullable: true
           type: string
         discount_amount:
+          nullable: true
+          type: string
+        discount_upto:
           nullable: true
           type: string
         currency:

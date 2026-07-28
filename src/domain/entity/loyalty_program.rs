@@ -251,6 +251,9 @@ impl backbone_orm::EntityRepoMeta for LoyaltyProgram {
     fn search_fields() -> &'static [&'static str] {
         &["program_name"]
     }
+    fn company_field() -> Option<&'static str> {
+        Some("company_id")
+    }
 }
 
 /// Builder for LoyaltyProgram entity

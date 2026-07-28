@@ -314,18 +314,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "backbone-gl-posting"
-version = "0.1.0"
-source = "git+https://github.com/faridlab/backbone-framework?tag=v2.7.6#15a7d6cd42d1398bababc5bac38230608a838a07"
-dependencies = [
- "async-trait",
- "chrono",
- "rust_decimal",
- "serde",
- "uuid",
-]
-
-[[package]]
 name = "backbone-messaging"
 version = "2.0.0"
 source = "git+https://github.com/faridlab/backbone-framework?tag=v2.7.1#fd5fa1286eafad62fe55c0bcccb33efde01b389e"
@@ -421,7 +409,7 @@ dependencies = [
 
 [[package]]
 name = "backbone-pos"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -498,14 +486,13 @@ dependencies = [
 
 [[package]]
 name = "backbone-selling"
-version = "0.5.3"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-trait",
  "axum",
  "backbone-auth 2.0.0 (git+https://github.com/faridlab/backbone-framework?tag=v2.7.6)",
  "backbone-core 2.0.0 (git+https://github.com/faridlab/backbone-framework?tag=v2.7.6)",
- "backbone-gl-posting",
  "backbone-messaging 2.0.0 (git+https://github.com/faridlab/backbone-framework?tag=v2.7.6)",
  "backbone-orm 2.0.0 (git+https://github.com/faridlab/backbone-framework?tag=v2.7.6)",
  "backbone-outbox 0.2.0 (git+https://github.com/faridlab/backbone-framework?tag=v2.7.6)",

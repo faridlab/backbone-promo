@@ -313,6 +313,9 @@ impl backbone_orm::EntityRepoMeta for PromoBundle {
     fn search_fields() -> &'static [&'static str] {
         &["title", "currency"]
     }
+    fn company_field() -> Option<&'static str> {
+        Some("company_id")
+    }
 }
 
 /// Builder for PromoBundle entity

@@ -254,6 +254,9 @@ impl backbone_orm::EntityRepoMeta for CouponCode {
     fn search_fields() -> &'static [&'static str] {
         &["code"]
     }
+    fn company_field() -> Option<&'static str> {
+        Some("company_id")
+    }
 }
 
 /// Builder for CouponCode entity

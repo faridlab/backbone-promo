@@ -179,6 +179,12 @@ impl PricingRule {
     // Fluent Setters (with_* for optional fields)
     // ==========================================================
 
+    /// Set the min_order_qty field (chainable)
+    pub fn with_min_order_qty(mut self, value: Decimal) -> Self {
+        self.min_order_qty = Some(value);
+        self
+    }
+
     /// Set the item_id field (chainable)
     pub fn with_item_id(mut self, value: Uuid) -> Self {
         self.item_id = Some(value);
@@ -233,6 +239,12 @@ impl PricingRule {
         self
     }
 
+    /// Set the discount_upto field (chainable)
+    pub fn with_discount_upto(mut self, value: Decimal) -> Self {
+        self.discount_upto = Some(value);
+        self
+    }
+
     /// Set the valid_to field (chainable)
     pub fn with_valid_to(mut self, value: DateTime<Utc>) -> Self {
         self.valid_to = Some(value);
@@ -261,6 +273,9 @@ impl PricingRule {
                 }
                 "min_order_amount" => {
                     if let Ok(v) = serde_json::from_value(value) { self.min_order_amount = v; }
+                }
+                "min_order_qty" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.min_order_qty = v; }
                 }
                 "stackable" => {
                     if let Ok(v) = serde_json::from_value(value) { self.stackable = v; }
@@ -303,6 +318,9 @@ impl PricingRule {
                 }
                 "discount_amount" => {
                     if let Ok(v) = serde_json::from_value(value) { self.discount_amount = v; }
+                }
+                "discount_upto" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.discount_upto = v; }
                 }
                 "currency" => {
                     if let Ok(v) = serde_json::from_value(value) { self.currency = v; }
@@ -386,6 +404,9 @@ impl backbone_orm::EntityRepoMeta for PricingRule {
     }
     fn search_fields() -> &'static [&'static str] {
         &["title", "currency"]
+    }
+    fn company_field() -> Option<&'static str> {
+        Some("company_id")
     }
 }
 

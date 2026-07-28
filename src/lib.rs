@@ -56,13 +56,13 @@ use sqlx::PgPool;
 /// let router = promo.all_crud_routes();
 /// ```
 pub struct PromoModule {
-    pub coupon_code_service: Arc<CouponCodeService>,
-    pub coupon_redemption_service: Arc<CouponRedemptionService>,
-    pub loyalty_program_service: Arc<LoyaltyProgramService>,
-    pub loyalty_point_entry_service: Arc<LoyaltyPointEntryService>,
-    pub pricing_rule_service: Arc<PricingRuleService>,
-    pub promo_bundle_service: Arc<PromoBundleService>,
-    pub promo_bundle_component_service: Arc<PromoBundleComponentService>,
+    pub(crate) coupon_code_service: Arc<CouponCodeService>,
+    pub(crate) coupon_redemption_service: Arc<CouponRedemptionService>,
+    pub(crate) loyalty_program_service: Arc<LoyaltyProgramService>,
+    pub(crate) loyalty_point_entry_service: Arc<LoyaltyPointEntryService>,
+    pub(crate) pricing_rule_service: Arc<PricingRuleService>,
+    pub(crate) promo_bundle_service: Arc<PromoBundleService>,
+    pub(crate) promo_bundle_component_service: Arc<PromoBundleComponentService>,
 }
 
 impl PromoModule {
