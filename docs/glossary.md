@@ -1,15 +1,30 @@
 # Glossary — ubiquitous language
 
-> Reader: **All** · Mode: **Reference** · Last reviewed 2026-07-05.
+> Reader: **All** · Mode: **Reference** · Last reviewed 2026-07-29.
 > One term, one meaning. Every page in this handbook uses these definitions. If a term you need is
 > missing, add it here rather than coining a synonym elsewhere.
 
 ## Domain entities
 
+**Promotion** — *informal umbrella term* for "a thing a merchant runs that changes a price." **Not a
+stored entity or field.** Every classic "promo type" (`standard` / `event` / `minimum` / `quantity`) is
+already expressible structurally, with no
+stored tag (ADR-003): `standard` (flat discount on a target) → `PricingRule` `scope = line`; `event`
+(time-windowed) → `PricingRule` with a `valid_from` / `valid_to` window; `minimum` (discount once a
+cart/spend threshold clears) → `PricingRule` `scope = order` + `min_order_amount`; `quantity` ("buy X get
+Y free") → a `PromoBundle` free-item reward. When a consumer needs to group/filter/report by this
+classification, it is **fully computable from existing fields** — derive it, do not store it.
+
 **PricingRule** — the unit the resolver evaluates. A rule targets a *selector* (`apply_on`: item /
 item_group / brand / all) under optional customer, quantity, amount, and date conditions, and carries
 *exactly one* effect (rate / discount_percentage / discount_amount). Source of truth:
 `schema/models/pricing_rule.model.yaml`.
+
+**PromoBundle** — a cart-scoped promotion whose condition spans *distinct* lines ("buy A + B, get a
+discount" / "buy X get Y free"). A set of `PromoBundleComponent`s, each a reusable `ApplyOn` selector with
+a `min_qty`; `match_type` = `all_of` | `any_n`. Carries one reward: a discount on the matched set, or a
+free-item reward (`reward_item_id` + `reward_qty`). Evaluated in the cart pass (ADR-002). Source of truth:
+`schema/models/promo_bundle.model.yaml`.
 
 **CouponCode** — a redeemable code that unlocks a `coupon_required` PricingRule. Bounded by `max_use`;
 carries its own validity window independent of the rule's. `schema/models/coupon_code.model.yaml`.
