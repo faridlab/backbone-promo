@@ -96,6 +96,7 @@ struct BundleCand {
     reward_qty: Option<Decimal>,
     stackable: bool,
     components: Vec<BundleComponentCand>,
+    gifts: Vec<(Uuid, Decimal)>,
 }
 
 impl BundleCand {
@@ -172,6 +173,23 @@ impl BundleCand {
             return None;
         }
         Some((item, qty))
+    }
+
+    /// The free item(s) this bundle grants via its gift list, when it is satisfied: one
+    /// `(gift_item, gift_qty × sets)` per gift. Empty when the bundle has no gifts or isn't satisfied.
+    /// Takes precedence over the legacy single `reward_item_id` when gifts are configured.
+    fn free_rewards(&self, cart: &CartQuery, lines: &[ResolvedLine]) -> Vec<(Uuid, Decimal)> {
+        let (sets, _) = self.satisfied_sets(cart, lines);
+        if sets < Decimal::ONE || self.gifts.is_empty() {
+            return Vec::new();
+        }
+        self.gifts
+            .iter()
+            .filter_map(|(item, per_set)| {
+                let qty = *per_set * sets;
+                if qty > Decimal::ZERO { Some((*item, qty)) } else { None }
+            })
+            .collect()
     }
 
     /// Compute the reward discount and the lines that contributed to satisfying the bundle.
@@ -323,6 +341,14 @@ impl PromoWriteService {
         for bundle in self.load_active_bundles(cart, subtotal).await? {
             // Buy-X-get-Y: a satisfied free-item bundle grants extra goods, not a discount. It doesn't
             // touch `remaining`/`locked` (a free line isn't an order-level discount on the basket).
+            // Gifts (1..N free items) take precedence over the legacy single reward_item_id.
+            let gifts = bundle.free_rewards(cart, &lines);
+            if !gifts.is_empty() {
+                for (item_id, quantity) in gifts {
+                    reward_lines.push(RewardLine { bundle_id: bundle.id, item_id, quantity });
+                }
+                continue;
+            }
             if bundle.reward_item_id.is_some() {
                 if let Some((item_id, quantity)) = bundle.free_reward(cart, &lines) {
                     reward_lines.push(RewardLine { bundle_id: bundle.id, item_id, quantity });
@@ -485,6 +511,12 @@ impl PromoWriteService {
         )
         .await?;
 
+        let grows = company_scope::with_company_scope(
+            Some(cart.company_id),
+            self.bundle_gifts.find_for_bundles(&self.pool, cart.company_id, &bundle_ids),
+        )
+        .await?;
+
         let mut bundles: Vec<BundleCand> = brows
             .into_iter()
             .map(|r| BundleCand {
@@ -498,6 +530,7 @@ impl PromoWriteService {
                 reward_qty: r.reward_qty,
                 stackable: r.stackable,
                 components: Vec::new(),
+                gifts: Vec::new(),
             })
             .collect();
         for cr in crows {
@@ -509,6 +542,11 @@ impl PromoWriteService {
                     brand_id: cr.brand_id,
                     min_qty: cr.min_qty,
                 });
+            }
+        }
+        for gr in grows {
+            if let Some(b) = bundles.iter_mut().find(|b| b.id == gr.bundle_id) {
+                b.gifts.push((gr.gift_item_id, gr.gift_qty));
             }
         }
         // A bundle with no components can never be satisfied — drop it.

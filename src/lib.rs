@@ -38,6 +38,7 @@ pub use application::service::LoyaltyPointEntryService;
 pub use application::service::PricingRuleService;
 pub use application::service::PromoBundleService;
 pub use application::service::PromoBundleComponentService;
+pub use application::service::PromoBundleGiftService;
 
 use std::sync::Arc;
 use axum::Router;
@@ -63,6 +64,7 @@ pub struct PromoModule {
     pub(crate) pricing_rule_service: Arc<PricingRuleService>,
     pub(crate) promo_bundle_service: Arc<PromoBundleService>,
     pub(crate) promo_bundle_component_service: Arc<PromoBundleComponentService>,
+    pub(crate) promo_bundle_gift_service: Arc<PromoBundleGiftService>,
 }
 
 impl PromoModule {
@@ -85,6 +87,7 @@ impl PromoModule {
             create_pricing_rule_routes,
             create_promo_bundle_routes,
             create_promo_bundle_component_routes,
+            create_promo_bundle_gift_routes,
         };
 
         Router::new()
@@ -95,6 +98,7 @@ impl PromoModule {
             .merge(create_pricing_rule_routes(self.pricing_rule_service.clone()))
             .merge(create_promo_bundle_routes(self.promo_bundle_service.clone()))
             .merge(create_promo_bundle_component_routes(self.promo_bundle_component_service.clone()))
+            .merge(create_promo_bundle_gift_routes(self.promo_bundle_gift_service.clone()))
     }
 
     /// Deprecated alias for [`Self::all_crud_routes`]. `routes()` reads like
@@ -163,6 +167,10 @@ impl PromoModuleBuilder {
         let promo_bundle_component_repository = Arc::new(PromoBundleComponentRepository::new(db_pool.clone()));
         let promo_bundle_component_service = Arc::new(PromoBundleComponentService::with_repository(promo_bundle_component_repository.clone()));
 
+        // PromoBundleGift service
+        let promo_bundle_gift_repository = Arc::new(PromoBundleGiftRepository::new(db_pool.clone()));
+        let promo_bundle_gift_service = Arc::new(PromoBundleGiftService::with_repository(promo_bundle_gift_repository.clone()));
+
         // <<< CUSTOM
         // END CUSTOM
 
@@ -174,6 +182,7 @@ impl PromoModuleBuilder {
             pricing_rule_service,
             promo_bundle_service,
             promo_bundle_component_service,
+            promo_bundle_gift_service,
             // <<< CUSTOM
             // END CUSTOM
         })

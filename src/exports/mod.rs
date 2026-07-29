@@ -48,6 +48,9 @@ pub use events::*;
 /// - `PromoBundleComponentDto` - Data transfer object for PromoBundleComponent
 /// - `PromoBundleComponentSummary` - Summary view of PromoBundleComponent
 /// - `PromoBundleComponentId` - Type-safe ID wrapper
+/// - `PromoBundleGiftDto` - Data transfer object for PromoBundleGift
+/// - `PromoBundleGiftSummary` - Summary view of PromoBundleGift
+/// - `PromoBundleGiftId` - Type-safe ID wrapper
 ///
 /// ## Public Services
 /// - `PromoQueryService` - Read-only queries
@@ -74,4 +77,7 @@ pub use events::*;
 /// - `PromoBundleComponentCreatedEvent` - Published when PromoBundleComponent is created
 /// - `PromoBundleComponentUpdatedEvent` - Published when PromoBundleComponent is updated
 /// - `PromoBundleComponentDeletedEvent` - Published when PromoBundleComponent is deleted
+/// - `PromoBundleGiftCreatedEvent` - Published when PromoBundleGift is created
+/// - `PromoBundleGiftUpdatedEvent` - Published when PromoBundleGift is updated
+/// - `PromoBundleGiftDeletedEvent` - Published when PromoBundleGift is deleted
 pub struct ExportSummary;

@@ -26,6 +26,7 @@ pub mod promo_loyalty;
 // END CUSTOM
 pub mod promo_bundle_service;
 pub mod promo_bundle_component_service;
+pub mod promo_bundle_gift_service;
 
 // <<< CUSTOM
 // END CUSTOM
@@ -49,5 +50,6 @@ pub use promo_write_service::{
 // END CUSTOM
 pub use promo_bundle_service::PromoBundleService;
 pub use promo_bundle_component_service::PromoBundleComponentService;
+pub use promo_bundle_gift_service::PromoBundleGiftService;
 // <<< CUSTOM
 // END CUSTOM

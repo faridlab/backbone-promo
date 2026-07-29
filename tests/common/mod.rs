@@ -259,6 +259,30 @@ pub async fn bundle_component(
     .expect("insert bundle component");
 }
 
+/// Attach a free gift to a bundle: `gift_qty` units of `gift_item` per satisfied set (ADR-005).
+pub async fn gift(
+    pool: &PgPool,
+    company: Uuid,
+    bundle_id: Uuid,
+    gift_item: Uuid,
+    gift_qty: &str,
+) {
+    sqlx::query(
+        r#"
+        INSERT INTO promo.promo_bundle_gifts
+            (company_id, bundle_id, gift_item_id, gift_qty)
+        VALUES ($1,$2,$3,$4)
+        "#,
+    )
+    .bind(company)
+    .bind(bundle_id)
+    .bind(gift_item)
+    .bind(dec(gift_qty))
+    .execute(pool)
+    .await
+    .expect("insert gift");
+}
+
 /// A coupon unlocking a rule, with a redemption cap.
 pub async fn coupon(
     pool: &PgPool,

@@ -86,6 +86,15 @@ pub trait PromoQueryService: Send + Sync {
     /// Check if PromoBundleComponent exists
     async fn promo_bundle_component_exists(&self, id: PromoBundleComponentId) -> Result<bool>;
 
+    /// Get PromoBundleGift by ID
+    async fn get_promo_bundle_gift(&self, id: PromoBundleGiftId) -> Result<Option<PromoBundleGiftDto>>;
+
+    /// Get PromoBundleGift summary by ID
+    async fn get_promo_bundle_gift_summary(&self, id: PromoBundleGiftId) -> Result<Option<PromoBundleGiftSummary>>;
+
+    /// Check if PromoBundleGift exists
+    async fn promo_bundle_gift_exists(&self, id: PromoBundleGiftId) -> Result<bool>;
+
 }
 
 // ============================================================================

@@ -9,6 +9,7 @@ pub mod loyalty_point_entry_domain_policy;
 pub mod pricing_rule_domain_policy;
 pub mod promo_bundle_domain_policy;
 pub mod promo_bundle_component_domain_policy;
+pub mod promo_bundle_gift_domain_policy;
 
 pub use coupon_code_domain_policy::CouponCodeDomainPolicy;
 pub use coupon_redemption_domain_policy::CouponRedemptionDomainPolicy;
@@ -17,6 +18,7 @@ pub use loyalty_point_entry_domain_policy::LoyaltyPointEntryDomainPolicy;
 pub use pricing_rule_domain_policy::PricingRuleDomainPolicy;
 pub use promo_bundle_domain_policy::PromoBundleDomainPolicy;
 pub use promo_bundle_component_domain_policy::PromoBundleComponentDomainPolicy;
+pub use promo_bundle_gift_domain_policy::PromoBundleGiftDomainPolicy;
 
 // <<< CUSTOM
 // END CUSTOM

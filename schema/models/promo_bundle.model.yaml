@@ -158,6 +158,45 @@ models:
       - type: index
         fields: [company_id, bundle_id]
 
+  - name: PromoBundleGift
+    collection: promo_bundle_gifts
+    description: "One free gift a bundle grants per satisfied set (the Shopee-style 'buy A, get gift(s)' shape)"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique gift id"
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Books owner # logical FK to organization.Company.id"
+      bundle_id:
+        type: uuid
+        attributes: ["@required", "@foreign_key(PromoBundle.id)"]
+        description: "The bundle this gift belongs to"
+
+      # --- The free item granted, and how many per satisfied set ---
+      gift_item_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "The free product granted per satisfied set # logical FK to catalog.Product.id"
+      gift_qty:
+        type: decimal
+        attributes: ["@default(1)", "@precision(18,4)", "@non_negative"]
+        description: "Free units of gift_item_id granted per satisfied bundle set"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      - type: index
+        fields: [bundle_id]
+      - type: index
+        fields: [company_id, bundle_id]
+
 enums:
   - name: BundleMatch
     description: "How many of a bundle's components must be present for it to fire"

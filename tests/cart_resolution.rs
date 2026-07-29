@@ -453,3 +453,38 @@ async fn cart18_order_discount_upto_cap() {
     assert_eq!(r.total, dec("950000.00"));
     assert_shares_tie_out(&r);
 }
+
+/// CART-19 (ADR-005) — multi-gift bundle: buying the qualifying product grants MULTIPLE distinct free
+/// gifts (Shopee-style "buy A, get gift(s)"), each as its own zero-priced RewardLine. The basket total
+/// is unchanged (gifts are extra goods, not a discount). The legacy single-gift path (reward_item_id,
+/// covered by cart16) still works via the fallback when a bundle has no gift rows.
+#[tokio::test]
+async fn cart19_multi_gift_bundle() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (item_a, gift_b, gift_c) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+
+    // Buy 1 A → get 1 free B and 2 free C (two distinct gifts on one bundle).
+    let bid = bundle(&pool, company, 0, "all_of", None, "discount_percentage", None, None, "0", false).await;
+    bundle_component(&pool, company, bid, item_a, "1").await;
+    gift(&pool, company, bid, gift_b, "1").await;
+    gift(&pool, company, bid, gift_c, "2").await;
+
+    let r = svc
+        .resolve_cart(&cart(company, vec![line(company, item_a, "100000", "1")]))
+        .await
+        .unwrap();
+
+    assert_eq!(r.subtotal, dec("100000.00"));
+    assert_eq!(r.order_discount_total, Decimal::ZERO, "gifts are free goods, not a discount");
+    assert_eq!(r.total, dec("100000.00"), "basket total unchanged");
+    assert_eq!(r.reward_lines.len(), 2, "one RewardLine per gift");
+    let qty_of = |item: Uuid| {
+        r.reward_lines.iter().filter(|rl| rl.item_id == item).map(|rl| rl.quantity).sum::<Decimal>()
+    };
+    assert_eq!(qty_of(gift_b), dec("1.0000"), "1 free B per satisfied set");
+    assert_eq!(qty_of(gift_c), dec("2.0000"), "2 free C per satisfied set");
+    assert!(r.reward_lines.iter().all(|rl| rl.bundle_id == bid), "all gifts attributed to the bundle");
+    assert_shares_tie_out(&r);
+}

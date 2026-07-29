@@ -16,6 +16,7 @@ use super::{
     pricing_rule_handler::create_pricing_rule_routes,
     promo_bundle_handler::create_promo_bundle_routes,
     promo_bundle_component_handler::create_promo_bundle_component_routes,
+    promo_bundle_gift_handler::create_promo_bundle_gift_routes,
 };
 
 use crate::application::service::{
@@ -26,6 +27,7 @@ use crate::application::service::{
     PricingRuleService,
     PromoBundleService,
     PromoBundleComponentService,
+    PromoBundleGiftService,
 };
 
 /// Services collection for all CRUD endpoints
@@ -37,6 +39,7 @@ pub struct HttpServices {
     pub pricing_rule: Arc<PricingRuleService>,
     pub promo_bundle: Arc<PromoBundleService>,
     pub promo_bundle_component: Arc<PromoBundleComponentService>,
+    pub promo_bundle_gift: Arc<PromoBundleGiftService>,
 }
 
 /// Configure all HTTP routes for this module using Axum and BackboneCrudHandler.
@@ -70,6 +73,8 @@ pub fn configure_routes(services: HttpServices) -> Router {
         .merge(create_promo_bundle_routes(services.promo_bundle))
         // PromoBundleComponent routes (12 Backbone endpoints)
         .merge(create_promo_bundle_component_routes(services.promo_bundle_component))
+        // PromoBundleGift routes (12 Backbone endpoints)
+        .merge(create_promo_bundle_gift_routes(services.promo_bundle_gift))
 }
 
 /// Create an individual entity's routes (for modular configuration)
@@ -102,6 +107,10 @@ pub mod individual {
 
     pub fn promo_bundle_component_routes(service: Arc<PromoBundleComponentService>) -> Router {
         create_promo_bundle_component_routes(service)
+    }
+
+    pub fn promo_bundle_gift_routes(service: Arc<PromoBundleGiftService>) -> Router {
+        create_promo_bundle_gift_routes(service)
     }
 
 }

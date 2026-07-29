@@ -200,6 +200,33 @@ pub struct PromoBundleComponentDeletedEvent {
 }
 
 // ============================================================================
+// PROMOBUNDLEGIFT EVENTS
+// ============================================================================
+
+/// Event published when a PromoBundleGift is created
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleGiftCreatedEvent {
+    pub id: PromoBundleGiftId,
+    pub data: PromoBundleGiftDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a PromoBundleGift is updated
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleGiftUpdatedEvent {
+    pub id: PromoBundleGiftId,
+    pub data: PromoBundleGiftDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a PromoBundleGift is deleted
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleGiftDeletedEvent {
+    pub id: PromoBundleGiftId,
+    pub occurred_at: DateTime<Utc>,
+}
+
+// ============================================================================
 // MODULE EVENT ENUM
 // ============================================================================
 
@@ -228,6 +255,9 @@ pub enum PromoEvent {
     PromoBundleComponentCreated(PromoBundleComponentCreatedEvent),
     PromoBundleComponentUpdated(PromoBundleComponentUpdatedEvent),
     PromoBundleComponentDeleted(PromoBundleComponentDeletedEvent),
+    PromoBundleGiftCreated(PromoBundleGiftCreatedEvent),
+    PromoBundleGiftUpdated(PromoBundleGiftUpdatedEvent),
+    PromoBundleGiftDeleted(PromoBundleGiftDeletedEvent),
 }
 
 /// Metadata for module events

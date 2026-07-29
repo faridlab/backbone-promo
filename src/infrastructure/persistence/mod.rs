@@ -11,6 +11,7 @@ mod loyalty_point_entry_repository;
 mod pricing_rule_repository;
 mod promo_bundle_repository;
 mod promo_bundle_component_repository;
+mod promo_bundle_gift_repository;
 
 // Custom persistence modules
 // <<< CUSTOM
@@ -24,6 +25,7 @@ pub use loyalty_point_entry_repository::LoyaltyPointEntryRepository;
 pub use pricing_rule_repository::PricingRuleRepository;
 pub use promo_bundle_repository::PromoBundleRepository;
 pub use promo_bundle_component_repository::PromoBundleComponentRepository;
+pub use promo_bundle_gift_repository::PromoBundleGiftRepository;
 
 // Re-export backbone-orm types
 pub use backbone_orm::repository::{
@@ -39,5 +41,6 @@ pub use backbone_orm::repository::{
 pub use loyalty_point_entry_repository::{NewAccrualRow, NewRedemptionRow, PriorRedemptionRow};
 pub use pricing_rule_repository::{LineRuleQuery, LineRuleRow, OrderRuleRow};
 pub use promo_bundle_component_repository::BundleComponentRow;
+pub use promo_bundle_gift_repository::BundleGiftRow;
 pub use promo_bundle_repository::BundleRow;
 // END CUSTOM

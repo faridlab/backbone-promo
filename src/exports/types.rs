@@ -469,6 +469,63 @@ pub struct PromoBundleComponentRef {
 }
 
 // ============================================================================
+// PROMOBUNDLEGIFT TYPES
+// ============================================================================
+
+/// Type-safe ID for PromoBundleGift
+///
+/// Use this instead of raw Uuid for type safety across modules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PromoBundleGiftId(pub Uuid);
+
+impl PromoBundleGiftId {
+    pub fn new(id: Uuid) -> Self {
+        Self(id)
+    }
+
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl From<Uuid> for PromoBundleGiftId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<PromoBundleGiftId> for Uuid {
+    fn from(id: PromoBundleGiftId) -> Self {
+        id.0
+    }
+}
+
+/// Data transfer object for PromoBundleGift
+///
+/// This is the public representation of PromoBundleGift for other modules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleGiftDto {
+    pub id: PromoBundleGiftId,
+    pub company_id: Uuid,
+    pub bundle_id: Uuid,
+    pub gift_item_id: Uuid,
+    pub gift_qty: Decimal,
+    pub metadata: serde_json::Value,
+}
+
+/// Summary view of PromoBundleGift for list displays
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleGiftSummary {
+    pub id: PromoBundleGiftId,
+}
+
+/// Reference to PromoBundleGift for foreign key relationships
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromoBundleGiftRef {
+    pub id: PromoBundleGiftId,
+}
+
+// ============================================================================
 // CUSTOM TYPES
 // ============================================================================
 

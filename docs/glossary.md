@@ -22,9 +22,14 @@ item_group / brand / all) under optional customer, quantity, amount, and date co
 
 **PromoBundle** — a cart-scoped promotion whose condition spans *distinct* lines ("buy A + B, get a
 discount" / "buy X get Y free"). A set of `PromoBundleComponent`s, each a reusable `ApplyOn` selector with
-a `min_qty`; `match_type` = `all_of` | `any_n`. Carries one reward: a discount on the matched set, or a
-free-item reward (`reward_item_id` + `reward_qty`). Evaluated in the cart pass (ADR-002). Source of truth:
-`schema/models/promo_bundle.model.yaml`.
+a `min_qty`; `match_type` = `all_of` | `any_n`. Carries one reward: a discount on the matched set, a
+free-item reward (`reward_item_id` + `reward_qty`), or 1..N free gifts (`PromoBundleGift`; ADR-005).
+Evaluated in the cart pass (ADR-002). Source of truth: `schema/models/promo_bundle.model.yaml`.
+
+**PromoBundleGift** — one free item a `PromoBundle` grants per satisfied set: `gift_item_id` +
+`gift_qty`. A bundle carries 1..N gifts (the Shopee-style "buy A, get gift(s)" shape); each becomes a
+zero-priced `RewardLine` (`gift_qty × satisfied_sets`). Gifts take precedence over the legacy single
+`reward_item_id` when both are set. Same source of truth as PromoBundle. (ADR-005.)
 
 **CouponCode** — a redeemable code that unlocks a `coupon_required` PricingRule. Bounded by `max_use`;
 carries its own validity window independent of the rule's. `schema/models/coupon_code.model.yaml`.

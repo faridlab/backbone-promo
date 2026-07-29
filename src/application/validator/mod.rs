@@ -12,6 +12,7 @@ pub mod loyalty_point_entry_validator;
 pub mod pricing_rule_validator;
 pub mod promo_bundle_validator;
 pub mod promo_bundle_component_validator;
+pub mod promo_bundle_gift_validator;
 
 pub use coupon_code_validator::{CouponCodeValidator, coupon_code_validator};
 pub use coupon_redemption_validator::{CouponRedemptionValidator, coupon_redemption_validator};
@@ -20,6 +21,7 @@ pub use loyalty_point_entry_validator::{LoyaltyPointEntryValidator, loyalty_poin
 pub use pricing_rule_validator::{PricingRuleValidator, pricing_rule_validator};
 pub use promo_bundle_validator::{PromoBundleValidator, promo_bundle_validator};
 pub use promo_bundle_component_validator::{PromoBundleComponentValidator, promo_bundle_component_validator};
+pub use promo_bundle_gift_validator::{PromoBundleGiftValidator, promo_bundle_gift_validator};
 
 // <<< CUSTOM
 // END CUSTOM

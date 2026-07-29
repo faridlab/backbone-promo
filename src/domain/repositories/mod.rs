@@ -13,6 +13,7 @@ pub mod loyalty_point_entry_repository;
 pub mod pricing_rule_repository;
 pub mod promo_bundle_repository;
 pub mod promo_bundle_component_repository;
+pub mod promo_bundle_gift_repository;
 
 // Re-exports
 pub use coupon_code_repository::{
@@ -56,4 +57,10 @@ pub use promo_bundle_component_repository::{
     PromoBundleComponentPaginationParams,
     PromoBundleComponentPaginatedResult,
     PromoBundleComponentFilter,
+};
+pub use promo_bundle_gift_repository::{
+    PromoBundleGiftRepository,
+    PromoBundleGiftPaginationParams,
+    PromoBundleGiftPaginatedResult,
+    PromoBundleGiftFilter,
 };

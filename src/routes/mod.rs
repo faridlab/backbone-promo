@@ -24,7 +24,9 @@ use crate::presentation::http::{
     create_promo_bundle_routes,
     create_promo_bundle_read_routes,
     create_promo_bundle_component_routes,
-    create_promo_bundle_component_read_routes
+    create_promo_bundle_component_read_routes,
+    create_promo_bundle_gift_routes,
+    create_promo_bundle_gift_read_routes
 };
 
 // Import AppState for stateful routes
@@ -55,6 +57,7 @@ pub fn create_stateless_routes(module: &crate::PromoModule) -> Router<()> {
         .merge(create_pricing_rule_routes(module.pricing_rule_service.clone()))
         .merge(create_promo_bundle_routes(module.promo_bundle_service.clone()))
         .merge(create_promo_bundle_component_routes(module.promo_bundle_component_service.clone()))
+        .merge(create_promo_bundle_gift_routes(module.promo_bundle_gift_service.clone()))
 }
 
 /// Read-only routes for the Promo module — every entity mounted READ-ONLY (the guarded base).
@@ -71,6 +74,7 @@ pub fn create_readonly_promo_routes(module: &crate::PromoModule) -> Router<()> {
         .merge(create_pricing_rule_read_routes(module.pricing_rule_service.clone()))
         .merge(create_promo_bundle_read_routes(module.promo_bundle_service.clone()))
         .merge(create_promo_bundle_component_read_routes(module.promo_bundle_component_service.clone()))
+        .merge(create_promo_bundle_gift_read_routes(module.promo_bundle_gift_service.clone()))
 }
 
 /// Get all routes (stateless) for the Promo module.

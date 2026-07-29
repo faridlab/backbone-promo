@@ -26,7 +26,7 @@ use uuid::Uuid;
 use crate::infrastructure::persistence::{
     CouponCodeRepository, CouponRedemptionRepository, LoyaltyPointEntryRepository,
     LoyaltyProgramRepository, PricingRuleRepository, PromoBundleComponentRepository,
-    PromoBundleRepository,
+    PromoBundleGiftRepository, PromoBundleRepository,
 };
 
 use super::promo_ports::{
@@ -47,6 +47,7 @@ pub struct PromoWriteService {
     pub(super) redemptions: CouponRedemptionRepository,
     pub(super) bundles: PromoBundleRepository,
     pub(super) bundle_components: PromoBundleComponentRepository,
+    pub(super) bundle_gifts: PromoBundleGiftRepository,
     pub(super) programs: LoyaltyProgramRepository,
     pub(super) entries: LoyaltyPointEntryRepository,
 }
@@ -58,9 +59,10 @@ impl PromoWriteService {
         let redemptions = CouponRedemptionRepository::new(pool.clone());
         let bundles = PromoBundleRepository::new(pool.clone());
         let bundle_components = PromoBundleComponentRepository::new(pool.clone());
+        let bundle_gifts = PromoBundleGiftRepository::new(pool.clone());
         let programs = LoyaltyProgramRepository::new(pool.clone());
         let entries = LoyaltyPointEntryRepository::new(pool.clone());
-        Self { pool, rules, coupons, redemptions, bundles, bundle_components, programs, entries }
+        Self { pool, rules, coupons, redemptions, bundles, bundle_components, bundle_gifts, programs, entries }
     }
 }
 

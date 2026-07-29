@@ -13,6 +13,7 @@ pub mod loyalty_point_entry_api_test;
 pub mod pricing_rule_api_test;
 pub mod promo_bundle_api_test;
 pub mod promo_bundle_component_api_test;
+pub mod promo_bundle_gift_api_test;
 
 // Re-exports for convenience
 pub use crud_test_base::*;
@@ -23,3 +24,4 @@ pub use loyalty_point_entry_api_test::*;
 pub use pricing_rule_api_test::*;
 pub use promo_bundle_api_test::*;
 pub use promo_bundle_component_api_test::*;
+pub use promo_bundle_gift_api_test::*;

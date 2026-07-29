@@ -16,6 +16,8 @@ pub mod promo_bundle_events;
 pub mod promo_bundle_event_handlers;
 pub mod promo_bundle_component_events;
 pub mod promo_bundle_component_event_handlers;
+pub mod promo_bundle_gift_events;
+pub mod promo_bundle_gift_event_handlers;
 
 pub use coupon_code_events::{CouponCodeEvent, CouponCodeEventPublisher, NoopCouponCodeEventPublisher};
 pub use coupon_code_event_handlers::CouponCodeEventHandler;
@@ -31,6 +33,8 @@ pub use promo_bundle_events::{PromoBundleEvent, PromoBundleEventPublisher, NoopP
 pub use promo_bundle_event_handlers::PromoBundleEventHandler;
 pub use promo_bundle_component_events::{PromoBundleComponentEvent, PromoBundleComponentEventPublisher, NoopPromoBundleComponentEventPublisher};
 pub use promo_bundle_component_event_handlers::PromoBundleComponentEventHandler;
+pub use promo_bundle_gift_events::{PromoBundleGiftEvent, PromoBundleGiftEventPublisher, NoopPromoBundleGiftEventPublisher};
+pub use promo_bundle_gift_event_handlers::PromoBundleGiftEventHandler;
 
 // <<< CUSTOM
 // END CUSTOM

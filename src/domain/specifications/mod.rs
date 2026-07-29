@@ -13,6 +13,7 @@ pub mod loyalty_point_entry_specification;
 pub mod pricing_rule_specification;
 pub mod promo_bundle_specification;
 pub mod promo_bundle_component_specification;
+pub mod promo_bundle_gift_specification;
 
 // <<< CUSTOM
 // END CUSTOM

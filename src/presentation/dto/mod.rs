@@ -12,6 +12,7 @@ pub mod loyalty_point_entry_dto;
 pub mod pricing_rule_dto;
 pub mod promo_bundle_dto;
 pub mod promo_bundle_component_dto;
+pub mod promo_bundle_gift_dto;
 
 // Re-exports
 pub use coupon_code_dto::{
@@ -69,6 +70,14 @@ pub use promo_bundle_component_dto::{
     PromoBundleComponentResponseDto,
     PromoBundleComponentListResponseDto,
     PromoBundleComponentSummaryDto,
+};
+pub use promo_bundle_gift_dto::{
+    CreatePromoBundleGiftDto,
+    UpdatePromoBundleGiftDto,
+    PatchPromoBundleGiftDto,
+    PromoBundleGiftResponseDto,
+    PromoBundleGiftListResponseDto,
+    PromoBundleGiftSummaryDto,
 };
 
 // Common pagination types

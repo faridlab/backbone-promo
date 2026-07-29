@@ -25,6 +25,8 @@ tags:
     description: PromoBundle management endpoints
   - name: PromoBundleComponents
     description: PromoBundleComponent management endpoints
+  - name: PromoBundleGifts
+    description: PromoBundleGift management endpoints
 
 paths:
   /api/v1/coupon_codes:
@@ -2589,6 +2591,372 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /api/v1/promo_bundle_gifts:
+    get:
+      tags:
+        - PromoBundleGifts
+      summary: List PromoBundleGifts
+      description: Get a paginated list of PromoBundleGifts with optional filtering and sorting
+      operationId: listPromoBundleGifts
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortOrderParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGiftList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - PromoBundleGifts
+      summary: Create PromoBundleGift
+      description: Create a new PromoBundleGift
+      operationId: createPromoBundleGift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePromoBundleGiftRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGift'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/promo_bundle_gifts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+
+    get:
+      tags:
+        - PromoBundleGifts
+      summary: Get PromoBundleGift by ID
+      operationId: getPromoBundleGift
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGift'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - PromoBundleGifts
+      summary: Update PromoBundleGift (full)
+      operationId: updatePromoBundleGift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromoBundleGiftRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGift'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - PromoBundleGifts
+      summary: Update PromoBundleGift (partial)
+      operationId: patchPromoBundleGift
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPromoBundleGiftRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGift'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - PromoBundleGifts
+      summary: Delete PromoBundleGift (soft)
+      operationId: deletePromoBundleGift
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/promo_bundle_gifts/bulk:
+    post:
+      tags:
+        - PromoBundleGifts
+      summary: Bulk create PromoBundleGifts
+      operationId: bulkCreatePromoBundleGifts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CreatePromoBundleGiftRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PromoBundleGift'
+    put:
+      tags:
+        - PromoBundleGifts
+      summary: Bulk update PromoBundleGifts (full, atomic)
+      operationId: bulkUpdatePromoBundleGifts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                allOf:
+                  - type: object
+                    required: [id]
+                    properties:
+                      id:
+                        type: string
+                  - $ref: '#/components/schemas/UpdatePromoBundleGiftRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGiftBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    patch:
+      tags:
+        - PromoBundleGifts
+      summary: Bulk partial-update PromoBundleGifts (atomic)
+      operationId: bulkPatchPromoBundleGifts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [ids, patch]
+                  properties:
+                    ids:
+                      type: array
+                      items: { type: string }
+                    patch:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [items]
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, patch]
+                        properties:
+                          id: { type: string }
+                          patch: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGiftBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundle_gifts/upsert:
+    post:
+      tags:
+        - PromoBundleGifts
+      summary: Upsert PromoBundleGift
+      operationId: upsertPromoBundleGift
+      parameters:
+        - name: key_field
+          in: query
+          schema:
+            type: string
+        - name: key_value
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePromoBundleGiftRequest'
+      responses:
+        '200':
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGift'
+
+  /api/v1/promo_bundle_gifts/trash:
+    get:
+      tags:
+        - PromoBundleGifts
+      summary: List deleted PromoBundleGifts
+      operationId: listDeletedPromoBundleGifts
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGiftList'
+
+  /api/v1/promo_bundle_gifts/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      tags:
+        - PromoBundleGifts
+      summary: Restore deleted PromoBundleGift
+      operationId: restorePromoBundleGift
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGift'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/promo_bundle_gifts/empty:
+    delete:
+      tags:
+        - PromoBundleGifts
+      summary: Empty trash for PromoBundleGifts
+      operationId: emptyTrashPromoBundleGifts
+      responses:
+        '200':
+          description: Trash emptied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_count:
+                    type: integer
+
+  /api/v1/promo_bundle_gifts/delete/bulk:
+    post:
+      tags:
+        - PromoBundleGifts
+      summary: Bulk soft-delete PromoBundleGifts by ids (atomic)
+      operationId: bulkDeletePromoBundleGifts
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  soft_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundle_gifts/restore/bulk:
+    post:
+      tags:
+        - PromoBundleGifts
+      summary: Bulk restore PromoBundleGifts by ids (atomic)
+      operationId: bulkRestorePromoBundleGifts
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromoBundleGiftBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/promo_bundle_gifts/restore/all:
+    post:
+      tags:
+        - PromoBundleGifts
+      summary: Restore all soft-deleted PromoBundleGifts
+      operationId: restoreAllPromoBundleGifts
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: integer }
+
+  /api/v1/promo_bundle_gifts/trash/bulk:
+    delete:
+      tags:
+        - PromoBundleGifts
+      summary: Bulk permanently-delete PromoBundleGifts from trash by ids (atomic)
+      operationId: bulkPermanentDeletePromoBundleGifts
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Permanently deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permanently_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
 components:
   schemas:
     CouponCode:
@@ -4119,6 +4487,119 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PromoBundleComponent'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PromoBundleGift:
+      type: object
+      required:
+        - id
+        - company_id
+        - bundle_id
+        - gift_item_id
+        - gift_qty
+        - metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        gift_item_id:
+          type: string
+          format: uuid
+        gift_qty:
+          type: string
+        metadata:
+          type: object
+
+    PromoBundleGiftBulkResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromoBundleGift'
+        total: { type: integer }
+        failed: { type: integer }
+        errors:
+          type: array
+          items: { type: string }
+
+    CreatePromoBundleGiftRequest:
+      type: object
+      required:
+        - company_id
+        - bundle_id
+        - gift_item_id
+        - gift_qty
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        gift_item_id:
+          type: string
+          format: uuid
+        gift_qty:
+          type: string
+        metadata:
+          type: object
+
+    UpdatePromoBundleGiftRequest:
+      type: object
+      required:
+        - company_id
+        - bundle_id
+        - gift_item_id
+        - gift_qty
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        gift_item_id:
+          type: string
+          format: uuid
+        gift_qty:
+          type: string
+        metadata:
+          type: object
+
+    PatchPromoBundleGiftRequest:
+      type: object
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        bundle_id:
+          type: string
+          format: uuid
+        gift_item_id:
+          type: string
+          format: uuid
+        gift_qty:
+          type: string
+        metadata:
+          type: object
+
+    PromoBundleGiftList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromoBundleGift'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 

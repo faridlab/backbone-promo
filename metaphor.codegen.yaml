@@ -34,6 +34,7 @@ user_owned:
   - "src/infrastructure/persistence/loyalty_program_repository.rs"
   - "src/infrastructure/persistence/pricing_rule_repository.rs"
   - "src/infrastructure/persistence/promo_bundle_component_repository.rs"
+  - "src/infrastructure/persistence/promo_bundle_gift_repository.rs"
   - "src/infrastructure/persistence/promo_bundle_repository.rs"
   - "tests/cart_pos_seam.rs"
   - "tests/cart_resolution.rs"
