@@ -5,8 +5,6 @@
 //! These services provide the public API for other modules.
 //! They only expose read operations - writes go through events.
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use uuid::Uuid;
@@ -95,21 +93,6 @@ pub trait PromoQueryService: Send + Sync {
     /// Check if PromoBundleGift exists
     async fn promo_bundle_gift_exists(&self, id: PromoBundleGiftId) -> Result<bool>;
 
-}
-
-// ============================================================================
-// QUERY SERVICE IMPLEMENTATION
-// ============================================================================
-
-/// Default implementation of PromoQueryService
-pub struct PromoQueryServiceImpl<R> {
-    repository: Arc<R>,
-}
-
-impl<R> PromoQueryServiceImpl<R> {
-    pub fn new(repository: Arc<R>) -> Self {
-        Self { repository }
-    }
 }
 
 // ============================================================================
