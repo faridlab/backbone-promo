@@ -91,6 +91,17 @@ async fn open_session(pool: &sqlx::PgPool, company: Uuid, profile: Uuid) -> Uuid
     .unwrap()
 }
 
+/// PPN is server-owned by the register: the till taxes every ticket at its configured rate, so the
+/// seam needs a real profile row (a non-PKP till — rate 0 — keeps the assert on net_total exact).
+async fn seed_profile(pool: &sqlx::PgPool, company: Uuid, profile: Uuid) {
+    sqlx::query("INSERT INTO pos.pos_profiles (id, company_id, name, tax_rate) VALUES ($1, $2, 'seam till', 0)")
+        .bind(profile)
+        .bind(company)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
 /// CPSEAM-1 — a bundle + an order-total discount, priced by promo, land on a REAL POS ticket whose
 /// net total equals the conserved cart total.
 #[tokio::test]
@@ -101,6 +112,7 @@ async fn cpseam1_cart_discounts_land_on_a_real_ticket() {
     let adapter = PromoCartAdapter { svc: promo.clone() };
     let company = Uuid::new_v4();
     let profile = Uuid::new_v4();
+    seed_profile(&pool, company, profile).await;
     let (item_a, item_b) = (Uuid::new_v4(), Uuid::new_v4());
     let session = open_session(&pool, company, profile).await;
 
@@ -147,6 +159,7 @@ async fn cpseam2_free_item_lands_on_the_ticket() {
     let adapter = PromoCartAdapter { svc: promo.clone() };
     let company = Uuid::new_v4();
     let profile = Uuid::new_v4();
+    seed_profile(&pool, company, profile).await;
     let (item_a, free_b) = (Uuid::new_v4(), Uuid::new_v4());
     let session = open_session(&pool, company, profile).await;
 
