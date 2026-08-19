@@ -18,6 +18,10 @@ version: 2
 schema: promo
 description: "pricing rules, coupons, and loyalty — resolves prices, posts no GL"
 
+# ADR-0014 company fence: every entity here (pricing rules, coupons, loyalty,
+# bundles) is company-scoped and fenced strict. No exceptions.
+company_fence: strict
+
 config:
   database: postgresql
   soft_delete: true
