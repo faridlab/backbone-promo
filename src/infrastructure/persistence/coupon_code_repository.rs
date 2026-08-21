@@ -66,7 +66,7 @@ impl CouponCodeRepository {
                 FROM promo.coupon_codes
                 WHERE company_id = $1
                   AND code = $2
-                  AND is_active = true
+                  AND status = 'active'
                   AND (metadata->>'deleted_at') IS NULL
                   AND valid_from <= $3
                   AND (valid_upto IS NULL OR valid_upto >= $3)
@@ -100,7 +100,7 @@ impl CouponCodeRepository {
             SET used_count = used_count + 1
             WHERE id = $1
               AND company_id = $2
-              AND is_active = true
+              AND status = 'active'
               AND (metadata->>'deleted_at') IS NULL
               AND (max_use IS NULL OR used_count < max_use)
             RETURNING pricing_rule_id

@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use anyhow::Result;
 use uuid::Uuid;
 
-use crate::domain::entity::CouponCode;
+use crate::domain::entity::{CouponCode, CouponCodeStatus};
 
 /// Pagination parameters for list queries
 #[derive(Debug, Clone, Default)]
@@ -48,13 +48,13 @@ pub struct CouponCodeFilter {
     pub code: Option<String>,
     pub pricing_rule_id: Option<Uuid>,
     pub description: Option<String>,
-    pub is_active: Option<bool>,
+    pub status: Option<CouponCodeStatus>,
 }
 
 impl CouponCodeFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.code.is_some() || self.pricing_rule_id.is_some() || self.description.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.code.is_some() || self.pricing_rule_id.is_some() || self.description.is_some() || self.status.is_some()
     }
 }
 

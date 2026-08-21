@@ -50,10 +50,11 @@ models:
       valid_upto:
         type: datetime?
         description: "Coupon usable until (null = open-ended)"
-      is_active:
-        type: bool
-        attributes: ["@default(true)"]
-        description: "Coupon is enabled"
+      # replaces is_active (boolean flipped to lifecycle enum)
+      status:
+        type: CouponCodeStatus
+        attributes: ["@default(active)"]
+        description: "Lifecycle (inactive coupons are refused at redemption while history keeps their records)"
 
       metadata:
         type: Metadata
@@ -67,4 +68,14 @@ models:
       - type: index
         fields: [pricing_rule_id]
       - type: index
-        fields: [company_id, is_active]
+        fields: [company_id, status]
+
+enums:
+  - name: CouponCodeStatus
+    description: "Lifecycle of a coupon code"
+    variants:
+      - name: active
+        description: "Enabled; the code can be redeemed"
+        default: true
+      - name: inactive
+        description: "Retired; redemption refuses the code, records remain"

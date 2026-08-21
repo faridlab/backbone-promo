@@ -20,6 +20,7 @@ use validator::Validate;
 use crate::domain::entity::PromoBundle;
 use crate::domain::entity::AuditMetadata;
 use crate::domain::entity::BundleMatch;
+use crate::domain::entity::PromoBundleStatus;
 use crate::domain::entity::RateOrDiscount;
 
 // =============================================================================
@@ -67,9 +68,7 @@ pub struct CreatePromoBundleDto {
     pub valid_from: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "valid_to")]
     pub valid_to: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: PromoBundleStatus,
 }
 
 // =============================================================================
@@ -117,9 +116,7 @@ pub struct UpdatePromoBundleDto {
     pub valid_from: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "valid_to")]
     pub valid_to: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: PromoBundleStatus,
 }
 
 // =============================================================================
@@ -172,15 +169,14 @@ pub struct PatchPromoBundleDto {
     pub valid_from: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "valid_to")]
     pub valid_to: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "is_active")]
-    pub is_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<PromoBundleStatus>,
 }
 
 impl PatchPromoBundleDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.match_type.is_some() || self.required_distinct.is_some() || self.reward.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.reward_item_id.is_some() || self.reward_qty.is_some() || self.currency.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.match_type.is_some() || self.required_distinct.is_some() || self.reward.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.reward_item_id.is_some() || self.reward_qty.is_some() || self.currency.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.status.is_some()
     }
 }
 
@@ -219,8 +215,7 @@ pub struct PromoBundleResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     pub valid_from: DateTime<Utc>,
     pub valid_to: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    pub is_active: bool,
+    pub status: PromoBundleStatus,
     pub metadata: AuditMetadata,
 }
 
@@ -307,7 +302,7 @@ impl From<PromoBundle> for PromoBundleResponseDto {
             stackable: entity.stackable,
             valid_from: entity.valid_from,
             valid_to: entity.valid_to,
-            is_active: entity.is_active,
+            status: entity.status,
             metadata: entity.metadata,
         }
     }
@@ -345,7 +340,7 @@ impl From<CreatePromoBundleDto> for PromoBundle {
             stackable: dto.stackable,
             valid_from: dto.valid_from,
             valid_to: dto.valid_to,
-            is_active: dto.is_active,
+            status: dto.status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -370,7 +365,7 @@ impl From<&PromoBundle> for PromoBundleResponseDto {
             stackable: entity.stackable.clone(),
             valid_from: entity.valid_from.clone(),
             valid_to: entity.valid_to.clone(),
-            is_active: entity.is_active.clone(),
+            status: entity.status.clone(),
             metadata: entity.metadata.clone(),
         }
     }
@@ -399,7 +394,7 @@ impl backbone_core::ApplyUpdateDto<UpdatePromoBundleDto> for PromoBundle {
         self.stackable = dto.stackable;
         self.valid_from = dto.valid_from;
         self.valid_to = dto.valid_to;
-        self.is_active = dto.is_active;
+        self.status = dto.status;
         Ok(self)
     }
 }

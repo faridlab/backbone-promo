@@ -19,6 +19,7 @@ use validator::Validate;
 
 use crate::domain::entity::LoyaltyProgram;
 use crate::domain::entity::AuditMetadata;
+use crate::domain::entity::LoyaltyProgramStatus;
 use crate::domain::entity::LoyaltyProgramType;
 
 // =============================================================================
@@ -54,9 +55,7 @@ pub struct CreateLoyaltyProgramDto {
     pub from_date: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "to_date")]
     pub to_date: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: LoyaltyProgramStatus,
 }
 
 // =============================================================================
@@ -92,9 +91,7 @@ pub struct UpdateLoyaltyProgramDto {
     pub from_date: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "to_date")]
     pub to_date: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: LoyaltyProgramStatus,
 }
 
 // =============================================================================
@@ -130,15 +127,14 @@ pub struct PatchLoyaltyProgramDto {
     pub from_date: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "to_date")]
     pub to_date: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "is_active")]
-    pub is_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<LoyaltyProgramStatus>,
 }
 
 impl PatchLoyaltyProgramDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.program_name.is_some() || self.program_type.is_some() || self.collection_factor.is_some() || self.conversion_factor.is_some() || self.expiry_duration_days.is_some() || self.from_date.is_some() || self.to_date.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.program_name.is_some() || self.program_type.is_some() || self.collection_factor.is_some() || self.conversion_factor.is_some() || self.expiry_duration_days.is_some() || self.from_date.is_some() || self.to_date.is_some() || self.status.is_some()
     }
 }
 
@@ -167,8 +163,7 @@ pub struct LoyaltyProgramResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     pub from_date: DateTime<Utc>,
     pub to_date: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    pub is_active: bool,
+    pub status: LoyaltyProgramStatus,
     pub metadata: AuditMetadata,
 }
 
@@ -248,7 +243,7 @@ impl From<LoyaltyProgram> for LoyaltyProgramResponseDto {
             expiry_duration_days: entity.expiry_duration_days,
             from_date: entity.from_date,
             to_date: entity.to_date,
-            is_active: entity.is_active,
+            status: entity.status,
             metadata: entity.metadata,
         }
     }
@@ -279,7 +274,7 @@ impl From<CreateLoyaltyProgramDto> for LoyaltyProgram {
             expiry_duration_days: dto.expiry_duration_days,
             from_date: dto.from_date,
             to_date: dto.to_date,
-            is_active: dto.is_active,
+            status: dto.status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -297,7 +292,7 @@ impl From<&LoyaltyProgram> for LoyaltyProgramResponseDto {
             expiry_duration_days: entity.expiry_duration_days.clone(),
             from_date: entity.from_date.clone(),
             to_date: entity.to_date.clone(),
-            is_active: entity.is_active.clone(),
+            status: entity.status.clone(),
             metadata: entity.metadata.clone(),
         }
     }
@@ -319,7 +314,7 @@ impl backbone_core::ApplyUpdateDto<UpdateLoyaltyProgramDto> for LoyaltyProgram {
         self.expiry_duration_days = dto.expiry_duration_days;
         self.from_date = dto.from_date;
         self.to_date = dto.to_date;
-        self.is_active = dto.is_active;
+        self.status = dto.status;
         Ok(self)
     }
 }

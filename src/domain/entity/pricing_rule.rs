@@ -7,6 +7,7 @@ use rust_decimal::Decimal;
 use super::RuleScope;
 use super::ApplyOn;
 use super::RateOrDiscount;
+use super::PricingRuleStatus;
 use super::AuditMetadata;
 
 /// Strongly-typed ID for PricingRule
@@ -78,7 +79,7 @@ pub struct PricingRule {
     pub valid_from: DateTime<Utc>,
     pub valid_to: Option<DateTime<Utc>>,
     pub coupon_required: bool,
-    pub is_active: bool,
+    pub status: PricingRuleStatus,
     #[serde(default)]
     #[sqlx(json)]
     pub metadata: AuditMetadata,
@@ -87,11 +88,11 @@ pub struct PricingRule {
 impl PricingRule {
     /// Create a builder for PricingRule
     pub fn builder() -> PricingRuleBuilder {
-        PricingRuleBuilder::default()
+        <PricingRuleBuilder as Default>::default()
     }
 
     /// Create a new PricingRule with required fields
-    pub fn new(company_id: Uuid, title: String, priority: i32, scope: RuleScope, min_order_amount: Decimal, stackable: bool, apply_on: ApplyOn, min_qty: Decimal, min_amount: Decimal, rate_or_discount: RateOrDiscount, currency: String, valid_from: DateTime<Utc>, coupon_required: bool, is_active: bool) -> Self {
+    pub fn new(company_id: Uuid, title: String, priority: i32, scope: RuleScope, min_order_amount: Decimal, stackable: bool, apply_on: ApplyOn, min_qty: Decimal, min_amount: Decimal, rate_or_discount: RateOrDiscount, currency: String, valid_from: DateTime<Utc>, coupon_required: bool, status: PricingRuleStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
             company_id,
@@ -119,7 +120,7 @@ impl PricingRule {
             valid_from,
             valid_to: None,
             coupon_required,
-            is_active,
+            status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -172,6 +173,11 @@ impl PricingRule {
     /// Get who deleted this entity
     pub fn deleted_by(&self) -> Option<&Uuid> {
         self.metadata.deleted_by.as_ref()
+    }
+
+    /// Get the current status
+    pub fn status(&self) -> &PricingRuleStatus {
+        &self.status
     }
 
 
@@ -334,8 +340,8 @@ impl PricingRule {
                 "coupon_required" => {
                     if let Ok(v) = serde_json::from_value(value) { self.coupon_required = v; }
                 }
-                "is_active" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.is_active = v; }
+                "status" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.status = v; }
                 }
                 _ => {} // ignore unknown fields
             }
@@ -400,6 +406,7 @@ impl backbone_orm::EntityRepoMeta for PricingRule {
         m.insert("scope".to_string(), "rule_scope".to_string());
         m.insert("apply_on".to_string(), "apply_on".to_string());
         m.insert("rate_or_discount".to_string(), "rate_or_discount".to_string());
+        m.insert("status".to_string(), "pricing_rule_status".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
@@ -441,7 +448,7 @@ pub struct PricingRuleBuilder {
     valid_from: Option<DateTime<Utc>>,
     valid_to: Option<DateTime<Utc>>,
     coupon_required: Option<bool>,
-    is_active: Option<bool>,
+    status: Option<PricingRuleStatus>,
 }
 
 impl PricingRuleBuilder {
@@ -595,9 +602,9 @@ impl PricingRuleBuilder {
         self
     }
 
-    /// Set the is_active field (default: `true`)
-    pub fn is_active(mut self, value: bool) -> Self {
-        self.is_active = Some(value);
+    /// Set the status field (default: `PricingRuleStatus::default()`)
+    pub fn status(mut self, value: PricingRuleStatus) -> Self {
+        self.status = Some(value);
         self
     }
 
@@ -614,11 +621,11 @@ impl PricingRuleBuilder {
             company_id,
             title,
             priority: self.priority.unwrap_or(0),
-            scope: self.scope.unwrap_or(RuleScope::default()),
+            scope: self.scope.unwrap_or_default(),
             min_order_amount: self.min_order_amount.unwrap_or(Decimal::from(0)),
             min_order_qty: self.min_order_qty,
             stackable: self.stackable.unwrap_or(false),
-            apply_on: self.apply_on.unwrap_or(ApplyOn::default()),
+            apply_on: self.apply_on.unwrap_or_default(),
             item_id: self.item_id,
             item_group_id: self.item_group_id,
             brand_id: self.brand_id,
@@ -627,7 +634,7 @@ impl PricingRuleBuilder {
             min_qty: self.min_qty.unwrap_or(Decimal::from(0)),
             max_qty: self.max_qty,
             min_amount: self.min_amount.unwrap_or(Decimal::from(0)),
-            rate_or_discount: self.rate_or_discount.unwrap_or(RateOrDiscount::default()),
+            rate_or_discount: self.rate_or_discount.unwrap_or_default(),
             rate: self.rate,
             discount_percentage: self.discount_percentage,
             discount_amount: self.discount_amount,
@@ -636,7 +643,7 @@ impl PricingRuleBuilder {
             valid_from,
             valid_to: self.valid_to,
             coupon_required: self.coupon_required.unwrap_or(false),
-            is_active: self.is_active.unwrap_or(true),
+            status: self.status.unwrap_or_default(),
             metadata: AuditMetadata::default(),
         })
     }

@@ -39,7 +39,7 @@ impl TestDataGenerator for PromoBundleTestData {
             "stackable": false,
             "valid_from": now,
             "valid_to": null,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }
@@ -63,7 +63,7 @@ impl TestDataGenerator for PromoBundleTestData {
             "stackable": false,
             "valid_from": now,
             "valid_to": null,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }

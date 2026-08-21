@@ -109,7 +109,7 @@ impl PricingRuleRepository {
                        rate, discount_percentage, discount_amount, discount_upto, valid_from
                 FROM promo.pricing_rules
                 WHERE company_id = $1
-                  AND is_active = true
+                  AND status = 'active'
                   AND scope = 'line'
                   AND (metadata->>'deleted_at') IS NULL
                   AND valid_from <= $2
@@ -179,7 +179,7 @@ impl PricingRuleRepository {
                        discount_percentage, discount_amount, discount_upto, stackable, valid_from
                 FROM promo.pricing_rules
                 WHERE company_id = $1
-                  AND is_active = true
+                  AND status = 'active'
                   AND scope = 'order'
                   AND (metadata->>'deleted_at') IS NULL
                   AND valid_from <= $2

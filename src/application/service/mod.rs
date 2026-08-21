@@ -12,6 +12,10 @@ pub mod coupon_redemption_service;
 pub mod loyalty_program_service;
 pub mod loyalty_point_entry_service;
 pub mod pricing_rule_service;
+pub mod promo_bundle_service;
+pub mod promo_bundle_component_service;
+pub mod promo_bundle_gift_service;
+
 // <<< CUSTOM
 pub mod promo_events;
 pub mod promo_ports;
@@ -23,12 +27,6 @@ pub mod promo_resolve;
 pub mod promo_cart;
 pub mod promo_coupon;
 pub mod promo_loyalty;
-// END CUSTOM
-pub mod promo_bundle_service;
-pub mod promo_bundle_component_service;
-pub mod promo_bundle_gift_service;
-
-// <<< CUSTOM
 // END CUSTOM
 
 pub use coupon_code_service::CouponCodeService;

@@ -10,11 +10,15 @@ pub mod pricing_rule;
 pub mod promo_bundle;
 pub mod promo_bundle_component;
 pub mod promo_bundle_gift;
+pub mod coupon_code_status;
+pub mod loyalty_program_status;
 pub mod loyalty_program_type;
 pub mod loyalty_entry_type;
+pub mod pricing_rule_status;
 pub mod rule_scope;
 pub mod apply_on;
 pub mod rate_or_discount;
+pub mod promo_bundle_status;
 pub mod bundle_match;
 
 // Re-exports
@@ -42,11 +46,15 @@ pub use promo_bundle_component::PromoBundleComponentId;
 pub use promo_bundle_gift::PromoBundleGift;
 pub use promo_bundle_gift::PromoBundleGiftBuilder;
 pub use promo_bundle_gift::PromoBundleGiftId;
+pub use coupon_code_status::CouponCodeStatus;
+pub use loyalty_program_status::LoyaltyProgramStatus;
 pub use loyalty_program_type::LoyaltyProgramType;
 pub use loyalty_entry_type::LoyaltyEntryType;
+pub use pricing_rule_status::PricingRuleStatus;
 pub use rule_scope::RuleScope;
 pub use apply_on::ApplyOn;
 pub use rate_or_discount::RateOrDiscount;
+pub use promo_bundle_status::PromoBundleStatus;
 pub use bundle_match::BundleMatch;
 
 // ==========================================================================

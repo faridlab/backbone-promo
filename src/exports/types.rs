@@ -57,7 +57,7 @@ pub struct CouponCodeDto {
     pub used_count: i32,
     pub valid_from: DateTime<Utc>,
     pub valid_upto: Option<DateTime<Utc>>,
-    pub is_active: bool,
+    pub status: CouponCodeStatus,
     pub metadata: serde_json::Value,
 }
 
@@ -65,6 +65,7 @@ pub struct CouponCodeDto {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CouponCodeSummary {
     pub id: CouponCodeId,
+    pub status: CouponCodeStatus,
 }
 
 /// Reference to CouponCode for foreign key relationships
@@ -178,7 +179,7 @@ pub struct LoyaltyProgramDto {
     pub expiry_duration_days: Option<i32>,
     pub from_date: DateTime<Utc>,
     pub to_date: Option<DateTime<Utc>>,
-    pub is_active: bool,
+    pub status: LoyaltyProgramStatus,
     pub metadata: serde_json::Value,
 }
 
@@ -187,6 +188,7 @@ pub struct LoyaltyProgramDto {
 pub struct LoyaltyProgramSummary {
     pub id: LoyaltyProgramId,
     pub program_name: String,
+    pub status: LoyaltyProgramStatus,
 }
 
 /// Reference to LoyaltyProgram for foreign key relationships
@@ -321,7 +323,7 @@ pub struct PricingRuleDto {
     pub valid_from: DateTime<Utc>,
     pub valid_to: Option<DateTime<Utc>>,
     pub coupon_required: bool,
-    pub is_active: bool,
+    pub status: PricingRuleStatus,
     pub metadata: serde_json::Value,
 }
 
@@ -330,6 +332,7 @@ pub struct PricingRuleDto {
 pub struct PricingRuleSummary {
     pub id: PricingRuleId,
     pub title: String,
+    pub status: PricingRuleStatus,
 }
 
 /// Reference to PricingRule for foreign key relationships
@@ -391,7 +394,7 @@ pub struct PromoBundleDto {
     pub stackable: bool,
     pub valid_from: DateTime<Utc>,
     pub valid_to: Option<DateTime<Utc>>,
-    pub is_active: bool,
+    pub status: PromoBundleStatus,
     pub metadata: serde_json::Value,
 }
 
@@ -400,6 +403,7 @@ pub struct PromoBundleDto {
 pub struct PromoBundleSummary {
     pub id: PromoBundleId,
     pub title: String,
+    pub status: PromoBundleStatus,
 }
 
 /// Reference to PromoBundle for foreign key relationships

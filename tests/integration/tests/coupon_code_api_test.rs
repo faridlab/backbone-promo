@@ -32,7 +32,7 @@ impl TestDataGenerator for CouponCodeTestData {
             "used_count": 1,
             "valid_from": now,
             "valid_upto": null,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }
@@ -49,7 +49,7 @@ impl TestDataGenerator for CouponCodeTestData {
             "used_count": 1,
             "valid_from": now,
             "valid_upto": null,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }

@@ -131,6 +131,13 @@ pub fn create_promo_bundle_gift_read_routes(service: Arc<PromoBundleGiftService>
 ///
 /// These routes must NOT be publicly exposed. Wrap them with an auth
 /// middleware before nesting into the application router.
+///
+/// # This is unguarded generic CRUD, not a validated write path
+///
+/// These are plain create/update/patch/delete mutations over the entity row —
+/// they bypass all business invariants. If the module exposes a validated write
+/// service (e.g. a command router over its domain engine), serve THAT instead
+/// for any mutation that must respect domain rules.
 pub fn create_promo_bundle_gift_write_routes(service: Arc<PromoBundleGiftService>) -> Router {
     BackboneCrudHandler::<PromoBundleGiftService, PromoBundleGift, CreatePromoBundleGiftDto, UpdatePromoBundleGiftDto, PromoBundleGiftResponseDto>::write_routes(
         service,
@@ -179,4 +186,3 @@ pub fn create_protected_promo_bundle_gift_routes<A: AuthMiddleware + Send + Sync
             }
         }))
 }
-

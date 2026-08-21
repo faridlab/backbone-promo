@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use anyhow::Result;
 use uuid::Uuid;
 
-use crate::domain::entity::{PricingRule, ApplyOn, RateOrDiscount, RuleScope};
+use crate::domain::entity::{PricingRule, ApplyOn, PricingRuleStatus, RateOrDiscount, RuleScope};
 
 /// Pagination parameters for list queries
 #[derive(Debug, Clone, Default)]
@@ -57,13 +57,13 @@ pub struct PricingRuleFilter {
     pub rate_or_discount: Option<RateOrDiscount>,
     pub currency: Option<String>,
     pub coupon_required: Option<bool>,
-    pub is_active: Option<bool>,
+    pub status: Option<PricingRuleStatus>,
 }
 
 impl PricingRuleFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.scope.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.rate_or_discount.is_some() || self.currency.is_some() || self.coupon_required.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.title.is_some() || self.scope.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.rate_or_discount.is_some() || self.currency.is_some() || self.coupon_required.is_some() || self.status.is_some()
     }
 }
 

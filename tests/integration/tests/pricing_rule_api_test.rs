@@ -49,7 +49,7 @@ impl TestDataGenerator for PricingRuleTestData {
             "valid_from": now,
             "valid_to": null,
             "coupon_required": false,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }
@@ -83,7 +83,7 @@ impl TestDataGenerator for PricingRuleTestData {
             "valid_from": now,
             "valid_to": null,
             "coupon_required": false,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }

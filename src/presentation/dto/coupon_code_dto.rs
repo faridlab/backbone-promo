@@ -18,6 +18,7 @@ use validator::Validate;
 
 use crate::domain::entity::CouponCode;
 use crate::domain::entity::AuditMetadata;
+use crate::domain::entity::CouponCodeStatus;
 
 // =============================================================================
 // Create DTO
@@ -54,9 +55,7 @@ pub struct CreateCouponCodeDto {
     pub valid_from: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "valid_upto")]
     pub valid_upto: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: CouponCodeStatus,
 }
 
 // =============================================================================
@@ -94,9 +93,7 @@ pub struct UpdateCouponCodeDto {
     pub valid_from: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "valid_upto")]
     pub valid_upto: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: CouponCodeStatus,
 }
 
 // =============================================================================
@@ -135,15 +132,14 @@ pub struct PatchCouponCodeDto {
     pub valid_from: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "valid_upto")]
     pub valid_upto: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "is_active")]
-    pub is_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<CouponCodeStatus>,
 }
 
 impl PatchCouponCodeDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.code.is_some() || self.pricing_rule_id.is_some() || self.description.is_some() || self.max_use.is_some() || self.used_count.is_some() || self.valid_from.is_some() || self.valid_upto.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.code.is_some() || self.pricing_rule_id.is_some() || self.description.is_some() || self.max_use.is_some() || self.used_count.is_some() || self.valid_from.is_some() || self.valid_upto.is_some() || self.status.is_some()
     }
 }
 
@@ -174,8 +170,7 @@ pub struct CouponCodeResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     pub valid_from: DateTime<Utc>,
     pub valid_upto: Option<DateTime<Utc>>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    pub is_active: bool,
+    pub status: CouponCodeStatus,
     pub metadata: AuditMetadata,
 }
 
@@ -255,7 +250,7 @@ impl From<CouponCode> for CouponCodeResponseDto {
             used_count: entity.used_count,
             valid_from: entity.valid_from,
             valid_upto: entity.valid_upto,
-            is_active: entity.is_active,
+            status: entity.status,
             metadata: entity.metadata,
         }
     }
@@ -286,7 +281,7 @@ impl From<CreateCouponCodeDto> for CouponCode {
             used_count: dto.used_count,
             valid_from: dto.valid_from,
             valid_upto: dto.valid_upto,
-            is_active: dto.is_active,
+            status: dto.status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -304,7 +299,7 @@ impl From<&CouponCode> for CouponCodeResponseDto {
             used_count: entity.used_count.clone(),
             valid_from: entity.valid_from.clone(),
             valid_upto: entity.valid_upto.clone(),
-            is_active: entity.is_active.clone(),
+            status: entity.status.clone(),
             metadata: entity.metadata.clone(),
         }
     }
@@ -326,7 +321,7 @@ impl backbone_core::ApplyUpdateDto<UpdateCouponCodeDto> for CouponCode {
         self.used_count = dto.used_count;
         self.valid_from = dto.valid_from;
         self.valid_upto = dto.valid_upto;
-        self.is_active = dto.is_active;
+        self.status = dto.status;
         Ok(self)
     }
 }

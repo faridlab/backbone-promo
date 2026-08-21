@@ -8,7 +8,7 @@
 //! ## Usage from other modules
 //!
 //! ```text
-//! use promo::exports::{CouponCodeDto, PromoQueryService};
+//! use promo::exports::{CouponCodeDto};
 //! ```
 
 mod types;
@@ -51,9 +51,6 @@ pub use events::*;
 /// - `PromoBundleGiftDto` - Data transfer object for PromoBundleGift
 /// - `PromoBundleGiftSummary` - Summary view of PromoBundleGift
 /// - `PromoBundleGiftId` - Type-safe ID wrapper
-///
-/// ## Public Services
-/// - `PromoQueryService` - Read-only queries
 ///
 /// ## Public Events
 /// - `CouponCodeCreatedEvent` - Published when CouponCode is created

@@ -32,7 +32,7 @@ impl TestDataGenerator for LoyaltyProgramTestData {
             "expiry_duration_days": null,
             "from_date": now,
             "to_date": null,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }
@@ -49,7 +49,7 @@ impl TestDataGenerator for LoyaltyProgramTestData {
             "expiry_duration_days": null,
             "from_date": now,
             "to_date": null,
-            "is_active": false,
+            "status": "active",
             "metadata": json!({}),
         })
     }

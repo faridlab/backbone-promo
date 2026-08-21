@@ -64,7 +64,7 @@ pub struct RuleSpec {
     pub coupon_required: bool,
     pub valid_from: chrono::DateTime<chrono::Utc>,
     pub valid_to: Option<chrono::DateTime<chrono::Utc>>,
-    pub is_active: bool,
+    pub status: &'static str,
 }
 
 impl RuleSpec {
@@ -88,7 +88,7 @@ impl RuleSpec {
             coupon_required: false,
             valid_from: now() - chrono::Duration::days(1),
             valid_to: None,
-            is_active: true,
+            status: "active",
         }
     }
 }
@@ -100,16 +100,16 @@ pub async fn rule(pool: &PgPool, s: RuleSpec) -> Uuid {
             (company_id, title, priority, apply_on, item_id, item_group_id, brand_id,
              customer_id, customer_group_id, min_qty, max_qty, min_amount,
              rate_or_discount, rate, discount_percentage, discount_amount,
-             coupon_required, valid_from, valid_to, is_active)
+             coupon_required, valid_from, valid_to, status)
         VALUES ($1,'test',$2,$3::apply_on,$4,$5,$6,$7,$8,$9,$10,$11,
-                $12::rate_or_discount,$13,$14,$15,$16,$17,$18,$19)
+                $12::rate_or_discount,$13,$14,$15,$16,$17,$18,$19::pricing_rule_status)
         RETURNING id
         "#,
     )
     .bind(s.company).bind(s.priority).bind(s.apply_on).bind(s.item).bind(s.item_group).bind(s.brand)
     .bind(s.customer).bind(s.customer_group).bind(s.min_qty).bind(s.max_qty).bind(s.min_amount)
     .bind(s.rate_or_discount).bind(s.rate).bind(s.discount_percentage).bind(s.discount_amount)
-    .bind(s.coupon_required).bind(s.valid_from).bind(s.valid_to).bind(s.is_active)
+    .bind(s.coupon_required).bind(s.valid_from).bind(s.valid_to).bind(s.status)
     .fetch_one(pool)
     .await
     .expect("insert rule")
@@ -134,9 +134,9 @@ pub async fn order_rule(
         INSERT INTO promo.pricing_rules
             (company_id, title, priority, scope, min_order_amount, stackable, apply_on,
              customer_group_id, rate_or_discount, discount_percentage, discount_amount,
-             coupon_required, valid_from, is_active)
+             coupon_required, valid_from, status)
         VALUES ($1,'test-order',$2,'order'::rule_scope,$3,$4,'all'::apply_on,$5,
-                $6::rate_or_discount,$7,$8,false,$9,true)
+                $6::rate_or_discount,$7,$8,false,$9,'active')
         RETURNING id
         "#,
     )
@@ -174,9 +174,9 @@ pub async fn order_rule_threshold(
         INSERT INTO promo.pricing_rules
             (company_id, title, priority, scope, min_order_amount, min_order_qty, stackable,
              apply_on, rate_or_discount, discount_percentage, discount_amount, discount_upto,
-             coupon_required, valid_from, is_active)
+             coupon_required, valid_from, status)
         VALUES ($1,'test-order-threshold',$2,'order'::rule_scope,$3,$4,$5,'all'::apply_on,
-                $6::rate_or_discount,$7,$8,$9,false,$10,true)
+                $6::rate_or_discount,$7,$8,$9,false,$10,'active')
         RETURNING id
         "#,
     )
@@ -214,9 +214,9 @@ pub async fn bundle(
         INSERT INTO promo.promo_bundles
             (company_id, title, priority, match_type, required_distinct, reward,
              discount_percentage, discount_amount, min_order_amount, stackable,
-             valid_from, is_active)
+             valid_from, status)
         VALUES ($1,'test-bundle',$2,$3::bundle_match,$4,$5::rate_or_discount,
-                $6,$7,$8,$9,$10,true)
+                $6,$7,$8,$9,$10,'active')
         RETURNING id
         "#,
     )
@@ -293,8 +293,8 @@ pub async fn coupon(
 ) -> Uuid {
     sqlx::query_scalar::<_, Uuid>(
         r#"INSERT INTO promo.coupon_codes
-             (company_id, code, pricing_rule_id, max_use, valid_from, is_active)
-           VALUES ($1,$2,$3,$4,$5,true) RETURNING id"#,
+             (company_id, code, pricing_rule_id, max_use, valid_from, status)
+           VALUES ($1,$2,$3,$4,$5,'active') RETURNING id"#,
     )
     .bind(company)
     .bind(code.to_uppercase())
@@ -317,8 +317,8 @@ pub async fn program(
     sqlx::query_scalar::<_, Uuid>(
         r#"INSERT INTO promo.loyalty_programs
              (company_id, program_name, program_type, collection_factor, conversion_factor,
-              expiry_duration_days, from_date, is_active)
-           VALUES ($1,'test','single_tier'::loyalty_program_type,$2,$3,$4,$5,true) RETURNING id"#,
+              expiry_duration_days, from_date, status)
+           VALUES ($1,'test','single_tier'::loyalty_program_type,$2,$3,$4,$5,'active') RETURNING id"#,
     )
     .bind(company)
     .bind(dec(collection_factor))

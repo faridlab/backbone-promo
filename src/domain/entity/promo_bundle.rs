@@ -6,6 +6,7 @@ use rust_decimal::Decimal;
 
 use super::BundleMatch;
 use super::RateOrDiscount;
+use super::PromoBundleStatus;
 use super::AuditMetadata;
 
 /// Strongly-typed ID for PromoBundle
@@ -67,7 +68,7 @@ pub struct PromoBundle {
     pub stackable: bool,
     pub valid_from: DateTime<Utc>,
     pub valid_to: Option<DateTime<Utc>>,
-    pub is_active: bool,
+    pub status: PromoBundleStatus,
     #[serde(default)]
     #[sqlx(json)]
     pub metadata: AuditMetadata,
@@ -76,11 +77,11 @@ pub struct PromoBundle {
 impl PromoBundle {
     /// Create a builder for PromoBundle
     pub fn builder() -> PromoBundleBuilder {
-        PromoBundleBuilder::default()
+        <PromoBundleBuilder as Default>::default()
     }
 
     /// Create a new PromoBundle with required fields
-    pub fn new(company_id: Uuid, title: String, priority: i32, match_type: BundleMatch, reward: RateOrDiscount, currency: String, min_order_amount: Decimal, stackable: bool, valid_from: DateTime<Utc>, is_active: bool) -> Self {
+    pub fn new(company_id: Uuid, title: String, priority: i32, match_type: BundleMatch, reward: RateOrDiscount, currency: String, min_order_amount: Decimal, stackable: bool, valid_from: DateTime<Utc>, status: PromoBundleStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
             company_id,
@@ -98,7 +99,7 @@ impl PromoBundle {
             stackable,
             valid_from,
             valid_to: None,
-            is_active,
+            status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -151,6 +152,11 @@ impl PromoBundle {
     /// Get who deleted this entity
     pub fn deleted_by(&self) -> Option<&Uuid> {
         self.metadata.deleted_by.as_ref()
+    }
+
+    /// Get the current status
+    pub fn status(&self) -> &PromoBundleStatus {
+        &self.status
     }
 
 
@@ -247,8 +253,8 @@ impl PromoBundle {
                 "valid_to" => {
                     if let Ok(v) = serde_json::from_value(value) { self.valid_to = v; }
                 }
-                "is_active" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.is_active = v; }
+                "status" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.status = v; }
                 }
                 _ => {} // ignore unknown fields
             }
@@ -308,6 +314,7 @@ impl backbone_orm::EntityRepoMeta for PromoBundle {
         m.insert("reward_item_id".to_string(), "uuid".to_string());
         m.insert("match_type".to_string(), "bundle_match".to_string());
         m.insert("reward".to_string(), "rate_or_discount".to_string());
+        m.insert("status".to_string(), "promo_bundle_status".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
@@ -339,7 +346,7 @@ pub struct PromoBundleBuilder {
     stackable: Option<bool>,
     valid_from: Option<DateTime<Utc>>,
     valid_to: Option<DateTime<Utc>>,
-    is_active: Option<bool>,
+    status: Option<PromoBundleStatus>,
 }
 
 impl PromoBundleBuilder {
@@ -433,9 +440,9 @@ impl PromoBundleBuilder {
         self
     }
 
-    /// Set the is_active field (default: `true`)
-    pub fn is_active(mut self, value: bool) -> Self {
-        self.is_active = Some(value);
+    /// Set the status field (default: `PromoBundleStatus::default()`)
+    pub fn status(mut self, value: PromoBundleStatus) -> Self {
+        self.status = Some(value);
         self
     }
 
@@ -452,9 +459,9 @@ impl PromoBundleBuilder {
             company_id,
             title,
             priority: self.priority.unwrap_or(0),
-            match_type: self.match_type.unwrap_or(BundleMatch::default()),
+            match_type: self.match_type.unwrap_or_default(),
             required_distinct: self.required_distinct,
-            reward: self.reward.unwrap_or(RateOrDiscount::default()),
+            reward: self.reward.unwrap_or_default(),
             discount_percentage: self.discount_percentage,
             discount_amount: self.discount_amount,
             reward_item_id: self.reward_item_id,
@@ -464,7 +471,7 @@ impl PromoBundleBuilder {
             stackable: self.stackable.unwrap_or(false),
             valid_from,
             valid_to: self.valid_to,
-            is_active: self.is_active.unwrap_or(true),
+            status: self.status.unwrap_or_default(),
             metadata: AuditMetadata::default(),
         })
     }

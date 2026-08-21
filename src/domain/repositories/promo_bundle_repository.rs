@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use anyhow::Result;
 use uuid::Uuid;
 
-use crate::domain::entity::{PromoBundle, BundleMatch, RateOrDiscount};
+use crate::domain::entity::{PromoBundle, BundleMatch, PromoBundleStatus, RateOrDiscount};
 
 /// Pagination parameters for list queries
 #[derive(Debug, Clone, Default)]
@@ -51,13 +51,13 @@ pub struct PromoBundleFilter {
     pub reward_item_id: Option<Uuid>,
     pub currency: Option<String>,
     pub stackable: Option<bool>,
-    pub is_active: Option<bool>,
+    pub status: Option<PromoBundleStatus>,
 }
 
 impl PromoBundleFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.match_type.is_some() || self.reward.is_some() || self.reward_item_id.is_some() || self.currency.is_some() || self.stackable.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.title.is_some() || self.match_type.is_some() || self.reward.is_some() || self.reward_item_id.is_some() || self.currency.is_some() || self.stackable.is_some() || self.status.is_some()
     }
 }
 

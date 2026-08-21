@@ -183,9 +183,9 @@ async fn csseam3_free_item_lands_on_the_order() {
     let bid = sqlx::query_scalar::<_, Uuid>(
         r#"INSERT INTO promo.promo_bundles
              (company_id, title, priority, match_type, reward, reward_item_id, reward_qty,
-              min_order_amount, stackable, valid_from, is_active)
+              min_order_amount, stackable, valid_from, status)
            VALUES ($1,'free',0,'all_of'::bundle_match,'discount_percentage'::rate_or_discount,
-                   $2,'1','0',false,now() - interval '1 day', true) RETURNING id"#,
+                   $2,'1','0',false,now() - interval '1 day', 'active') RETURNING id"#,
     ).bind(company).bind(free_b).fetch_one(&pool).await.unwrap();
     bundle_component(&pool, company, bid, item_a, "1").await;
 

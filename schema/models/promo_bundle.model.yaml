@@ -89,10 +89,11 @@ models:
       valid_to:
         type: datetime?
         description: "Bundle effective until (null = open-ended)"
-      is_active:
-        type: bool
-        attributes: ["@default(true)"]
-        description: "Bundle is enabled"
+      # replaces is_active (boolean flipped to lifecycle enum)
+      status:
+        type: PromoBundleStatus
+        attributes: ["@default(active)"]
+        description: "Lifecycle (inactive bundles are no longer composed into orders; history keeps their sales)"
 
       metadata:
         type: Metadata
@@ -101,7 +102,7 @@ models:
 
     indexes:
       - type: index
-        fields: [company_id, is_active]
+        fields: [company_id, status]
       - type: index
         fields: [company_id, priority]
       - type: index
@@ -198,6 +199,15 @@ models:
         fields: [company_id, bundle_id]
 
 enums:
+  - name: PromoBundleStatus
+    description: "Lifecycle of a promotional bundle"
+    variants:
+      - name: active
+        description: "Bundle is offered"
+        default: true
+      - name: inactive
+        description: "Retired; no longer composed into orders"
+
   - name: BundleMatch
     description: "How many of a bundle's components must be present for it to fire"
     variants:

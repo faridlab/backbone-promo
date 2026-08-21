@@ -12,12 +12,10 @@ pub mod loyalty_point_entry_handler;
 pub mod pricing_rule_handler;
 pub mod promo_bundle_handler;
 pub mod promo_bundle_component_handler;
-// <<< CUSTOM
-pub mod guarded_routes;
-// END CUSTOM
 pub mod promo_bundle_gift_handler;
 
 // <<< CUSTOM
+pub mod guarded_routes;
 // END CUSTOM
 
 // Re-exports

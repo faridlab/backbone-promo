@@ -20,6 +20,7 @@ use validator::Validate;
 use crate::domain::entity::PricingRule;
 use crate::domain::entity::AuditMetadata;
 use crate::domain::entity::ApplyOn;
+use crate::domain::entity::PricingRuleStatus;
 use crate::domain::entity::RateOrDiscount;
 use crate::domain::entity::RuleScope;
 
@@ -89,9 +90,7 @@ pub struct CreatePricingRuleDto {
     #[cfg_attr(feature = "openapi", schema(example = true))]
     #[serde(alias = "coupon_required")]
     pub coupon_required: bool,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: PricingRuleStatus,
 }
 
 // =============================================================================
@@ -160,9 +159,7 @@ pub struct UpdatePricingRuleDto {
     #[cfg_attr(feature = "openapi", schema(example = true))]
     #[serde(alias = "coupon_required")]
     pub coupon_required: bool,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "is_active")]
-    pub is_active: bool,
+    pub status: PricingRuleStatus,
 }
 
 // =============================================================================
@@ -236,15 +233,14 @@ pub struct PatchPricingRuleDto {
     #[cfg_attr(feature = "openapi", schema(example = true))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "coupon_required")]
     pub coupon_required: Option<bool>,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "is_active")]
-    pub is_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<PricingRuleStatus>,
 }
 
 impl PatchPricingRuleDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.scope.is_some() || self.min_order_amount.is_some() || self.min_order_qty.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.discount_upto.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.is_active.is_some()
+        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.scope.is_some() || self.min_order_amount.is_some() || self.min_order_qty.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.discount_upto.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.status.is_some()
     }
 }
 
@@ -294,8 +290,7 @@ pub struct PricingRuleResponseDto {
     pub valid_to: Option<DateTime<Utc>>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
     pub coupon_required: bool,
-    #[cfg_attr(feature = "openapi", schema(example = true))]
-    pub is_active: bool,
+    pub status: PricingRuleStatus,
     pub metadata: AuditMetadata,
 }
 
@@ -392,7 +387,7 @@ impl From<PricingRule> for PricingRuleResponseDto {
             valid_from: entity.valid_from,
             valid_to: entity.valid_to,
             coupon_required: entity.coupon_required,
-            is_active: entity.is_active,
+            status: entity.status,
             metadata: entity.metadata,
         }
     }
@@ -440,7 +435,7 @@ impl From<CreatePricingRuleDto> for PricingRule {
             valid_from: dto.valid_from,
             valid_to: dto.valid_to,
             coupon_required: dto.coupon_required,
-            is_active: dto.is_active,
+            status: dto.status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -475,7 +470,7 @@ impl From<&PricingRule> for PricingRuleResponseDto {
             valid_from: entity.valid_from.clone(),
             valid_to: entity.valid_to.clone(),
             coupon_required: entity.coupon_required.clone(),
-            is_active: entity.is_active.clone(),
+            status: entity.status.clone(),
             metadata: entity.metadata.clone(),
         }
     }
@@ -514,7 +509,7 @@ impl backbone_core::ApplyUpdateDto<UpdatePricingRuleDto> for PricingRule {
         self.valid_from = dto.valid_from;
         self.valid_to = dto.valid_to;
         self.coupon_required = dto.coupon_required;
-        self.is_active = dto.is_active;
+        self.status = dto.status;
         Ok(self)
     }
 }

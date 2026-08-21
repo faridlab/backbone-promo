@@ -5,6 +5,7 @@ use uuid::Uuid;
 use rust_decimal::Decimal;
 
 use super::LoyaltyProgramType;
+use super::LoyaltyProgramStatus;
 use super::AuditMetadata;
 
 /// Strongly-typed ID for LoyaltyProgram
@@ -59,7 +60,7 @@ pub struct LoyaltyProgram {
     pub expiry_duration_days: Option<i32>,
     pub from_date: DateTime<Utc>,
     pub to_date: Option<DateTime<Utc>>,
-    pub is_active: bool,
+    pub status: LoyaltyProgramStatus,
     #[serde(default)]
     #[sqlx(json)]
     pub metadata: AuditMetadata,
@@ -68,11 +69,11 @@ pub struct LoyaltyProgram {
 impl LoyaltyProgram {
     /// Create a builder for LoyaltyProgram
     pub fn builder() -> LoyaltyProgramBuilder {
-        LoyaltyProgramBuilder::default()
+        <LoyaltyProgramBuilder as Default>::default()
     }
 
     /// Create a new LoyaltyProgram with required fields
-    pub fn new(company_id: Uuid, program_name: String, program_type: LoyaltyProgramType, collection_factor: Decimal, conversion_factor: Decimal, from_date: DateTime<Utc>, is_active: bool) -> Self {
+    pub fn new(company_id: Uuid, program_name: String, program_type: LoyaltyProgramType, collection_factor: Decimal, conversion_factor: Decimal, from_date: DateTime<Utc>, status: LoyaltyProgramStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
             company_id,
@@ -83,7 +84,7 @@ impl LoyaltyProgram {
             expiry_duration_days: None,
             from_date,
             to_date: None,
-            is_active,
+            status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -138,6 +139,11 @@ impl LoyaltyProgram {
         self.metadata.deleted_by.as_ref()
     }
 
+    /// Get the current status
+    pub fn status(&self) -> &LoyaltyProgramStatus {
+        &self.status
+    }
+
 
     // ==========================================================
     // Fluent Setters (with_* for optional fields)
@@ -187,8 +193,8 @@ impl LoyaltyProgram {
                 "to_date" => {
                     if let Ok(v) = serde_json::from_value(value) { self.to_date = v; }
                 }
-                "is_active" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.is_active = v; }
+                "status" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.status = v; }
                 }
                 _ => {} // ignore unknown fields
             }
@@ -246,6 +252,7 @@ impl backbone_orm::EntityRepoMeta for LoyaltyProgram {
         m.insert("id".to_string(), "uuid".to_string());
         m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("program_type".to_string(), "loyalty_program_type".to_string());
+        m.insert("status".to_string(), "loyalty_program_status".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
@@ -270,7 +277,7 @@ pub struct LoyaltyProgramBuilder {
     expiry_duration_days: Option<i32>,
     from_date: Option<DateTime<Utc>>,
     to_date: Option<DateTime<Utc>>,
-    is_active: Option<bool>,
+    status: Option<LoyaltyProgramStatus>,
 }
 
 impl LoyaltyProgramBuilder {
@@ -322,9 +329,9 @@ impl LoyaltyProgramBuilder {
         self
     }
 
-    /// Set the is_active field (default: `true`)
-    pub fn is_active(mut self, value: bool) -> Self {
-        self.is_active = Some(value);
+    /// Set the status field (default: `LoyaltyProgramStatus::default()`)
+    pub fn status(mut self, value: LoyaltyProgramStatus) -> Self {
+        self.status = Some(value);
         self
     }
 
@@ -342,13 +349,13 @@ impl LoyaltyProgramBuilder {
             id: Uuid::new_v4(),
             company_id,
             program_name,
-            program_type: self.program_type.unwrap_or(LoyaltyProgramType::default()),
+            program_type: self.program_type.unwrap_or_default(),
             collection_factor,
             conversion_factor,
             expiry_duration_days: self.expiry_duration_days,
             from_date,
             to_date: self.to_date,
-            is_active: self.is_active.unwrap_or(true),
+            status: self.status.unwrap_or_default(),
             metadata: AuditMetadata::default(),
         })
     }

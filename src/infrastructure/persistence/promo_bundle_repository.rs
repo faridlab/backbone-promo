@@ -81,7 +81,7 @@ impl PromoBundleRepository {
                        reward_item_id, reward_qty, stackable, valid_from
                 FROM promo.promo_bundles
                 WHERE company_id = $1
-                  AND is_active = true
+                  AND status = 'active'
                   AND (metadata->>'deleted_at') IS NULL
                   AND valid_from <= $2
                   AND (valid_to IS NULL OR valid_to >= $2)

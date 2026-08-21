@@ -23,6 +23,7 @@ pub mod infrastructure;
 pub mod application;
 pub mod presentation;
 pub mod seeders;
+pub mod exports;
 
 // Re-exports for convenience - Domain entities
 pub use domain::entity::*;
@@ -65,6 +66,8 @@ pub struct PromoModule {
     pub(crate) promo_bundle_service: Arc<PromoBundleService>,
     pub(crate) promo_bundle_component_service: Arc<PromoBundleComponentService>,
     pub(crate) promo_bundle_gift_service: Arc<PromoBundleGiftService>,
+    // <<< CUSTOM FIELDS
+    // END CUSTOM
 }
 
 impl PromoModule {
@@ -106,10 +109,41 @@ impl PromoModule {
     /// mount exposes unguarded writes. Compose a guarded router (read + validated
     /// writes) for production, or call `all_crud_routes()` to opt into the full
     /// unguarded surface explicitly.
-    #[deprecated(note = "mounts unvalidated generic CRUD on every entity; compose a guarded router for production, or call all_crud_routes() for the intentional full/unguarded surface")]
+    #[deprecated(note = "mounts unvalidated generic CRUD; prefer readonly_routes() + validated writes, or all_crud_routes() for the full/unguarded surface")]
     pub fn routes(&self) -> Router {
         self.all_crud_routes()
     }
+
+    /// Read-only routes for every entity (GET endpoints only) — the safe base.
+    ///
+    /// Generic mutation can't reach here, so this surface cannot bypass a
+    /// validated write service's invariants. Use this as the production base and
+    /// merge validated write routes (or a write service's HTTP layer) onto it.
+    pub fn readonly_routes(&self) -> Router {
+        use presentation::http::{
+            create_coupon_code_read_routes,
+            create_coupon_redemption_read_routes,
+            create_loyalty_program_read_routes,
+            create_loyalty_point_entry_read_routes,
+            create_pricing_rule_read_routes,
+            create_promo_bundle_read_routes,
+            create_promo_bundle_component_read_routes,
+            create_promo_bundle_gift_read_routes,
+        };
+
+        Router::new()
+            .merge(create_coupon_code_read_routes(self.coupon_code_service.clone()))
+            .merge(create_coupon_redemption_read_routes(self.coupon_redemption_service.clone()))
+            .merge(create_loyalty_program_read_routes(self.loyalty_program_service.clone()))
+            .merge(create_loyalty_point_entry_read_routes(self.loyalty_point_entry_service.clone()))
+            .merge(create_pricing_rule_read_routes(self.pricing_rule_service.clone()))
+            .merge(create_promo_bundle_read_routes(self.promo_bundle_service.clone()))
+            .merge(create_promo_bundle_component_read_routes(self.promo_bundle_component_service.clone()))
+            .merge(create_promo_bundle_gift_read_routes(self.promo_bundle_gift_service.clone()))
+    }
+
+    // <<< CUSTOM METHODS
+    // END CUSTOM
 }
 
 /// Builder for PromoModule

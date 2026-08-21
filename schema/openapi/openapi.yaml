@@ -2968,7 +2968,7 @@ components:
         - pricing_rule_id
         - used_count
         - valid_from
-        - is_active
+        - status
         - metadata
       properties:
         id:
@@ -3001,8 +3001,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3027,7 +3027,7 @@ components:
         - pricing_rule_id
         - used_count
         - valid_from
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -3057,8 +3057,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3070,7 +3070,7 @@ components:
         - pricing_rule_id
         - used_count
         - valid_from
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -3100,8 +3100,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3135,8 +3135,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3307,7 +3307,7 @@ components:
         - collection_factor
         - conversion_factor
         - from_date
-        - is_active
+        - status
         - metadata
       properties:
         id:
@@ -3336,8 +3336,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3363,7 +3363,7 @@ components:
         - collection_factor
         - conversion_factor
         - from_date
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -3389,8 +3389,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3403,7 +3403,7 @@ components:
         - collection_factor
         - conversion_factor
         - from_date
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -3429,8 +3429,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3460,8 +3460,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3688,7 +3688,7 @@ components:
         - currency
         - valid_from
         - coupon_required
-        - is_active
+        - status
         - metadata
       properties:
         id:
@@ -3766,8 +3766,8 @@ components:
           format: date-time
         coupon_required:
           type: boolean
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3800,7 +3800,7 @@ components:
         - currency
         - valid_from
         - coupon_required
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -3875,8 +3875,8 @@ components:
           format: date-time
         coupon_required:
           type: boolean
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -3896,7 +3896,7 @@ components:
         - currency
         - valid_from
         - coupon_required
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -3971,8 +3971,8 @@ components:
           format: date-time
         coupon_required:
           type: boolean
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -4051,8 +4051,8 @@ components:
           format: date-time
         coupon_required:
           type: boolean
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -4079,7 +4079,7 @@ components:
         - min_order_amount
         - stackable
         - valid_from
-        - is_active
+        - status
         - metadata
       properties:
         id:
@@ -4128,8 +4128,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -4158,7 +4158,7 @@ components:
         - min_order_amount
         - stackable
         - valid_from
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -4204,8 +4204,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -4221,7 +4221,7 @@ components:
         - min_order_amount
         - stackable
         - valid_from
-        - is_active
+        - status
         - metadata
       properties:
         company_id:
@@ -4267,8 +4267,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 
@@ -4318,8 +4318,8 @@ components:
           nullable: true
           type: string
           format: date-time
-        is_active:
-          type: boolean
+        status:
+          type: string
         metadata:
           type: object
 

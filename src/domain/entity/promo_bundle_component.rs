@@ -66,7 +66,7 @@ pub struct PromoBundleComponent {
 impl PromoBundleComponent {
     /// Create a builder for PromoBundleComponent
     pub fn builder() -> PromoBundleComponentBuilder {
-        PromoBundleComponentBuilder::default()
+        <PromoBundleComponentBuilder as Default>::default()
     }
 
     /// Create a new PromoBundleComponent with required fields
@@ -325,7 +325,7 @@ impl PromoBundleComponentBuilder {
             id: Uuid::new_v4(),
             company_id,
             bundle_id,
-            apply_on: self.apply_on.unwrap_or(ApplyOn::default()),
+            apply_on: self.apply_on.unwrap_or_default(),
             item_id: self.item_id,
             item_group_id: self.item_group_id,
             brand_id: self.brand_id,

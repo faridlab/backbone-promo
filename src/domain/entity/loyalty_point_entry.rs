@@ -69,7 +69,7 @@ pub struct LoyaltyPointEntry {
 impl LoyaltyPointEntry {
     /// Create a builder for LoyaltyPointEntry
     pub fn builder() -> LoyaltyPointEntryBuilder {
-        LoyaltyPointEntryBuilder::default()
+        <LoyaltyPointEntryBuilder as Default>::default()
     }
 
     /// Create a new LoyaltyPointEntry with required fields

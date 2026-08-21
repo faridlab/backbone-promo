@@ -349,9 +349,9 @@ async fn free_bundle(
     sqlx::query_scalar::<_, Uuid>(
         r#"INSERT INTO promo.promo_bundles
              (company_id, title, priority, match_type, reward, reward_item_id, reward_qty,
-              min_order_amount, stackable, valid_from, is_active)
+              min_order_amount, stackable, valid_from, status)
            VALUES ($1,'free-bundle',0,'all_of'::bundle_match,'discount_percentage'::rate_or_discount,
-                   $2,$3,'0',false,now() - interval '1 day', true)
+                   $2,$3,'0',false,now() - interval '1 day', 'active')
            RETURNING id"#,
     )
     .bind(company)

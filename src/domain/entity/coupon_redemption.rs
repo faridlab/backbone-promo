@@ -62,7 +62,7 @@ pub struct CouponRedemption {
 impl CouponRedemption {
     /// Create a builder for CouponRedemption
     pub fn builder() -> CouponRedemptionBuilder {
-        CouponRedemptionBuilder::default()
+        <CouponRedemptionBuilder as Default>::default()
     }
 
     /// Create a new CouponRedemption with required fields

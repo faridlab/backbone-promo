@@ -54,10 +54,11 @@ models:
       to_date:
         type: datetime?
         description: "Program effective until (null = open-ended)"
-      is_active:
-        type: bool
-        attributes: ["@default(true)"]
-        description: "Program is enabled"
+      # replaces is_active (boolean flipped to lifecycle enum)
+      status:
+        type: LoyaltyProgramStatus
+        attributes: ["@default(active)"]
+        description: "Lifecycle (inactive programs stop earning and redeeming; balances and history remain)"
 
       metadata:
         type: Metadata
@@ -66,7 +67,7 @@ models:
 
     indexes:
       - type: index
-        fields: [company_id, is_active]
+        fields: [company_id, status]
 
   - name: LoyaltyPointEntry
     collection: loyalty_point_entries
@@ -136,6 +137,15 @@ models:
         fields: [customer_id, entry_type]
 
 enums:
+  - name: LoyaltyProgramStatus
+    description: "Lifecycle of a loyalty program"
+    variants:
+      - name: active
+        description: "Program earns and redeems points"
+        default: true
+      - name: inactive
+        description: "Retired; earning and redemption stop, balances and history remain"
+
   - name: LoyaltyProgramType
     description: "Flat or tiered loyalty scheme"
     variants:

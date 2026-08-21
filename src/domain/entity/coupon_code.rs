@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
+
+use super::CouponCodeStatus;
 use super::AuditMetadata;
 
 /// Strongly-typed ID for CouponCode
@@ -56,7 +58,7 @@ pub struct CouponCode {
     pub used_count: i32,
     pub valid_from: DateTime<Utc>,
     pub valid_upto: Option<DateTime<Utc>>,
-    pub is_active: bool,
+    pub status: CouponCodeStatus,
     #[serde(default)]
     #[sqlx(json)]
     pub metadata: AuditMetadata,
@@ -65,11 +67,11 @@ pub struct CouponCode {
 impl CouponCode {
     /// Create a builder for CouponCode
     pub fn builder() -> CouponCodeBuilder {
-        CouponCodeBuilder::default()
+        <CouponCodeBuilder as Default>::default()
     }
 
     /// Create a new CouponCode with required fields
-    pub fn new(company_id: Uuid, code: String, pricing_rule_id: Uuid, used_count: i32, valid_from: DateTime<Utc>, is_active: bool) -> Self {
+    pub fn new(company_id: Uuid, code: String, pricing_rule_id: Uuid, used_count: i32, valid_from: DateTime<Utc>, status: CouponCodeStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
             company_id,
@@ -80,7 +82,7 @@ impl CouponCode {
             used_count,
             valid_from,
             valid_upto: None,
-            is_active,
+            status,
             metadata: AuditMetadata::default(),
         }
     }
@@ -133,6 +135,11 @@ impl CouponCode {
     /// Get who deleted this entity
     pub fn deleted_by(&self) -> Option<&Uuid> {
         self.metadata.deleted_by.as_ref()
+    }
+
+    /// Get the current status
+    pub fn status(&self) -> &CouponCodeStatus {
+        &self.status
     }
 
 
@@ -190,8 +197,8 @@ impl CouponCode {
                 "valid_upto" => {
                     if let Ok(v) = serde_json::from_value(value) { self.valid_upto = v; }
                 }
-                "is_active" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.is_active = v; }
+                "status" => {
+                    if let Ok(v) = serde_json::from_value(value) { self.status = v; }
                 }
                 _ => {} // ignore unknown fields
             }
@@ -249,6 +256,7 @@ impl backbone_orm::EntityRepoMeta for CouponCode {
         m.insert("id".to_string(), "uuid".to_string());
         m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("pricing_rule_id".to_string(), "uuid".to_string());
+        m.insert("status".to_string(), "coupon_code_status".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
@@ -273,7 +281,7 @@ pub struct CouponCodeBuilder {
     used_count: Option<i32>,
     valid_from: Option<DateTime<Utc>>,
     valid_upto: Option<DateTime<Utc>>,
-    is_active: Option<bool>,
+    status: Option<CouponCodeStatus>,
 }
 
 impl CouponCodeBuilder {
@@ -325,9 +333,9 @@ impl CouponCodeBuilder {
         self
     }
 
-    /// Set the is_active field (default: `true`)
-    pub fn is_active(mut self, value: bool) -> Self {
-        self.is_active = Some(value);
+    /// Set the status field (default: `CouponCodeStatus::default()`)
+    pub fn status(mut self, value: CouponCodeStatus) -> Self {
+        self.status = Some(value);
         self
     }
 
@@ -350,7 +358,7 @@ impl CouponCodeBuilder {
             used_count: self.used_count.unwrap_or(0),
             valid_from,
             valid_upto: self.valid_upto,
-            is_active: self.is_active.unwrap_or(true),
+            status: self.status.unwrap_or_default(),
             metadata: AuditMetadata::default(),
         })
     }

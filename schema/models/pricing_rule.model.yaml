@@ -128,10 +128,11 @@ models:
         type: bool
         attributes: ["@default(false)"]
         description: "If true the rule applies only when a valid coupon for it is presented"
-      is_active:
-        type: bool
-        attributes: ["@default(true)"]
-        description: "Rule is enabled"
+      # replaces is_active (boolean flipped to lifecycle enum)
+      status:
+        type: PricingRuleStatus
+        attributes: ["@default(active)"]
+        description: "Lifecycle (inactive rules no longer match in price computation; history keeps where they applied)"
 
       metadata:
         type: Metadata
@@ -140,15 +141,23 @@ models:
 
     indexes:
       - type: index
-        fields: [company_id, is_active, apply_on]
+        fields: [company_id, status, apply_on]
       - type: index
-        fields: [company_id, item_id, is_active]
+        fields: [company_id, item_id, status]
       - type: index
         fields: [company_id, priority]
       - type: index
         fields: [valid_from, valid_to]
 
 enums:
+  - name: PricingRuleStatus
+    description: "Lifecycle of a pricing rule"
+    variants:
+      - name: active
+        description: "Rule participates in price computation"
+        default: true
+      - name: inactive
+        description: "Retired; the rule no longer matches, history keeps where it applied"
   - name: RuleScope
     description: "Whether a pricing rule is matched per line or once against the whole cart"
     variants:

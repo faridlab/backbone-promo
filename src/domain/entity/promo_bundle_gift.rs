@@ -61,7 +61,7 @@ pub struct PromoBundleGift {
 impl PromoBundleGift {
     /// Create a builder for PromoBundleGift
     pub fn builder() -> PromoBundleGiftBuilder {
-        PromoBundleGiftBuilder::default()
+        <PromoBundleGiftBuilder as Default>::default()
     }
 
     /// Create a new PromoBundleGift with required fields

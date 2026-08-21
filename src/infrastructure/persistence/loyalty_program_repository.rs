@@ -62,7 +62,7 @@ impl LoyaltyProgramRepository {
             pool,
             sqlx::query(
                 r#"SELECT collection_factor, expiry_duration_days FROM promo.loyalty_programs
-                   WHERE id = $1 AND company_id = $2 AND is_active = true
+                   WHERE id = $1 AND company_id = $2 AND status = 'active'
                      AND (metadata->>'deleted_at') IS NULL
                      AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)"#,
             )
@@ -88,7 +88,7 @@ impl LoyaltyProgramRepository {
     ) -> Result<Option<Decimal>, sqlx::Error> {
         sqlx::query_scalar(
             r#"SELECT conversion_factor FROM promo.loyalty_programs
-               WHERE id = $1 AND company_id = $2 AND is_active = true
+               WHERE id = $1 AND company_id = $2 AND status = 'active'
                  AND (metadata->>'deleted_at') IS NULL
                  AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)"#,
         )
