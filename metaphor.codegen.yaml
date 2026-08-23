@@ -36,12 +36,24 @@ user_owned:
   - "src/infrastructure/persistence/promo_bundle_component_repository.rs"
   - "src/infrastructure/persistence/promo_bundle_gift_repository.rs"
   - "src/infrastructure/persistence/promo_bundle_repository.rs"
+  # Hand-written migrations the generator cannot re-derive from the schema: the
+  # pricing-rule threshold-shape columns (min_order_qty, discount_upto) and the
+  # lifecycle status-enum swap (is_active booleans -> status enums per entity).
+  # Unlisted, a `--force` regen can drop them — the same protection payment's
+  # fused-lifecycle migration carries in its manifest.
+  - "migrations/20260729000001_add_pricing_rule_threshold_fields.up.sql"
+  - "migrations/20260729000001_add_pricing_rule_threshold_fields.down.sql"
+  - "migrations/20260821130000_status_lifecycle.up.sql"
+  - "migrations/20260821130000_status_lifecycle.down.sql"
   - "tests/cart_pos_seam.rs"
   - "tests/cart_resolution.rs"
   - "tests/cart_selling_seam.rs"
   - "tests/integrity_probes.rs"
   - "tests/price_resolution_seam.rs"
   - "tests/promo_golden_cases.rs"
+  # Hand-written shared helpers (live pool + per-test fresh company_id seeding)
+  # used by every suite; not a generator-emitted path.
+  - "tests/common/**"
   - "scripts/**"
 
   # Behavior tests (the golden cases / oracle) + BDD features.
