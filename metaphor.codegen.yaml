@@ -21,9 +21,22 @@ user_owned:
   - "src/application/service/promo_cart.rs"
   - "src/application/service/promo_coupon.rs"
   - "src/application/service/promo_loyalty.rs"
+  # Per-order points ledger: the grant/spend/reverse order verbs. Same impl-chunk pattern
+  # as the loyalty/coupon/cart chunks above.
+  - "src/application/service/promo_loyalty_order.rs"
   # Guarded route composer: wraps the company-scoped entity read surface in company_auth (ADR-0008
   # RLS fence). Hand-authored, mirrors backbone-pos/backbone-inventory guarded_routes.rs.
   - "src/presentation/http/guarded_routes.rs"
+  # The unvalidated generic-CRUD mounts are cfg-gated so they cannot ship by default:
+  #   - src/lib.rs        #[cfg(any(test, feature = "unguarded"))] on all_crud_routes / routes
+  #   - src/routes/mod.rs same gate on create_stateless_routes / get_routes /
+  #                      create_combined_routes / get_routes_with_state
+  # Without owning these two files, regen re-exposes the unguarded surface (including generic
+  # CRUD over the loyalty point ledger) in every production build. tests/codegen_invariants.rs
+  # pins the gate counts.
+  - "src/lib.rs"
+  - "src/routes/mod.rs"
+  - "tests/codegen_invariants.rs"
   # Own the hand-written promo SQL (the structural rule/bundle searches behind resolve, the coupon
   # lookup + its guarded redemption burn, and the loyalty accrual/balance/redemption ledger) that the
   # write service orchestrates. Declared here — not renamed with a `_custom` suffix — so the generator
@@ -31,6 +44,10 @@ user_owned:
   - "src/infrastructure/persistence/coupon_code_repository.rs"
   - "src/infrastructure/persistence/coupon_redemption_repository.rs"
   - "src/infrastructure/persistence/loyalty_point_entry_repository.rs"
+  # The NOWAIT member-balance anchor (speculative insert + FOR UPDATE NOWAIT) and the
+  # per-order points ledger rows behind grant/spend/reverse.
+  - "src/infrastructure/persistence/loyalty_member_anchor_repository.rs"
+  - "src/infrastructure/persistence/loyalty_order_points_repository.rs"
   - "src/infrastructure/persistence/loyalty_program_repository.rs"
   - "src/infrastructure/persistence/pricing_rule_repository.rs"
   - "src/infrastructure/persistence/promo_bundle_component_repository.rs"
@@ -45,10 +62,27 @@ user_owned:
   - "migrations/20260729000001_add_pricing_rule_threshold_fields.down.sql"
   - "migrations/20260821130000_status_lifecycle.up.sql"
   - "migrations/20260821130000_status_lifecycle.down.sql"
+  # Hand-written v0.3.0 migrations the schema cannot re-derive: the reversal entry types,
+  # the order-points table backstops, the NOWAIT member anchor, the expiry-aware balance
+  # conservation trigger, and the window/CHECK backstops across the promo tables. The
+  # order-points CREATE table itself (20260825100050) IS schema-derived (see
+  # schema/models/loyalty_order_points.model.yaml) and stays generator-owned.
+  - "migrations/20260825100000_add_loyalty_reversal_entry_types.up.sql"
+  - "migrations/20260825100000_add_loyalty_reversal_entry_types.down.sql"
+  - "migrations/20260825100100_loyalty_order_points_backstops.up.sql"
+  - "migrations/20260825100100_loyalty_order_points_backstops.down.sql"
+  - "migrations/20260825100200_create_loyalty_member_anchor.up.sql"
+  - "migrations/20260825100200_create_loyalty_member_anchor.down.sql"
+  - "migrations/20260825100300_loyalty_balance_conservation_trigger.up.sql"
+  - "migrations/20260825100300_loyalty_balance_conservation_trigger.down.sql"
+  - "migrations/20260825100400_s7_backstop_checks.up.sql"
+  - "migrations/20260825100400_s7_backstop_checks.down.sql"
   - "tests/cart_pos_seam.rs"
   - "tests/cart_resolution.rs"
   - "tests/cart_selling_seam.rs"
   - "tests/integrity_probes.rs"
+  - "tests/loyalty_order_points.rs"
+  - "tests/loyalty_fence_probes.rs"
   - "tests/price_resolution_seam.rs"
   - "tests/promo_golden_cases.rs"
   # Hand-written shared helpers (live pool + per-test fresh company_id seeding)

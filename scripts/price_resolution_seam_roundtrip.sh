@@ -14,6 +14,9 @@ SEAM=(
   src/application/service/promo_events.rs
   src/application/service/promo_ports.rs
   src/application/service/promo_write_service.rs
+  src/application/service/promo_loyalty_order.rs
+  src/infrastructure/persistence/loyalty_member_anchor_repository.rs
+  src/infrastructure/persistence/loyalty_order_points_repository.rs
 )
 
 before=$(shasum "${SEAM[@]}")
@@ -28,5 +31,6 @@ echo "OK: seam files byte-identical across regen"
 
 echo "== re-running the seam + oracle suite =="
 SQLX_OFFLINE=false cargo test --test promo_golden_cases --test integrity_probes \
+  --test loyalty_order_points --test loyalty_fence_probes \
   --test price_resolution_seam 2>&1 | grep -E "test result"
 echo "OK: §5 round-trip holds"

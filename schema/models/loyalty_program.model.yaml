@@ -164,4 +164,8 @@ enums:
       - name: redeemed
         description: "Points spent against a purchase (−)"
       - name: expired
-        description: "Points lapsed past expiry (−)"
+        description: "Points lapsed past expiry (−). Reserved for a future materializing sweep; no rows are written by the current verbs (expiry is enforced at redeem/reversal time against expiry_date)"
+      - name: grant_reversed
+        description: "Grant clawed back by a return (−, source = the return document)"
+      - name: spend_reversed
+        description: "Spent points restored by a return (+, source = the return document)"

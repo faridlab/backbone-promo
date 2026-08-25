@@ -48,6 +48,7 @@ use crate::handlers::AppState;
 /// let routes = create_stateless_routes(&module);
 /// let app = Router::new().merge(routes);
 /// ```
+#[cfg(any(test, feature = "unguarded"))]
 pub fn create_stateless_routes(module: &crate::PromoModule) -> Router<()> {
     Router::new()
         .merge(create_coupon_code_routes(module.coupon_code_service.clone()))
@@ -80,6 +81,7 @@ pub fn create_readonly_promo_routes(module: &crate::PromoModule) -> Router<()> {
 /// Get all routes (stateless) for the Promo module.
 ///
 /// This is a convenience function that wraps routes with API versioning.
+#[cfg(any(test, feature = "unguarded"))]
 pub fn get_routes(module: &crate::PromoModule) -> Router<()> {
     Router::new()
         .nest("/api/v1", create_stateless_routes(module))
@@ -111,6 +113,7 @@ pub fn create_stateful_routes() -> Router<AppState> {
 /// Create combined routes (stateless CRUD + stateful custom handlers).
 ///
 /// This merges both stateless CRUD routes and stateful custom routes.
+#[cfg(any(test, feature = "unguarded"))]
 pub fn create_combined_routes(module: &crate::PromoModule) -> Router<AppState> {
     // First create stateless routes
     let crud_routes: Router<()> = create_stateless_routes(module);
@@ -129,6 +132,7 @@ pub fn create_combined_routes(module: &crate::PromoModule) -> Router<AppState> {
 /// Get all routes (stateful) for the Promo module.
 ///
 /// This is a convenience function that wraps routes with API versioning.
+#[cfg(any(test, feature = "unguarded"))]
 pub fn get_routes_with_state(module: &crate::PromoModule) -> Router<AppState> {
     Router::new()
         .nest("/api/v1", create_combined_routes(module))

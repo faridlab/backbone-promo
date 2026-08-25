@@ -15,6 +15,8 @@ tags:
     description: CouponCode management endpoints
   - name: CouponRedemptions
     description: CouponRedemption management endpoints
+  - name: LoyaltyOrderPointses
+    description: LoyaltyOrderPoints management endpoints
   - name: LoyaltyPrograms
     description: LoyaltyProgram management endpoints
   - name: LoyaltyPointEntries
@@ -747,6 +749,372 @@ paths:
         - CouponRedemptions
       summary: Bulk permanently-delete CouponRedemptions from trash by ids (atomic)
       operationId: bulkPermanentDeleteCouponRedemptions
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Permanently deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permanently_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/loyalty_order_pointses:
+    get:
+      tags:
+        - LoyaltyOrderPointses
+      summary: List LoyaltyOrderPointses
+      description: Get a paginated list of LoyaltyOrderPointses with optional filtering and sorting
+      operationId: listLoyaltyOrderPointses
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortOrderParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPointsList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Create LoyaltyOrderPoints
+      description: Create a new LoyaltyOrderPoints
+      operationId: createLoyaltyOrderPoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLoyaltyOrderPointsRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPoints'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/loyalty_order_pointses/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+
+    get:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Get LoyaltyOrderPoints by ID
+      operationId: getLoyaltyOrderPoints
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPoints'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Update LoyaltyOrderPoints (full)
+      operationId: updateLoyaltyOrderPoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLoyaltyOrderPointsRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPoints'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Update LoyaltyOrderPoints (partial)
+      operationId: patchLoyaltyOrderPoints
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchLoyaltyOrderPointsRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPoints'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Delete LoyaltyOrderPoints (soft)
+      operationId: deleteLoyaltyOrderPoints
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/loyalty_order_pointses/bulk:
+    post:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Bulk create LoyaltyOrderPointses
+      operationId: bulkCreateLoyaltyOrderPointses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CreateLoyaltyOrderPointsRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoyaltyOrderPoints'
+    put:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Bulk update LoyaltyOrderPointses (full, atomic)
+      operationId: bulkUpdateLoyaltyOrderPointses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                allOf:
+                  - type: object
+                    required: [id]
+                    properties:
+                      id:
+                        type: string
+                  - $ref: '#/components/schemas/UpdateLoyaltyOrderPointsRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPointsBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    patch:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Bulk partial-update LoyaltyOrderPointses (atomic)
+      operationId: bulkPatchLoyaltyOrderPointses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [ids, patch]
+                  properties:
+                    ids:
+                      type: array
+                      items: { type: string }
+                    patch:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [items]
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, patch]
+                        properties:
+                          id: { type: string }
+                          patch: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPointsBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/loyalty_order_pointses/upsert:
+    post:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Upsert LoyaltyOrderPoints
+      operationId: upsertLoyaltyOrderPoints
+      parameters:
+        - name: key_field
+          in: query
+          schema:
+            type: string
+        - name: key_value
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLoyaltyOrderPointsRequest'
+      responses:
+        '200':
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPoints'
+
+  /api/v1/loyalty_order_pointses/trash:
+    get:
+      tags:
+        - LoyaltyOrderPointses
+      summary: List deleted LoyaltyOrderPointses
+      operationId: listDeletedLoyaltyOrderPointses
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPointsList'
+
+  /api/v1/loyalty_order_pointses/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Restore deleted LoyaltyOrderPoints
+      operationId: restoreLoyaltyOrderPoints
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPoints'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/loyalty_order_pointses/empty:
+    delete:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Empty trash for LoyaltyOrderPointses
+      operationId: emptyTrashLoyaltyOrderPointses
+      responses:
+        '200':
+          description: Trash emptied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_count:
+                    type: integer
+
+  /api/v1/loyalty_order_pointses/delete/bulk:
+    post:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Bulk soft-delete LoyaltyOrderPointses by ids (atomic)
+      operationId: bulkDeleteLoyaltyOrderPointses
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Soft-deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  soft_deleted: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/loyalty_order_pointses/restore/bulk:
+    post:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Bulk restore LoyaltyOrderPointses by ids (atomic)
+      operationId: bulkRestoreLoyaltyOrderPointses
+      requestBody:
+        $ref: '#/components/requestBodies/BatchIds'
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoyaltyOrderPointsBulkResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/loyalty_order_pointses/restore/all:
+    post:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Restore all soft-deleted LoyaltyOrderPointses
+      operationId: restoreAllLoyaltyOrderPointses
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: integer }
+
+  /api/v1/loyalty_order_pointses/trash/bulk:
+    delete:
+      tags:
+        - LoyaltyOrderPointses
+      summary: Bulk permanently-delete LoyaltyOrderPointses from trash by ids (atomic)
+      operationId: bulkPermanentDeleteLoyaltyOrderPointses
       requestBody:
         $ref: '#/components/requestBodies/BatchIds'
       responses:
@@ -3294,6 +3662,241 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CouponRedemption'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    LoyaltyOrderPoints:
+      type: object
+      required:
+        - id
+        - company_id
+        - loyalty_program_id
+        - customer_id
+        - order_ref_type
+        - order_ref_id
+        - grant_base_amount
+        - granted_points
+        - spent_points
+        - granted_reversed_points
+        - spent_reversed_points
+        - metadata
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_id:
+          type: string
+          format: uuid
+        loyalty_program_id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        order_ref_type:
+          type: string
+          maxLength: 40
+        order_ref_id:
+          type: string
+          format: uuid
+        coupon_code_id:
+          nullable: true
+          type: string
+          format: uuid
+        grant_base_amount:
+          type: string
+        granted_points:
+          type: string
+        spent_points:
+          type: string
+        granted_reversed_points:
+          type: string
+        spent_reversed_points:
+          type: string
+        granted_at:
+          nullable: true
+          type: string
+          format: date-time
+        spent_at:
+          nullable: true
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    LoyaltyOrderPointsBulkResult:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoyaltyOrderPoints'
+        total: { type: integer }
+        failed: { type: integer }
+        errors:
+          type: array
+          items: { type: string }
+
+    CreateLoyaltyOrderPointsRequest:
+      type: object
+      required:
+        - company_id
+        - loyalty_program_id
+        - customer_id
+        - order_ref_type
+        - order_ref_id
+        - grant_base_amount
+        - granted_points
+        - spent_points
+        - granted_reversed_points
+        - spent_reversed_points
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        loyalty_program_id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        order_ref_type:
+          type: string
+          maxLength: 40
+        order_ref_id:
+          type: string
+          format: uuid
+        coupon_code_id:
+          nullable: true
+          type: string
+          format: uuid
+        grant_base_amount:
+          type: string
+        granted_points:
+          type: string
+        spent_points:
+          type: string
+        granted_reversed_points:
+          type: string
+        spent_reversed_points:
+          type: string
+        granted_at:
+          nullable: true
+          type: string
+          format: date-time
+        spent_at:
+          nullable: true
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    UpdateLoyaltyOrderPointsRequest:
+      type: object
+      required:
+        - company_id
+        - loyalty_program_id
+        - customer_id
+        - order_ref_type
+        - order_ref_id
+        - grant_base_amount
+        - granted_points
+        - spent_points
+        - granted_reversed_points
+        - spent_reversed_points
+        - metadata
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        loyalty_program_id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        order_ref_type:
+          type: string
+          maxLength: 40
+        order_ref_id:
+          type: string
+          format: uuid
+        coupon_code_id:
+          nullable: true
+          type: string
+          format: uuid
+        grant_base_amount:
+          type: string
+        granted_points:
+          type: string
+        spent_points:
+          type: string
+        granted_reversed_points:
+          type: string
+        spent_reversed_points:
+          type: string
+        granted_at:
+          nullable: true
+          type: string
+          format: date-time
+        spent_at:
+          nullable: true
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    PatchLoyaltyOrderPointsRequest:
+      type: object
+      properties:
+        company_id:
+          type: string
+          format: uuid
+        loyalty_program_id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        order_ref_type:
+          type: string
+          maxLength: 40
+        order_ref_id:
+          type: string
+          format: uuid
+        coupon_code_id:
+          nullable: true
+          type: string
+          format: uuid
+        grant_base_amount:
+          type: string
+        granted_points:
+          type: string
+        spent_points:
+          type: string
+        granted_reversed_points:
+          type: string
+        spent_reversed_points:
+          type: string
+        granted_at:
+          nullable: true
+          type: string
+          format: date-time
+        spent_at:
+          nullable: true
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    LoyaltyOrderPointsList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoyaltyOrderPoints'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 

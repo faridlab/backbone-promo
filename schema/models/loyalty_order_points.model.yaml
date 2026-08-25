@@ -1,0 +1,94 @@
+# =============================================================================
+# Domain: Promo
+# Entity: LoyaltyOrderPoints
+# Description: Per-order loyalty accounting — the grant/spend/reversal state of
+# one member's points on one logical order. One row per (company, program,
+# order_ref_type, order_ref_id): the order-flow verbs (grant_order_points /
+# spend_order_points / reverse_order_points) keep it in step with the signed
+# entry ledger, and its counters make a partial return server-derivable from
+# amounts alone. Reversals are COMPENSATING ledger entries (never a status
+# flip): the counters below record how much of each leg has been reversed, and
+# DB CHECKs bound them by the granted/spent totals. No status column — the
+# counters plus their CHECKs are the truth (derived state drifts).
+# =============================================================================
+
+models:
+  - name: LoyaltyOrderPoints
+    collection: loyalty_order_points
+    description: "Per-order loyalty accounting: the grant/spend/reversal state of one member's points on one logical order"
+
+    fields:
+      id:
+        type: uuid
+        attributes: ["@id", "@default(uuid)"]
+        description: "Unique row id"
+      company_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "Books owner # logical FK to organization.Company.id"
+      loyalty_program_id:
+        type: uuid
+        attributes: ["@required", "@foreign_key(LoyaltyProgram.id)"]
+        description: "The program the order's points belong to"
+      customer_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "The member # logical FK to party.Party.id"
+
+      order_ref_type:
+        type: string
+        attributes: ["@required", "@max(40)"]
+        description: "Logical order kind, e.g. pos_order / sales_order (the source module owns the id)"
+      order_ref_id:
+        type: uuid
+        attributes: ["@required", "@exclude_from_foreign_key_check"]
+        description: "The logical order id # logical FK (source module owns it)"
+      coupon_code_id:
+        type: uuid?
+        attributes: ["@foreign_key(CouponCode.id)"]
+        description: "The coupon that rode the order, when one did (informational link to the burn)"
+
+      grant_base_amount:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Server snapshot of the net-of-tax earning base the grant was derived from"
+      granted_points:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Points granted on this order (floor(base x collection_factor))"
+      spent_points:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Points spent (redeemed) against this order"
+      granted_reversed_points:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Cumulative points of the grant clawed back by returns (bounded by a CHECK to granted_points)"
+      spent_reversed_points:
+        type: decimal
+        attributes: ["@default(0)", "@precision(18,2)", "@non_negative"]
+        description: "Cumulative points of the spend restored by returns (bounded by a CHECK to spent_points)"
+
+      granted_at:
+        type: datetime?
+        description: "When the grant leg posted (null while the order has not earned)"
+      spent_at:
+        type: datetime?
+        description: "When the spend leg posted (null while the order burned nothing)"
+
+      metadata:
+        type: Metadata
+        attributes: ["@audit_metadata"]
+        description: "Audit metadata"
+
+    indexes:
+      # One row per order per program (a future second program on the same order
+      # needs no re-migration). The reversal-counter CHECKs live in a hand
+      # migration — the schema DSL cannot express cross-column constraints.
+      - type: unique
+        fields: [company_id, loyalty_program_id, order_ref_type, order_ref_id]
+        where: "deleted_at IS NULL"
+      - type: index
+        fields: [company_id, customer_id]
+      - type: index
+        fields: [loyalty_program_id]

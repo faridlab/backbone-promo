@@ -8,6 +8,7 @@ pub use backbone_core::{Specification, AndSpecification, OrSpecification, NotSpe
 
 pub mod coupon_code_specification;
 pub mod coupon_redemption_specification;
+pub mod loyalty_order_points_specification;
 pub mod loyalty_program_specification;
 pub mod loyalty_point_entry_specification;
 pub mod pricing_rule_specification;

@@ -7,6 +7,7 @@
 
 pub mod coupon_code_handler;
 pub mod coupon_redemption_handler;
+pub mod loyalty_order_points_handler;
 pub mod loyalty_program_handler;
 pub mod loyalty_point_entry_handler;
 pub mod pricing_rule_handler;
@@ -21,14 +22,13 @@ pub mod guarded_routes;
 // Re-exports
 pub use coupon_code_handler::{create_coupon_code_routes, create_coupon_code_read_routes, create_coupon_code_write_routes};
 pub use coupon_redemption_handler::{create_coupon_redemption_routes, create_coupon_redemption_read_routes, create_coupon_redemption_write_routes};
+pub use loyalty_order_points_handler::{create_loyalty_order_points_routes, create_loyalty_order_points_read_routes, create_loyalty_order_points_write_routes};
 pub use loyalty_program_handler::{create_loyalty_program_routes, create_loyalty_program_read_routes, create_loyalty_program_write_routes};
 pub use loyalty_point_entry_handler::{create_loyalty_point_entry_routes, create_loyalty_point_entry_read_routes, create_loyalty_point_entry_write_routes};
 pub use pricing_rule_handler::{create_pricing_rule_routes, create_pricing_rule_read_routes, create_pricing_rule_write_routes};
 pub use promo_bundle_handler::{create_promo_bundle_routes, create_promo_bundle_read_routes, create_promo_bundle_write_routes};
 pub use promo_bundle_component_handler::{create_promo_bundle_component_routes, create_promo_bundle_component_read_routes, create_promo_bundle_component_write_routes};
-// <<< CUSTOM
-pub use guarded_routes::create_guarded_promo_routes;
-// END CUSTOM
 pub use promo_bundle_gift_handler::{create_promo_bundle_gift_routes, create_promo_bundle_gift_read_routes, create_promo_bundle_gift_write_routes};
 // <<< CUSTOM
+pub use guarded_routes::create_guarded_promo_routes;
 // END CUSTOM

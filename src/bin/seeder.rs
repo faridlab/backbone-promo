@@ -14,6 +14,7 @@ use std::env;
 // Import seeders
 use backbone_promo::seeders::SeedCouponCodeSeeder;
 use backbone_promo::seeders::SeedCouponRedemptionSeeder;
+use backbone_promo::seeders::SeedLoyaltyOrderPointsSeeder;
 use backbone_promo::seeders::SeedLoyaltyProgramSeeder;
 use backbone_promo::seeders::SeedLoyaltyPointEntrySeeder;
 use backbone_promo::seeders::SeedPricingRuleSeeder;
@@ -50,6 +51,7 @@ async fn main() -> Result<()> {
     let mut seeders: Vec<Box<dyn Seeder + Send + Sync>> = Vec::new();
     seeders.push(Box::new(SeedCouponCodeSeeder::new()));
     seeders.push(Box::new(SeedCouponRedemptionSeeder::new()));
+    seeders.push(Box::new(SeedLoyaltyOrderPointsSeeder::new()));
     seeders.push(Box::new(SeedLoyaltyProgramSeeder::new()));
     seeders.push(Box::new(SeedLoyaltyPointEntrySeeder::new()));
     seeders.push(Box::new(SeedPricingRuleSeeder::new()));

@@ -18,7 +18,7 @@ use backbone_orm::company_scope;
 use uuid::Uuid;
 
 use super::promo_events::{CouponRedeemed, PromoEvent, PromoEventSink};
-use super::promo_ports::PricingError;
+use super::promo_ports::{LockResource, PricingError};
 use super::promo_write_service::PromoWriteService;
 
 impl PromoWriteService {
@@ -31,6 +31,12 @@ impl PromoWriteService {
     ///     records WHICH document consumed the use. A retry of the same sale (a dropped ack, an
     ///     at-least-once event) finds the existing row and returns the same result WITHOUT a second
     ///     burn — the same partial-unique pattern the loyalty accrual leg uses.
+    ///
+    /// The coupon row is locked `FOR UPDATE NOWAIT` FIRST — before any write — so two sales burning
+    /// the same coupon serialize on the row instead of racing the guarded bump (a lost lock maps to
+    /// [`PricingError::LockBusy`]; host contract: 409, `Retry-After: 1`, retry once). This is the
+    /// ONLY lock the coupon verb takes, so it never cycles against the loyalty verbs'
+    /// program-row → anchor order.
     ///
     /// The ledger insert and the counter bump commit in one transaction: on a fresh source we insert
     /// the ledger row then advance the counter (rolling both back if the coupon is exhausted); on a
@@ -45,8 +51,16 @@ impl PromoWriteService {
     ) -> Result<Uuid, PricingError> {
         let mut tx = self.pool.begin().await?;
         // RLS scope (ADR-0008): company is an explicit argument — bind it onto our own transaction so the
-        // ledger claim and the guarded counter bump both pass the `app.company_id` fence.
+        // row lock, the ledger claim, and the guarded counter bump all pass the `app.company_id` fence.
         company_scope::bind_company_on(&mut tx, company_id).await?;
+
+        // Lock the coupon row first (NOWAIT). Ok(false) = no active row → fall through to the claim,
+        // which refuses unknown coupons and lets the bump refuse exhausted ones — the typed
+        // CouponInvalid / CouponExhausted semantics are unchanged.
+        self.coupons
+            .lock_for_burn(&mut tx, coupon_id, company_id)
+            .await
+            .map_err(|e| super::promo_write_service::lock_busy_or_db(e, LockResource::CouponCode))?;
 
         // Idempotency gate: claim this (coupon, source) exactly once. ON CONFLICT → already redeemed.
         let claimed = self

@@ -3,7 +3,7 @@
 
 mod common;
 
-use backbone_promo::application::service::promo_ports::PriceQuery;
+use backbone_promo::application::service::promo_ports::{CartLine, CartQuery, PriceQuery};
 use backbone_promo::application::service::promo_write_service::PromoWriteService;
 use common::*;
 use rust_decimal::Decimal;
@@ -20,6 +20,7 @@ fn q(company: Uuid, item: Uuid, list: &str, qty: &str) -> PriceQuery {
         customer_id: None,
         customer_group_id: None,
         coupon_code: None,
+        tax_key: None,
         at: now(),
     }
 }
@@ -150,4 +151,80 @@ async fn pgc6_coupon_gate() {
     assert_eq!(r2.applied_rule_id, Some(rule_id));
     assert_eq!(r2.unit_price, dec("75000.00"));
     assert!(r2.applied_coupon_id.is_some());
+}
+
+/// PGC-7 — the tax-split golden: a pinned cart whose order discount crosses THREE tax groups.
+/// These exact numbers (shares, per-group totals, line nets) are the regression baseline for the
+/// per-tax-group allocation kernel; any change in the partition math must come with an explicit
+/// decision, not drift.
+#[tokio::test]
+async fn pgc7_tax_split_golden() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (a, b, cc) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+    // 10% off the whole order, no cap.
+    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let mk = |item: Uuid, list: &str, key: Option<&str>| CartLine {
+        line_id: Uuid::new_v4(),
+        tax_key: key.map(str::to_string),
+        query: PriceQuery {
+            company_id: company,
+            list_price: dec(list),
+            quantity: Decimal::ONE,
+            item_id: item,
+            item_group_id: None,
+            brand_id: None,
+            customer_id: None,
+            customer_group_id: None,
+            coupon_code: None,
+            tax_key: None,
+            at: now(),
+        },
+    };
+    let la = mk(a, "100000", Some("PPN"));
+    let lb = mk(b, "33333", Some("PPN11"));
+    let lc = mk(cc, "66667", None);
+    let (ia, ib, ic) = (la.line_id, lb.line_id, lc.line_id);
+    let r = svc
+        .resolve_cart(&CartQuery {
+            company_id: company,
+            customer_id: None,
+            customer_group_id: None,
+            coupon_code: None,
+            lines: vec![la, lb, lc],
+            at: now(),
+        })
+        .await
+        .unwrap();
+
+    // Subtotal 200000 → 10% = 20000 exactly. Group slices ∝ capacity:
+    //   PPN 100000 → 10000.00; PPN11 33333 → 3333.30; None 66667 → 6666.70. Σ = 20000.00.
+    assert_eq!(r.subtotal, dec("200000.00"));
+    assert_eq!(r.order_discount_total, dec("20000.00"));
+    assert_eq!(r.total, dec("180000.00"));
+    let share = |id: Uuid| {
+        r.order_adjustments[0].allocated.iter().find(|s| s.line_id == id).unwrap().clone()
+    };
+    assert_eq!(share(ia).tax_key.as_deref(), Some("PPN"));
+    assert_eq!(share(ia).share, dec("10000.00"));
+    assert_eq!(share(ib).tax_key.as_deref(), Some("PPN11"));
+    assert_eq!(share(ib).share, dec("3333.30"));
+    assert_eq!(share(ic).tax_key, None);
+    assert_eq!(share(ic).share, dec("6666.70"));
+    let group = |key: Option<&str>| {
+        r.order_adjustments[0]
+            .by_tax_group
+            .iter()
+            .find(|g| g.tax_key.as_deref() == key)
+            .unwrap()
+            .discount_amount
+    };
+    assert_eq!(group(Some("PPN")), dec("10000.00"));
+    assert_eq!(group(Some("PPN11")), dec("3333.30"));
+    assert_eq!(group(None), dec("6666.70"));
+    // Line nets conserve to the total.
+    let net = |id: Uuid| r.lines.iter().find(|l| l.line_id == id).unwrap().net_line_total;
+    assert_eq!(net(ia) + net(ib) + net(ic), dec("180000.00"));
 }

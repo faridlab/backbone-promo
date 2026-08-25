@@ -8,6 +8,7 @@ pub mod crud_test_base;
 
 pub mod coupon_code_api_test;
 pub mod coupon_redemption_api_test;
+pub mod loyalty_order_points_api_test;
 pub mod loyalty_program_api_test;
 pub mod loyalty_point_entry_api_test;
 pub mod pricing_rule_api_test;
@@ -19,6 +20,7 @@ pub mod promo_bundle_gift_api_test;
 pub use crud_test_base::*;
 pub use coupon_code_api_test::*;
 pub use coupon_redemption_api_test::*;
+pub use loyalty_order_points_api_test::*;
 pub use loyalty_program_api_test::*;
 pub use loyalty_point_entry_api_test::*;
 pub use pricing_rule_api_test::*;

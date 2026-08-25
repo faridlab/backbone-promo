@@ -1,6 +1,6 @@
 [package]
 name = "backbone-promo"
-version = "0.2.4"
+version = "0.3.0"
 edition = "2021"
 description = "Advertisements, promo campaigns, banners (extracted from bersihir)"
 
@@ -57,6 +57,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 [features]
 default = []
+# Mounts the UNVALIDATED generic-CRUD composers (PromoModule::all_crud_routes /
+# PromoModule::routes, and routes::{create_stateless_routes, get_routes,
+# create_combined_routes, get_routes_with_state}). OFF by default — production
+# consumers must mount the guarded read surface + validated write verbs; the
+# generic surface includes full CRUD over the loyalty point ledger. Enable for
+# trusted/admin/seeding tooling; also kept available under `cfg(test)`.
+unguarded = []
 events = []
 auth = []
 grpc = []

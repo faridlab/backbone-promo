@@ -11,6 +11,7 @@ use std::sync::Arc;
 use super::{
     coupon_code_handler::create_coupon_code_routes,
     coupon_redemption_handler::create_coupon_redemption_routes,
+    loyalty_order_points_handler::create_loyalty_order_points_routes,
     loyalty_program_handler::create_loyalty_program_routes,
     loyalty_point_entry_handler::create_loyalty_point_entry_routes,
     pricing_rule_handler::create_pricing_rule_routes,
@@ -22,6 +23,7 @@ use super::{
 use crate::application::service::{
     CouponCodeService,
     CouponRedemptionService,
+    LoyaltyOrderPointsService,
     LoyaltyProgramService,
     LoyaltyPointEntryService,
     PricingRuleService,
@@ -34,6 +36,7 @@ use crate::application::service::{
 pub struct HttpServices {
     pub coupon_code: Arc<CouponCodeService>,
     pub coupon_redemption: Arc<CouponRedemptionService>,
+    pub loyalty_order_points: Arc<LoyaltyOrderPointsService>,
     pub loyalty_program: Arc<LoyaltyProgramService>,
     pub loyalty_point_entry: Arc<LoyaltyPointEntryService>,
     pub pricing_rule: Arc<PricingRuleService>,
@@ -63,6 +66,8 @@ pub fn configure_routes(services: HttpServices) -> Router {
         .merge(create_coupon_code_routes(services.coupon_code))
         // CouponRedemption routes (12 Backbone endpoints)
         .merge(create_coupon_redemption_routes(services.coupon_redemption))
+        // LoyaltyOrderPoints routes (12 Backbone endpoints)
+        .merge(create_loyalty_order_points_routes(services.loyalty_order_points))
         // LoyaltyProgram routes (12 Backbone endpoints)
         .merge(create_loyalty_program_routes(services.loyalty_program))
         // LoyaltyPointEntry routes (12 Backbone endpoints)
@@ -87,6 +92,10 @@ pub mod individual {
 
     pub fn coupon_redemption_routes(service: Arc<CouponRedemptionService>) -> Router {
         create_coupon_redemption_routes(service)
+    }
+
+    pub fn loyalty_order_points_routes(service: Arc<LoyaltyOrderPointsService>) -> Router {
+        create_loyalty_order_points_routes(service)
     }
 
     pub fn loyalty_program_routes(service: Arc<LoyaltyProgramService>) -> Router {

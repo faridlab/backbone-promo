@@ -65,6 +65,33 @@ pub struct CouponRedemptionDeletedEvent {
 }
 
 // ============================================================================
+// LOYALTYORDERPOINTS EVENTS
+// ============================================================================
+
+/// Event published when a LoyaltyOrderPoints is created
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoyaltyOrderPointsCreatedEvent {
+    pub id: LoyaltyOrderPointsId,
+    pub data: LoyaltyOrderPointsDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a LoyaltyOrderPoints is updated
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoyaltyOrderPointsUpdatedEvent {
+    pub id: LoyaltyOrderPointsId,
+    pub data: LoyaltyOrderPointsDto,
+    pub occurred_at: DateTime<Utc>,
+}
+
+/// Event published when a LoyaltyOrderPoints is deleted
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoyaltyOrderPointsDeletedEvent {
+    pub id: LoyaltyOrderPointsId,
+    pub occurred_at: DateTime<Utc>,
+}
+
+// ============================================================================
 // LOYALTYPROGRAM EVENTS
 // ============================================================================
 
@@ -240,6 +267,9 @@ pub enum PromoEvent {
     CouponRedemptionCreated(CouponRedemptionCreatedEvent),
     CouponRedemptionUpdated(CouponRedemptionUpdatedEvent),
     CouponRedemptionDeleted(CouponRedemptionDeletedEvent),
+    LoyaltyOrderPointsCreated(LoyaltyOrderPointsCreatedEvent),
+    LoyaltyOrderPointsUpdated(LoyaltyOrderPointsUpdatedEvent),
+    LoyaltyOrderPointsDeleted(LoyaltyOrderPointsDeletedEvent),
     LoyaltyProgramCreated(LoyaltyProgramCreatedEvent),
     LoyaltyProgramUpdated(LoyaltyProgramUpdatedEvent),
     LoyaltyProgramDeleted(LoyaltyProgramDeletedEvent),

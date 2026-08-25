@@ -24,6 +24,12 @@ pub struct PriceQuery {
     pub customer_group_id: Option<Uuid>,
     /// A coupon code the customer presented (unlocks `coupon_required` rules). Case-insensitive.
     pub coupon_code: Option<String>,
+    /// The caller's opaque tax-group key for this line (e.g. its tax template / jurisdiction id).
+    /// Promo is tax-agnostic — it never interprets the key, it only partitions order-level
+    /// discounts by it so each tax base stays correct (`by_tax_group` on `OrderAdjustment`).
+    /// `None` = the caller has no tax split (single-group behavior, byte-identical allocations).
+    #[serde(default)]
+    pub tax_key: Option<String>,
     /// The instant to evaluate validity windows against (the sale's posting time).
     pub at: chrono::DateTime<chrono::Utc>,
 }
@@ -70,6 +76,11 @@ pub struct CartLine {
     pub line_id: Uuid,
     /// The line's pricing dimensions — same shape a single-line `resolve` takes.
     pub query: PriceQuery,
+    /// The line's opaque tax-group key, cart-level form (wins over `query.tax_key` when set).
+    /// Same meaning as [`PriceQuery::tax_key`]; provided here so cart callers can set it beside
+    /// the line id without reaching into the embedded query.
+    #[serde(default)]
+    pub tax_key: Option<String>,
 }
 
 /// The whole basket to price in one call. Customer, coupon and instant are cart-wide.
@@ -102,6 +113,10 @@ pub struct ResolvedLine {
     pub order_discount_share: Decimal,
     /// `unit_price·quantity − order_discount_share` (never negative).
     pub net_line_total: Decimal,
+    /// The line's effective tax-group key (the caller's own `tax_key`, echoed for convenience so
+    /// consumers can group nets without re-joining their input).
+    #[serde(default)]
+    pub tax_key: Option<String>,
 }
 
 /// What produced an order-level discount.
@@ -113,13 +128,32 @@ pub enum AdjustmentSource {
     Bundle(Uuid),
 }
 
+/// One line's share of an order-level discount, carrying the line's tax-group key so a consumer can
+/// reduce each tax base without re-joining its own input.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AllocationShare {
+    pub line_id: Uuid,
+    pub tax_key: Option<String>,
+    pub share: Decimal,
+}
+
+/// An order-level discount totalled per tax group — consumers get the group fold for free instead
+/// of re-deriving it from `allocated`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TaxGroupTotal {
+    pub tax_key: Option<String>,
+    pub discount_amount: Decimal,
+}
+
 /// One order-level discount and how it was spread across lines (`allocated` sums to `discount_amount`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OrderAdjustment {
     pub source: AdjustmentSource,
     pub discount_amount: Decimal,
-    /// `(line_id, share)` pairs; Σ share == `discount_amount` exactly (penny-reconciled).
-    pub allocated: Vec<(Uuid, Decimal)>,
+    /// Per-line shares; Σ `share` == `discount_amount` exactly (penny-reconciled, tax-group aware).
+    pub allocated: Vec<AllocationShare>,
+    /// The same discount folded per tax group; Σ `discount_amount` == the adjustment's total.
+    pub by_tax_group: Vec<TaxGroupTotal>,
 }
 
 /// A free item a satisfied buy-X-get-Y bundle grants — a zero-priced line the consumer adds to the
@@ -183,6 +217,107 @@ pub struct RedemptionRequest {
     pub at: chrono::DateTime<chrono::Utc>,
 }
 
+// ---- Per-order loyalty accounting (the order-flow verbs) ---------------------------------------
+//
+// The per-order verbs are the compose surface a host (POS / selling) drives at order confirm,
+// payment and return. Server-authoritative throughout (PSX-5): requests carry order FACTS (amounts,
+// refs, customer intent); the server derives every point delta (floor(base × collection_factor) /
+// reversal proportions) and every money value (points × conversion_factor). A request never carries
+// a point delta to write.
+
+/// Grant (earn) a member's points for one logical order. The earning base is the caller's
+/// net-of-tax order amount; the points are DERIVED server-side from the program's
+/// `collection_factor`. Idempotent per order: both the order row (unique per
+/// company/program/order-ref) and the ledger entry (unique per company/source-type/source-id/entry
+/// type) make a re-driven confirm a no-op returning the same outcome.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrderPointsGrantRequest {
+    pub company_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub customer_id: Uuid,
+    /// The logical order kind, e.g. `pos_order` / `sales_order` — half of the idempotency key.
+    pub order_ref_type: String,
+    /// The logical order id (the source module owns it) — half of the idempotency key.
+    pub order_ref_id: Uuid,
+    /// The net-of-tax earning base for the whole order.
+    pub grant_base_amount: Decimal,
+    /// The coupon that rode the order, when one did (recorded on the order's points row).
+    pub coupon_code_id: Option<Uuid>,
+    pub at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Outcome of [`PromoWriteService::grant_order_points`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrderPointsGrantOutcome {
+    /// The per-order points row, when anything was written.
+    pub order_points_id: Option<Uuid>,
+    /// The ledger entry, when a fresh `earned` entry was claimed.
+    pub entry_id: Option<Uuid>,
+    /// The server-derived points (floor(base × collection_factor); 0 = nothing written).
+    pub points: Decimal,
+    /// True when the order had already granted (idempotent replay).
+    pub already: bool,
+}
+
+/// Spend (redeem) a member's points against one logical order. `points` is the customer's INTENT,
+/// not an authoritative delta: the server bounds it by the expiry-aware available balance and
+/// derives the money value from the program's `conversion_factor`. Idempotent per order.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrderPointsSpendRequest {
+    pub company_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub customer_id: Uuid,
+    pub order_ref_type: String,
+    pub order_ref_id: Uuid,
+    pub points: Decimal,
+    pub at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Outcome of [`PromoWriteService::spend_order_points`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrderPointsSpendOutcome {
+    pub entry_id: Uuid,
+    pub points: Decimal,
+    /// The derived money value (points × conversion_factor) — never client-supplied.
+    pub discount_value: Decimal,
+    /// The member's expiry-aware available balance after the spend.
+    pub available_after: Decimal,
+    /// True when the order had already spent (idempotent replay).
+    pub already: bool,
+}
+
+/// Reverse (part of) one order's points against a RETURN document. `return_amount` `None` = full
+/// cancel; `Some(base)` = a partial return's earning base. Both legs are derived server-side and
+/// bounded (grant clawback never drives a member negative; spend restoration never exceeds what was
+/// spent). Idempotent per return document.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrderPointsReversalRequest {
+    pub company_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub customer_id: Uuid,
+    pub order_ref_type: String,
+    pub order_ref_id: Uuid,
+    /// The RETURN document's kind — the idempotency anchor for the reversal legs.
+    pub reversal_ref_type: String,
+    /// The RETURN document's id (source module owns it).
+    pub reversal_ref_id: Uuid,
+    /// `None` = full cancel; `Some(base)` = the partial return's earning base.
+    pub return_amount: Option<Decimal>,
+    pub at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Outcome of [`PromoWriteService::reverse_order_points`].
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OrderPointsReversalOutcome {
+    pub order_points_id: Uuid,
+    /// Points clawed back off the grant (negative-direction leg).
+    pub grant_reversed: Decimal,
+    /// Points restored off the spend (positive-direction leg).
+    pub spend_restored: Decimal,
+    /// True when this return document had already reversed (idempotent replay).
+    pub already: bool,
+}
+
 /// Errors surfaced to a caller.
 #[derive(Debug, thiserror::Error)]
 pub enum PricingError {
@@ -196,6 +331,38 @@ pub enum PricingError {
     ProgramInvalid,
     #[error("insufficient points: have {available}, asked {requested}")]
     InsufficientPoints { available: Decimal, requested: Decimal },
+    #[error("points expired: {lapsed} lapsed, {available} still available")]
+    PointsExpired { lapsed: Decimal, available: Decimal },
+    /// A `FOR UPDATE NOWAIT` row lock was already held — the caller should retry once after jitter.
+    /// Recommended host mapping: 409 Conflict, body
+    /// `{"code":"promo_lock_busy","resource":"loyalty_program|member_balance|coupon_code"}`,
+    /// `Retry-After: 1`.
+    #[error("lock busy: another transaction holds {resource:?}")]
+    LockBusy { resource: LockResource },
     #[error("invalid input: {0}")]
     Invalid(String),
+}
+
+/// Which serialization lock a [`PricingError::LockBusy`] lost. Serialized per the lock ORDER
+/// program row → member anchor (the coupon verb locks only the coupon row), so no transaction
+/// takes two of these in conflicting orders — a LockBusy is always transient, never a deadlock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LockResource {
+    /// The loyalty program row (pins collection/conversion factors against admin edits).
+    LoyaltyProgram,
+    /// The per-member balance anchor (serializes every balance-changing loyalty op for the member).
+    MemberBalance,
+    /// A coupon row about to be burned.
+    CouponCode,
+}
+
+impl LockResource {
+    /// The wire name carried in the host's 409 body (`resource` field).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LoyaltyProgram => "loyalty_program",
+            Self::MemberBalance => "member_balance",
+            Self::CouponCode => "coupon_code",
+        }
+    }
 }

@@ -33,6 +33,9 @@ pub use events::*;
 /// - `CouponRedemptionDto` - Data transfer object for CouponRedemption
 /// - `CouponRedemptionSummary` - Summary view of CouponRedemption
 /// - `CouponRedemptionId` - Type-safe ID wrapper
+/// - `LoyaltyOrderPointsDto` - Data transfer object for LoyaltyOrderPoints
+/// - `LoyaltyOrderPointsSummary` - Summary view of LoyaltyOrderPoints
+/// - `LoyaltyOrderPointsId` - Type-safe ID wrapper
 /// - `LoyaltyProgramDto` - Data transfer object for LoyaltyProgram
 /// - `LoyaltyProgramSummary` - Summary view of LoyaltyProgram
 /// - `LoyaltyProgramId` - Type-safe ID wrapper
@@ -59,6 +62,9 @@ pub use events::*;
 /// - `CouponRedemptionCreatedEvent` - Published when CouponRedemption is created
 /// - `CouponRedemptionUpdatedEvent` - Published when CouponRedemption is updated
 /// - `CouponRedemptionDeletedEvent` - Published when CouponRedemption is deleted
+/// - `LoyaltyOrderPointsCreatedEvent` - Published when LoyaltyOrderPoints is created
+/// - `LoyaltyOrderPointsUpdatedEvent` - Published when LoyaltyOrderPoints is updated
+/// - `LoyaltyOrderPointsDeletedEvent` - Published when LoyaltyOrderPoints is deleted
 /// - `LoyaltyProgramCreatedEvent` - Published when LoyaltyProgram is created
 /// - `LoyaltyProgramUpdatedEvent` - Published when LoyaltyProgram is updated
 /// - `LoyaltyProgramDeletedEvent` - Published when LoyaltyProgram is deleted

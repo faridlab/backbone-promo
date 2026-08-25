@@ -44,6 +44,47 @@ pub struct LoyaltyPointsRedeemed {
     pub source_id: Uuid,
 }
 
+/// Points granted for one logical order (the order-flow earn leg). Idempotent per order.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LoyaltyOrderPointsGranted {
+    pub order_points_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub company_id: Uuid,
+    pub customer_id: Uuid,
+    pub order_ref_type: String,
+    pub order_ref_id: Uuid,
+    pub points: Decimal,
+    pub grant_base_amount: Decimal,
+}
+
+/// Points spent against one logical order (the order-flow burn leg). Idempotent per order.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LoyaltyOrderPointsSpent {
+    pub order_points_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub company_id: Uuid,
+    pub customer_id: Uuid,
+    pub order_ref_type: String,
+    pub order_ref_id: Uuid,
+    pub points: Decimal,
+    pub discount_value: Decimal,
+}
+
+/// (Part of) one order's points reversed against a return document. Idempotent per return.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LoyaltyOrderPointsReversed {
+    pub order_points_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub company_id: Uuid,
+    pub customer_id: Uuid,
+    pub order_ref_type: String,
+    pub order_ref_id: Uuid,
+    pub grant_reversed: Decimal,
+    pub spend_restored: Decimal,
+    pub reversal_ref_type: String,
+    pub reversal_ref_id: Uuid,
+}
+
 /// The promo domain-event union.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
@@ -51,6 +92,9 @@ pub enum PromoEvent {
     CouponRedeemed(CouponRedeemed),
     LoyaltyPointsEarned(LoyaltyPointsEarned),
     LoyaltyPointsRedeemed(LoyaltyPointsRedeemed),
+    LoyaltyOrderPointsGranted(LoyaltyOrderPointsGranted),
+    LoyaltyOrderPointsSpent(LoyaltyOrderPointsSpent),
+    LoyaltyOrderPointsReversed(LoyaltyOrderPointsReversed),
 }
 
 /// Sink the write path publishes to. A consuming service supplies its own (bus, outbox, …).

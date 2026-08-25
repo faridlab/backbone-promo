@@ -76,3 +76,4 @@ imports:
   - coupon_code.model.yaml
   - coupon_redemption.model.yaml
   - loyalty_program.model.yaml
+  - loyalty_order_points.model.yaml

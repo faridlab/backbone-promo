@@ -9,6 +9,7 @@ pub use error::{ServiceError, ServiceResult};
 
 pub mod coupon_code_service;
 pub mod coupon_redemption_service;
+pub mod loyalty_order_points_service;
 pub mod loyalty_program_service;
 pub mod loyalty_point_entry_service;
 pub mod pricing_rule_service;
@@ -27,27 +28,32 @@ pub mod promo_resolve;
 pub mod promo_cart;
 pub mod promo_coupon;
 pub mod promo_loyalty;
+pub mod promo_loyalty_order;
 // END CUSTOM
 
 pub use coupon_code_service::CouponCodeService;
 pub use coupon_redemption_service::CouponRedemptionService;
+pub use loyalty_order_points_service::LoyaltyOrderPointsService;
 pub use loyalty_program_service::LoyaltyProgramService;
 pub use loyalty_point_entry_service::LoyaltyPointEntryService;
 pub use pricing_rule_service::PricingRuleService;
-// <<< CUSTOM
-pub use promo_events::{
-    CouponRedeemed, LoggingSink, LoyaltyPointsEarned, LoyaltyPointsRedeemed, PromoEvent,
-    PromoEventSink,
-};
-pub use promo_ports::{
-    AccrualRequest, PriceQuery, PriceResolverPort, PricingError, RedemptionRequest, ResolvedPrice,
-};
-pub use promo_write_service::{
-    AccrualOutcome, PromoPriceResolver, PromoWriteService, RedemptionOutcome,
-};
-// END CUSTOM
 pub use promo_bundle_service::PromoBundleService;
 pub use promo_bundle_component_service::PromoBundleComponentService;
 pub use promo_bundle_gift_service::PromoBundleGiftService;
 // <<< CUSTOM
+pub use promo_events::{
+    CouponRedeemed, LoggingSink, LoyaltyOrderPointsGranted, LoyaltyOrderPointsReversed,
+    LoyaltyOrderPointsSpent, LoyaltyPointsEarned, LoyaltyPointsRedeemed, PromoEvent,
+    PromoEventSink,
+};
+pub use promo_ports::{
+    AccrualRequest, AllocationShare, CartLine, CartQuery, LockResource, OrderAdjustment,
+    OrderPointsGrantOutcome, OrderPointsGrantRequest, OrderPointsReversalOutcome,
+    OrderPointsReversalRequest, OrderPointsSpendOutcome, OrderPointsSpendRequest, PriceQuery,
+    PriceResolverPort, PricingError, RedemptionRequest, ResolvedCart, ResolvedLine, ResolvedPrice,
+    TaxGroupTotal,
+};
+pub use promo_write_service::{
+    AccrualOutcome, PromoPriceResolver, PromoWriteService, RedemptionOutcome,
+};
 // END CUSTOM

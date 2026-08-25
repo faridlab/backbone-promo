@@ -7,6 +7,7 @@
 
 pub mod coupon_code_dto;
 pub mod coupon_redemption_dto;
+pub mod loyalty_order_points_dto;
 pub mod loyalty_program_dto;
 pub mod loyalty_point_entry_dto;
 pub mod pricing_rule_dto;
@@ -30,6 +31,14 @@ pub use coupon_redemption_dto::{
     CouponRedemptionResponseDto,
     CouponRedemptionListResponseDto,
     CouponRedemptionSummaryDto,
+};
+pub use loyalty_order_points_dto::{
+    CreateLoyaltyOrderPointsDto,
+    UpdateLoyaltyOrderPointsDto,
+    PatchLoyaltyOrderPointsDto,
+    LoyaltyOrderPointsResponseDto,
+    LoyaltyOrderPointsListResponseDto,
+    LoyaltyOrderPointsSummaryDto,
 };
 pub use loyalty_program_dto::{
     CreateLoyaltyProgramDto,

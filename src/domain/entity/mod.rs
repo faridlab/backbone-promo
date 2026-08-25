@@ -4,6 +4,7 @@
 
 pub mod coupon_code;
 pub mod coupon_redemption;
+pub mod loyalty_order_points;
 pub mod loyalty_program;
 pub mod loyalty_point_entry;
 pub mod pricing_rule;
@@ -28,6 +29,9 @@ pub use coupon_code::CouponCodeId;
 pub use coupon_redemption::CouponRedemption;
 pub use coupon_redemption::CouponRedemptionBuilder;
 pub use coupon_redemption::CouponRedemptionId;
+pub use loyalty_order_points::LoyaltyOrderPoints;
+pub use loyalty_order_points::LoyaltyOrderPointsBuilder;
+pub use loyalty_order_points::LoyaltyOrderPointsId;
 pub use loyalty_program::LoyaltyProgram;
 pub use loyalty_program::LoyaltyProgramBuilder;
 pub use loyalty_program::LoyaltyProgramId;

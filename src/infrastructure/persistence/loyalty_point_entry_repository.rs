@@ -67,10 +67,36 @@ pub struct NewRedemptionRow<'a> {
     pub at: chrono::DateTime<chrono::Utc>,
 }
 
+/// The exact row a reversal leg writes — a compensating entry sourced on the RETURN document.
+/// `entry_type` is `'grant_reversed'` (points NEGATIVE: clawback) or `'spend_reversed'` (points
+/// POSITIVE: restoration) in the SQL; `expiry` is copied from the order's original `earned` entry
+/// for a spend restoration (a restored point lapses when the point it restores would have) and is
+/// NULL for a clawback.
+pub struct NewReversalRow<'a> {
+    pub company_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub customer_id: Uuid,
+    pub entry_type: &'a str,
+    /// Signed by the caller: negative for `grant_reversed`, positive for `spend_reversed`.
+    pub points: Decimal,
+    pub source_type: &'a str,
+    pub source_id: Uuid,
+    pub at: chrono::DateTime<chrono::Utc>,
+    pub expiry: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 /// A prior redemption found on replay — its `points` are the stored (negative) value.
 pub struct PriorRedemptionRow {
     pub id: Uuid,
     pub points: Decimal,
+}
+
+/// Both reversal legs previously written for one RETURN document, found on replay: the stored
+/// (positive) magnitudes of its `grant_reversed` / `spend_reversed` entries.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PriorReversalRow {
+    pub grant_reversed: Decimal,
+    pub spend_reversed: Decimal,
 }
 
 /// Hand-written LoyaltyPointEntry SQL. Lives here (not in the write service) per the module's 4-layer
@@ -116,29 +142,44 @@ impl LoyaltyPointEntryRepository {
         Ok(row.map(|r| r.get("id")))
     }
 
-    /// Serialize every balance-changing op for one (company, customer, program) — the lock that stops
-    /// concurrent redemptions overselling the balance. Transaction-scoped: it releases on commit or
-    /// rollback, so the caller never unlocks explicitly.
-    ///
-    /// Takes the CALLER'S connection — the lock is worthless on any other. The caller has already bound
-    /// the company on it (`bind_company_on`) — don't re-bind here.
-    pub async fn lock_member_balance(
+    /// Claim the accrual slot on the CALLER'S transaction — same idempotency contract as
+    /// [`Self::claim_accrual`], for callers whose transaction already carries the company bind
+    /// (`bind_company_on`), so no scope wrapper is needed: the insert rides the ambient
+    /// `app.company_id` and commits (or rolls back) with the caller's unit of work.
+    pub async fn claim_accrual_on(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
-        customer_id: Uuid,
-        loyalty_program_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        let lock_key = format!("{company_id}:{customer_id}:{loyalty_program_id}");
-        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
-            .bind(&lock_key)
-            .execute(conn)
-            .await?;
-        Ok(())
+        a: &NewAccrualRow<'_>,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO promo.loyalty_point_entries
+                (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+                 source_type, source_id, posting_date, expiry_date)
+            VALUES ($1, $2, $3, 'earned', $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (company_id, source_type, source_id, entry_type)
+                WHERE (metadata->>'deleted_at') IS NULL
+            DO NOTHING
+            RETURNING id
+            "#,
+        )
+        .bind(a.company_id)
+        .bind(a.loyalty_program_id)
+        .bind(a.customer_id)
+        .bind(a.points)
+        .bind(a.purchase_amount)
+        .bind(a.source_type)
+        .bind(a.source_id)
+        .bind(a.at)
+        .bind(a.expiry)
+        .fetch_optional(conn)
+        .await?;
+        Ok(row.map(|r| r.get("id")))
     }
 
     /// A prior `redeemed` entry for this exact source, if any — the idempotent-replay short-circuit.
-    /// Same caller-owned-tx contract as [`Self::lock_member_balance`].
+    /// Same caller-owned-tx contract as the balance read: the caller has already bound the company
+    /// (`bind_company_on`) — don't re-bind here.
     pub async fn find_redemption_by_source(
         &self,
         conn: &mut sqlx::PgConnection,
@@ -159,25 +200,132 @@ impl LoyaltyPointEntryRepository {
         Ok(row.map(|r| PriorRedemptionRow { id: r.get("id"), points: r.get("points") }))
     }
 
-    /// The member's balance: Σ signed points (earned +, redeemed/expired −). Read under the advisory
-    /// lock, so it cannot be raced. Same caller-owned-tx contract as [`Self::lock_member_balance`].
-    pub async fn available_balance(
+    /// The member's position at an instant, expiry-aware: `(available, lapsed)` over the same
+    /// company/customer/program partition the raw SUM always used. `available` counts only entries
+    /// whose `expiry_date` is NULL or still in the future at `$4`; `lapsed` counts the rest — the
+    /// caller uses it to tell "your points expired" apart from "you never had them". Read under the
+    /// member anchor lock, so it cannot be raced.
+    pub async fn balances_at(
         &self,
         conn: &mut sqlx::PgConnection,
         company_id: Uuid,
         customer_id: Uuid,
         loyalty_program_id: Uuid,
-    ) -> Result<Decimal, sqlx::Error> {
-        sqlx::query_scalar(
-            r#"SELECT COALESCE(SUM(points), 0) FROM promo.loyalty_point_entries
+        at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(Decimal, Decimal), sqlx::Error> {
+        let row = sqlx::query(
+            r#"SELECT
+                   COALESCE(SUM(points) FILTER (WHERE expiry_date IS NULL OR expiry_date > $4), 0) AS available,
+                   COALESCE(SUM(points) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date <= $4), 0) AS lapsed
+               FROM promo.loyalty_point_entries
                WHERE company_id = $1 AND customer_id = $2 AND loyalty_program_id = $3
                  AND (metadata->>'deleted_at') IS NULL"#,
         )
         .bind(company_id)
         .bind(customer_id)
         .bind(loyalty_program_id)
+        .bind(at)
         .fetch_one(conn)
+        .await?;
+        Ok((row.get("available"), row.get("lapsed")))
+    }
+
+    /// The `expiry_date` of a document's original `earned` entry, if any — a spend restoration
+    /// copies it, so a restored point lapses when the point it restores would have. NULL when the
+    /// document never earned (the order only spent points earned elsewhere) — documented edge.
+    pub async fn find_earned_expiry(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        company_id: Uuid,
+        source_type: &str,
+        source_id: Uuid,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, sqlx::Error> {
+        sqlx::query_scalar(
+            r#"SELECT expiry_date FROM promo.loyalty_point_entries
+               WHERE company_id = $1 AND source_type = $2 AND source_id = $3 AND entry_type = 'earned'
+                 AND (metadata->>'deleted_at') IS NULL"#,
+        )
+        .bind(company_id)
+        .bind(source_type)
+        .bind(source_id)
+        .fetch_optional(conn)
         .await
+        // outer Option = row presence, inner = NULL expiry (earned with no expiry program)
+        .map(|v: Option<Option<chrono::DateTime<chrono::Utc>>>| v.flatten())
+    }
+
+    /// The reversal legs a RETURN document already wrote, if any — the idempotent-replay
+    /// short-circuit for per-order reversals. Same caller-owned-tx contract as the balance read.
+    pub async fn find_reversal_by_source(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        company_id: Uuid,
+        source_type: &str,
+        source_id: Uuid,
+    ) -> Result<Option<PriorReversalRow>, sqlx::Error> {
+        let rows = sqlx::query(
+            // ::text — the enum column decodes as its text label (bind/decode cast rule)
+            r#"SELECT entry_type::text AS entry_type, points FROM promo.loyalty_point_entries
+               WHERE company_id = $1 AND source_type = $2 AND source_id = $3
+                 AND entry_type IN ('grant_reversed', 'spend_reversed')
+                 AND (metadata->>'deleted_at') IS NULL"#,
+        )
+        .bind(company_id)
+        .bind(source_type)
+        .bind(source_id)
+        .fetch_all(conn)
+        .await?;
+        if rows.is_empty() {
+            return Ok(None);
+        }
+        let mut prior = PriorReversalRow::default();
+        for r in rows {
+            let t: String = r.get("entry_type");
+            let p: Decimal = r.get("points");
+            match t.as_str() {
+                // Stored signed: grant_reversed is negative, spend_reversed positive. Report
+                // magnitudes — the outcome carries positive leg amounts.
+                "grant_reversed" => prior.grant_reversed = -p,
+                "spend_reversed" => prior.spend_reversed = p,
+                _ => {}
+            }
+        }
+        Ok(Some(prior))
+    }
+
+    /// Claim a reversal leg for one RETURN document: the entry partial-unique key
+    /// `(company, source_type, source_id, entry_type)` makes a re-driven return a no-op.
+    /// `Ok(None)` = this return already wrote this leg. Same caller-owned-tx contract.
+    pub async fn insert_reversal(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        r: &NewReversalRow<'_>,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        let entry_type = r.entry_type.to_string();
+        let row = sqlx::query(
+            r#"
+            INSERT INTO promo.loyalty_point_entries
+                (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+                 source_type, source_id, posting_date, expiry_date)
+            VALUES ($1, $2, $3, $4::loyalty_entry_type, $5, 0, $6, $7, $8, $9)
+            ON CONFLICT (company_id, source_type, source_id, entry_type)
+                WHERE (metadata->>'deleted_at') IS NULL
+            DO NOTHING
+            RETURNING id
+            "#,
+        )
+        .bind(r.company_id)
+        .bind(r.loyalty_program_id)
+        .bind(r.customer_id)
+        .bind(entry_type)
+        .bind(r.points)
+        .bind(r.source_type)
+        .bind(r.source_id)
+        .bind(r.at)
+        .bind(r.expiry)
+        .fetch_optional(conn)
+        .await?;
+        Ok(row.map(|row| row.get("id")))
     }
 
     /// Write the redemption entry. The caller has already checked it against the balance under the

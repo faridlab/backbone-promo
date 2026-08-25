@@ -12,6 +12,8 @@ pub enum LoyaltyEntryType {
     Earned,
     Redeemed,
     Expired,
+    GrantReversed,
+    SpendReversed,
 }
 
 impl std::fmt::Display for LoyaltyEntryType {
@@ -20,6 +22,8 @@ impl std::fmt::Display for LoyaltyEntryType {
             Self::Earned => write!(f, "earned"),
             Self::Redeemed => write!(f, "redeemed"),
             Self::Expired => write!(f, "expired"),
+            Self::GrantReversed => write!(f, "grant_reversed"),
+            Self::SpendReversed => write!(f, "spend_reversed"),
         }
     }
 }
@@ -32,6 +36,8 @@ impl FromStr for LoyaltyEntryType {
             "earned" => Ok(Self::Earned),
             "redeemed" => Ok(Self::Redeemed),
             "expired" => Ok(Self::Expired),
+            "grant_reversed" => Ok(Self::GrantReversed),
+            "spend_reversed" => Ok(Self::SpendReversed),
             _ => Err(format!("Unknown LoyaltyEntryType variant: {}", s)),
         }
     }

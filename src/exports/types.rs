@@ -134,6 +134,72 @@ pub struct CouponRedemptionRef {
 }
 
 // ============================================================================
+// LOYALTYORDERPOINTS TYPES
+// ============================================================================
+
+/// Type-safe ID for LoyaltyOrderPoints
+///
+/// Use this instead of raw Uuid for type safety across modules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct LoyaltyOrderPointsId(pub Uuid);
+
+impl LoyaltyOrderPointsId {
+    pub fn new(id: Uuid) -> Self {
+        Self(id)
+    }
+
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl From<Uuid> for LoyaltyOrderPointsId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<LoyaltyOrderPointsId> for Uuid {
+    fn from(id: LoyaltyOrderPointsId) -> Self {
+        id.0
+    }
+}
+
+/// Data transfer object for LoyaltyOrderPoints
+///
+/// This is the public representation of LoyaltyOrderPoints for other modules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoyaltyOrderPointsDto {
+    pub id: LoyaltyOrderPointsId,
+    pub company_id: Uuid,
+    pub loyalty_program_id: Uuid,
+    pub customer_id: Uuid,
+    pub order_ref_type: String,
+    pub order_ref_id: Uuid,
+    pub coupon_code_id: Option<Uuid>,
+    pub grant_base_amount: Decimal,
+    pub granted_points: Decimal,
+    pub spent_points: Decimal,
+    pub granted_reversed_points: Decimal,
+    pub spent_reversed_points: Decimal,
+    pub granted_at: Option<DateTime<Utc>>,
+    pub spent_at: Option<DateTime<Utc>>,
+    pub metadata: serde_json::Value,
+}
+
+/// Summary view of LoyaltyOrderPoints for list displays
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoyaltyOrderPointsSummary {
+    pub id: LoyaltyOrderPointsId,
+}
+
+/// Reference to LoyaltyOrderPoints for foreign key relationships
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoyaltyOrderPointsRef {
+    pub id: LoyaltyOrderPointsId,
+}
+
+// ============================================================================
 // LOYALTYPROGRAM TYPES
 // ============================================================================
 

@@ -34,6 +34,7 @@ pub use infrastructure::persistence::*;
 // Re-exports - Application services
 pub use application::service::CouponCodeService;
 pub use application::service::CouponRedemptionService;
+pub use application::service::LoyaltyOrderPointsService;
 pub use application::service::LoyaltyProgramService;
 pub use application::service::LoyaltyPointEntryService;
 pub use application::service::PricingRuleService;
@@ -60,6 +61,7 @@ use sqlx::PgPool;
 pub struct PromoModule {
     pub(crate) coupon_code_service: Arc<CouponCodeService>,
     pub(crate) coupon_redemption_service: Arc<CouponRedemptionService>,
+    pub(crate) loyalty_order_points_service: Arc<LoyaltyOrderPointsService>,
     pub(crate) loyalty_program_service: Arc<LoyaltyProgramService>,
     pub(crate) loyalty_point_entry_service: Arc<LoyaltyPointEntryService>,
     pub(crate) pricing_rule_service: Arc<PricingRuleService>,
@@ -81,10 +83,12 @@ impl PromoModule {
     /// create invalid rows or soft-delete a referenced master out from under its
     /// dependents. Prefer a guarded composition (read + validated writes) for any
     /// real deployment; use this only in trusted/admin/seeding contexts.
+    #[cfg(any(test, feature = "unguarded"))]
     pub fn all_crud_routes(&self) -> Router {
         use presentation::http::{
             create_coupon_code_routes,
             create_coupon_redemption_routes,
+            create_loyalty_order_points_routes,
             create_loyalty_program_routes,
             create_loyalty_point_entry_routes,
             create_pricing_rule_routes,
@@ -96,6 +100,7 @@ impl PromoModule {
         Router::new()
             .merge(create_coupon_code_routes(self.coupon_code_service.clone()))
             .merge(create_coupon_redemption_routes(self.coupon_redemption_service.clone()))
+            .merge(create_loyalty_order_points_routes(self.loyalty_order_points_service.clone()))
             .merge(create_loyalty_program_routes(self.loyalty_program_service.clone()))
             .merge(create_loyalty_point_entry_routes(self.loyalty_point_entry_service.clone()))
             .merge(create_pricing_rule_routes(self.pricing_rule_service.clone()))
@@ -110,6 +115,7 @@ impl PromoModule {
     /// writes) for production, or call `all_crud_routes()` to opt into the full
     /// unguarded surface explicitly.
     #[deprecated(note = "mounts unvalidated generic CRUD; prefer readonly_routes() + validated writes, or all_crud_routes() for the full/unguarded surface")]
+    #[cfg(any(test, feature = "unguarded"))]
     pub fn routes(&self) -> Router {
         self.all_crud_routes()
     }
@@ -123,6 +129,7 @@ impl PromoModule {
         use presentation::http::{
             create_coupon_code_read_routes,
             create_coupon_redemption_read_routes,
+            create_loyalty_order_points_read_routes,
             create_loyalty_program_read_routes,
             create_loyalty_point_entry_read_routes,
             create_pricing_rule_read_routes,
@@ -134,6 +141,7 @@ impl PromoModule {
         Router::new()
             .merge(create_coupon_code_read_routes(self.coupon_code_service.clone()))
             .merge(create_coupon_redemption_read_routes(self.coupon_redemption_service.clone()))
+            .merge(create_loyalty_order_points_read_routes(self.loyalty_order_points_service.clone()))
             .merge(create_loyalty_program_read_routes(self.loyalty_program_service.clone()))
             .merge(create_loyalty_point_entry_read_routes(self.loyalty_point_entry_service.clone()))
             .merge(create_pricing_rule_read_routes(self.pricing_rule_service.clone()))
@@ -181,6 +189,10 @@ impl PromoModuleBuilder {
         let coupon_redemption_repository = Arc::new(CouponRedemptionRepository::new(db_pool.clone()));
         let coupon_redemption_service = Arc::new(CouponRedemptionService::with_repository(coupon_redemption_repository.clone()));
 
+        // LoyaltyOrderPoints service
+        let loyalty_order_points_repository = Arc::new(LoyaltyOrderPointsRepository::new(db_pool.clone()));
+        let loyalty_order_points_service = Arc::new(LoyaltyOrderPointsService::with_repository(loyalty_order_points_repository.clone()));
+
         // LoyaltyProgram service
         let loyalty_program_repository = Arc::new(LoyaltyProgramRepository::new(db_pool.clone()));
         let loyalty_program_service = Arc::new(LoyaltyProgramService::with_repository(loyalty_program_repository.clone()));
@@ -211,6 +223,7 @@ impl PromoModuleBuilder {
         Ok(PromoModule {
             coupon_code_service,
             coupon_redemption_service,
+            loyalty_order_points_service,
             loyalty_program_service,
             loyalty_point_entry_service,
             pricing_rule_service,

@@ -39,6 +39,7 @@ impl CartPricingPort for PromoCartAdapter {
                 .iter()
                 .map(|l| CartLine {
                     line_id: l.line_ref,
+                    tax_key: None,
                     query: PriceQuery {
                         company_id: req.company_id,
                         list_price: l.list_price,
@@ -49,6 +50,7 @@ impl CartPricingPort for PromoCartAdapter {
                         customer_id: req.customer_id,
                         customer_group_id: req.customer_group_id,
                         coupon_code: req.coupon_code.clone(),
+                        tax_key: None,
                         at: now(),
                     },
                 })

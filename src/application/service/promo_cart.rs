@@ -14,8 +14,8 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use super::promo_ports::{
-    AdjustmentSource, CartLine, CartQuery, OrderAdjustment, PriceQuery, PricingError, ResolvedCart,
-    ResolvedLine, RewardLine,
+    AdjustmentSource, AllocationShare, CartLine, CartQuery, OrderAdjustment, PriceQuery,
+    PricingError, ResolvedCart, ResolvedLine, RewardLine, TaxGroupTotal,
 };
 use super::promo_write_service::{money, PromoWriteService};
 
@@ -223,10 +223,10 @@ impl BundleCand {
 
 /// Apply a pass's allocated shares onto the lines' running `order_discount_share`, so the next pass's
 /// `allocate` sees the reduced remaining capacity.
-fn apply_shares(lines: &mut [ResolvedLine], allocated: &[(Uuid, Decimal)]) {
-    for (line_id, share) in allocated {
-        if let Some(l) = lines.iter_mut().find(|l| l.line_id == *line_id) {
-            l.order_discount_share += *share;
+fn apply_shares(lines: &mut [ResolvedLine], allocated: &[AllocationShare]) {
+    for s in allocated {
+        if let Some(l) = lines.iter_mut().find(|l| l.line_id == s.line_id) {
+            l.order_discount_share += s.share;
         }
     }
 }
@@ -283,6 +283,105 @@ fn allocate(
     (disc, shares)
 }
 
+/// The tax-group-aware allocation kernel: [`allocate`] run per tax group, so no line's share ever
+/// crosses a tax boundary. The contributing lines are partitioned by their effective tax key
+/// (`None` is its own group — the caller had no tax split); each group receives its
+/// capacity-proportional slice of the discount, penny-folded WITHIN the group by [`allocate`]
+/// itself. The one rounding step the partition adds — the group-slice level — is folded onto the
+/// most-slack line, so:
+///
+///   * Σ group slices == `min(total, Σ caps)` EXACTLY (a group never receives more than its own
+///     lines can absorb, and no line's share exceeds its own capacity);
+///   * a degenerate single-group call (every line one key, or no keys at all) goes through
+///     [`allocate`] unchanged — byte-identical shares to the tax-agnostic kernel.
+fn allocate_by_tax(
+    total: Decimal,
+    line_ids: &[Uuid],
+    lines: &[ResolvedLine],
+) -> (Decimal, Vec<AllocationShare>) {
+    if total <= Decimal::ZERO || line_ids.is_empty() {
+        return (Decimal::ZERO, Vec::new());
+    }
+    let cap = |id: &Uuid| -> Decimal {
+        lines
+            .iter()
+            .find(|l| l.line_id == *id)
+            .map(|l| (l.unit_price * l.quantity - l.order_discount_share).max(Decimal::ZERO))
+            .unwrap_or(Decimal::ZERO)
+    };
+    let cap_sum: Decimal = line_ids.iter().map(cap).sum();
+    if cap_sum <= Decimal::ZERO {
+        return (Decimal::ZERO, Vec::new());
+    }
+    // Never allocate more than the contributing lines can hold.
+    let disc = total.min(cap_sum);
+
+    // Partition the contributing lines by effective tax key, first-seen order.
+    let mut groups: Vec<(Option<String>, Vec<Uuid>)> = Vec::new();
+    for id in line_ids {
+        let key = lines.iter().find(|l| l.line_id == *id).and_then(|l| l.tax_key.clone());
+        match groups.iter_mut().find(|(k, _)| *k == key) {
+            Some((_, ids)) => ids.push(*id),
+            None => groups.push((key, vec![*id])),
+        }
+    }
+
+    // Degenerate single group: the tax-agnostic kernel, byte-identical (the partition would add a
+    // redundant money() round-trip that could move a sub-penny remainder).
+    if groups.len() == 1 {
+        let key = groups[0].0.clone();
+        let (allocated, shares) = allocate(total, line_ids, lines);
+        return (
+            allocated,
+            shares
+                .into_iter()
+                .map(|(line_id, share)| AllocationShare { line_id, tax_key: key.clone(), share })
+                .collect(),
+        );
+    }
+
+    // Capacity-proportional slice per group, penny-folded within the group by `allocate`.
+    let mut shares: Vec<AllocationShare> = Vec::with_capacity(line_ids.len());
+    let mut running = Decimal::ZERO;
+    for (key, ids) in &groups {
+        let group_cap: Decimal = ids.iter().map(|id| cap(id)).sum();
+        if group_cap <= Decimal::ZERO {
+            continue;
+        }
+        let slice = money(disc * group_cap / cap_sum);
+        let (taken, group_shares) = allocate(slice, ids, lines);
+        running += taken;
+        for (line_id, share) in group_shares {
+            shares.push(AllocationShare { line_id, tax_key: key.clone(), share });
+        }
+    }
+    // Cross-group rounding remainder: fold onto the most-slack line so Σ shares == disc EXACTLY.
+    let remainder = disc - running;
+    if remainder != Decimal::ZERO {
+        let slack = |i: usize| cap(&shares[i].line_id) - shares[i].share;
+        if let Some(idx) = (0..shares.len()).max_by(|&a, &b| slack(a).cmp(&slack(b))) {
+            shares[idx].share = money(shares[idx].share + remainder);
+        }
+    }
+    (disc, shares)
+}
+
+/// Fold an adjustment's per-line shares into per-tax-group totals — each tax base's discount in one
+/// place, exactly (shares are already 2dp money, so the fold introduces no rounding).
+fn fold_by_tax_group(shares: &[AllocationShare]) -> Vec<TaxGroupTotal> {
+    let mut groups: Vec<TaxGroupTotal> = Vec::new();
+    for s in shares {
+        match groups.iter_mut().find(|g| g.tax_key == s.tax_key) {
+            Some(g) => g.discount_amount += s.share,
+            None => groups.push(TaxGroupTotal {
+                tax_key: s.tax_key.clone(),
+                discount_amount: s.share,
+            }),
+        }
+    }
+    groups
+}
+
 impl PromoWriteService {
     // ---- 1b. resolve_cart (cart-scoped read, ADR-002) -----------------------------------------
 
@@ -317,6 +416,9 @@ impl PromoWriteService {
             };
             let rp = self.resolve(&q).await?;
             let gross = money(rp.unit_price * q.quantity);
+            // The line's effective tax-group key: the cart-level form wins over the embedded
+            // query's. Echoed on the resolved line and carried into every allocation share.
+            let tax_key = cl.tax_key.clone().or_else(|| q.tax_key.clone());
             lines.push(ResolvedLine {
                 line_id: cl.line_id,
                 item_id: q.item_id,
@@ -326,6 +428,7 @@ impl PromoWriteService {
                 applied_rule_id: rp.applied_rule_id,
                 order_discount_share: Decimal::ZERO,
                 net_line_total: gross,
+                tax_key,
             });
         }
         let subtotal: Decimal = money(lines.iter().map(|l| l.unit_price * l.quantity).sum());
@@ -368,7 +471,7 @@ impl PromoWriteService {
                 continue;
             }
             // `disc` is what the contributing lines could actually absorb (≤ want).
-            let (disc, allocated) = allocate(want, &contributing, &lines);
+            let (disc, allocated) = allocate_by_tax(want, &contributing, &lines);
             if disc <= Decimal::ZERO {
                 continue;
             }
@@ -376,6 +479,7 @@ impl PromoWriteService {
             adjustments.push(OrderAdjustment {
                 source: AdjustmentSource::Bundle(bundle.id),
                 discount_amount: disc,
+                by_tax_group: fold_by_tax_group(&allocated),
                 allocated,
             });
             remaining -= disc;
@@ -399,7 +503,7 @@ impl PromoWriteService {
                 if !rule.stackable && !adjustments.is_empty() {
                     continue;
                 }
-                let (disc, allocated) = allocate(want, &all_line_ids, &lines);
+                let (disc, allocated) = allocate_by_tax(want, &all_line_ids, &lines);
                 if disc <= Decimal::ZERO {
                     continue;
                 }
@@ -407,6 +511,7 @@ impl PromoWriteService {
                 adjustments.push(OrderAdjustment {
                     source: AdjustmentSource::OrderRule(rule.id),
                     discount_amount: disc,
+                    by_tax_group: fold_by_tax_group(&allocated),
                     allocated,
                 });
                 remaining -= disc;

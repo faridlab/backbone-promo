@@ -74,7 +74,16 @@ impl LoyaltyProgramRepository {
         Ok(row.map(|r| (r.get("collection_factor"), r.get("expiry_duration_days"))))
     }
 
-    /// An active, in-window program's `conversion_factor` (currency per point).
+    /// An active, in-window program's `conversion_factor` (currency per point), with the program row
+    /// locked `FOR UPDATE NOWAIT` — the lock pins the factors against admin edits for the length of
+    /// the redemption, and fail-fast refusal (SQLSTATE 55P03, mapped by the service to
+    /// `PricingError::LockBusy`) is the deliberate posture over blocking.
+    ///
+    /// Throughput note (deliberate): the program-row lock means concurrent DIFFERENT-member
+    /// redemptions on one program can refuse each other during single-digit-ms transaction windows.
+    /// Loyalty redemption is not the hot path (cart pricing is); hosts retry once with jitter. If a
+    /// deployment ever sees retry storms, dropping this lock to plain `FOR UPDATE` is a one-line
+    /// patch with no shape change.
     ///
     /// Takes the CALLER'S connection: it is read INSIDE the redemption tx, so the factor that prices a
     /// burn is the one the serialized balance check saw. The caller has already bound the company on it
@@ -90,13 +99,36 @@ impl LoyaltyProgramRepository {
             r#"SELECT conversion_factor FROM promo.loyalty_programs
                WHERE id = $1 AND company_id = $2 AND status = 'active'
                  AND (metadata->>'deleted_at') IS NULL
-                 AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)"#,
+                 AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)
+               FOR UPDATE NOWAIT"#,
         )
         .bind(program_id)
         .bind(company_id)
         .bind(at)
         .fetch_optional(conn)
         .await
+    }
+
+    /// The program row's `(collection_factor, conversion_factor)` with the row locked
+    /// `FOR UPDATE NOWAIT` — the reversal verb's program lock. Unlike the redemption read this is
+    /// deliberately NOT window-checked: a return months later must still reverse under a program
+    /// that has since gone inactive or out of window (its factors still govern the math).
+    pub async fn find_factors_locked(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        company_id: Uuid,
+        program_id: Uuid,
+    ) -> Result<Option<(Decimal, Decimal)>, sqlx::Error> {
+        let row = sqlx::query(
+            r#"SELECT collection_factor, conversion_factor FROM promo.loyalty_programs
+               WHERE id = $1 AND company_id = $2 AND (metadata->>'deleted_at') IS NULL
+               FOR UPDATE NOWAIT"#,
+        )
+        .bind(program_id)
+        .bind(company_id)
+        .fetch_optional(conn)
+        .await?;
+        Ok(row.map(|r| (r.get("collection_factor"), r.get("conversion_factor"))))
     }
 }
 

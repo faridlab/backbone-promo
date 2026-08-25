@@ -16,6 +16,7 @@ use uuid::Uuid;
 fn line(company: Uuid, item: Uuid, list: &str, qty: &str) -> CartLine {
     CartLine {
         line_id: Uuid::new_v4(),
+        tax_key: None,
         query: PriceQuery {
             company_id: company,
             list_price: dec(list),
@@ -26,6 +27,7 @@ fn line(company: Uuid, item: Uuid, list: &str, qty: &str) -> CartLine {
             customer_id: None,
             customer_group_id: None,
             coupon_code: None,
+            tax_key: None,
             at: now(),
         },
     }
@@ -42,11 +44,14 @@ fn cart(company: Uuid, lines: Vec<CartLine>) -> CartQuery {
     }
 }
 
-/// Σ of every line's allocated share must equal the adjustment's headline discount, exactly.
+/// Σ of every line's allocated share must equal the adjustment's headline discount, exactly — and
+/// the per-tax-group fold must agree with the per-line shares (D4).
 fn assert_shares_tie_out(cart_result: &backbone_promo::application::service::promo_ports::ResolvedCart) {
     for adj in &cart_result.order_adjustments {
-        let sum: Decimal = adj.allocated.iter().map(|(_, s)| *s).sum();
+        let sum: Decimal = adj.allocated.iter().map(|s| s.share).sum();
         assert_eq!(sum, adj.discount_amount, "allocation shares must sum to the discount exactly");
+        let group_sum: Decimal = adj.by_tax_group.iter().map(|g| g.discount_amount).sum();
+        assert_eq!(group_sum, adj.discount_amount, "by_tax_group must fold to the same total");
     }
     // Line shares must also sum to the order discount total.
     let line_sum: Decimal = cart_result.lines.iter().map(|l| l.order_discount_share).sum();
@@ -300,6 +305,7 @@ async fn cart10_order_rule_absent_from_single_line_resolve() {
         customer_id: None,
         customer_group_id: None,
         coupon_code: None,
+        tax_key: None,
         at: now(),
     };
     let r = svc.resolve(&q).await.unwrap();
@@ -487,4 +493,291 @@ async fn cart19_multi_gift_bundle() {
     assert_eq!(qty_of(gift_c), dec("2.0000"), "2 free C per satisfied set");
     assert!(r.reward_lines.iter().all(|rl| rl.bundle_id == bid), "all gifts attributed to the bundle");
     assert_shares_tie_out(&r);
+}
+
+// ---- Per-tax-group allocation (D4) ----------------------------------------------------------------
+//
+// Order-level discounts are partitioned by each line's effective tax-group key so a consumer can
+// reduce each tax base without re-deriving anything. Every case still satisfies the conservation
+// oracle (`assert_shares_tie_out`, which also checks the by-tax fold).
+
+/// A cart line carrying an explicit tax-group key (None = the caller has no tax split).
+fn line_tax(company: Uuid, item: Uuid, list: &str, qty: &str, tax_key: Option<&str>) -> CartLine {
+    CartLine {
+        line_id: Uuid::new_v4(),
+        tax_key: tax_key.map(str::to_string),
+        query: PriceQuery {
+            company_id: company,
+            list_price: dec(list),
+            quantity: dec(qty),
+            item_id: item,
+            item_group_id: None,
+            brand_id: None,
+            customer_id: None,
+            customer_group_id: None,
+            coupon_code: None,
+            tax_key: None,
+            at: now(),
+        },
+    }
+}
+
+/// The discount share carried on `order_adjustments` for one line, with its tax key.
+fn share_of(r: &backbone_promo::application::service::promo_ports::ResolvedCart, line_id: Uuid) -> (Option<String>, Decimal) {
+    let share = r.order_adjustments[0]
+        .allocated
+        .iter()
+        .find(|s| s.line_id == line_id)
+        .expect("line has a share");
+    (share.tax_key.clone(), share.share)
+}
+
+/// The adjustment's per-tax-group total for one key.
+fn group_total(
+    r: &backbone_promo::application::service::promo_ports::ResolvedCart,
+    key: Option<&str>,
+) -> Decimal {
+    r.order_adjustments[0]
+        .by_tax_group
+        .iter()
+        .find(|g| g.tax_key.as_deref() == key)
+        .map(|g| g.discount_amount)
+        .unwrap_or(Decimal::ZERO)
+}
+
+/// TAX-1 — a 10% order rule over two tax groups splits exactly 10% per group; every share carries
+/// its line's key and the ResolvedLine echoes it.
+#[tokio::test]
+async fn tax1_two_group_split() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let la = line_tax(company, a, "100000", "1", Some("PPN"));
+    let lb = line_tax(company, b, "50000", "1", Some("FREE"));
+    let id_a = la.line_id;
+    let id_b = lb.line_id;
+    let r = svc.resolve_cart(&cart(company, vec![la, lb])).await.unwrap();
+
+    assert_eq!(r.subtotal, dec("150000.00"));
+    assert_eq!(r.order_discount_total, dec("15000.00"));
+    assert_eq!(share_of(&r, id_a), (Some("PPN".into()), dec("10000.00")));
+    assert_eq!(share_of(&r, id_b), (Some("FREE".into()), dec("5000.00")));
+    assert_eq!(group_total(&r, Some("PPN")), dec("10000.00"));
+    assert_eq!(group_total(&r, Some("FREE")), dec("5000.00"));
+    // The resolved lines echo their keys so consumers can group nets without re-joining input.
+    let echo = |id: Uuid| r.lines.iter().find(|l| l.line_id == id).unwrap().tax_key.clone();
+    assert_eq!(echo(id_a), Some("PPN".into()));
+    assert_eq!(echo(id_b), Some("FREE".into()));
+    assert_shares_tie_out(&r);
+}
+
+/// TAX-2 — cross-group penny fold: a fixed 100 off three equal lines in three groups takes
+/// 33.33/33.33/33.34 (the partition's one rounding step folded onto the most-slack line) and the
+/// per-tax fold matches exactly.
+#[tokio::test]
+async fn tax2_three_group_penny_fold() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (a, b, cc) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+    order_rule(&pool, company, 0, "0", "discount_amount", None, Some(dec("100")), false, None).await;
+
+    let lines = vec![
+        line_tax(company, a, "100000", "1", Some("A")),
+        line_tax(company, b, "100000", "1", Some("B")),
+        line_tax(company, cc, "100000", "1", Some("C")),
+    ];
+    let r = svc.resolve_cart(&cart(company, lines)).await.unwrap();
+    assert_eq!(r.order_discount_total, dec("100.00"));
+    let mut shares: Vec<Decimal> =
+        r.order_adjustments[0].allocated.iter().map(|s| s.share).collect();
+    shares.sort();
+    assert_eq!(shares, vec![dec("33.33"), dec("33.33"), dec("33.34")]);
+    assert_eq!(
+        group_total(&r, Some("A")) + group_total(&r, Some("B")) + group_total(&r, Some("C")),
+        dec("100.00")
+    );
+    assert_shares_tie_out(&r);
+}
+
+/// TAX-3 — degenerate single group is byte-identical to the tax-agnostic kernel: the same cart with
+/// NO keys and with one shared key produces the exact pre-D4 shares (CART-3's numbers).
+#[tokio::test]
+async fn tax3_single_group_byte_identical() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (a, b, cc) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+    order_rule(&pool, company, 0, "0", "discount_amount", None, Some(dec("10000")), false, None).await;
+
+    let bare = svc
+        .resolve_cart(&cart(company, vec![
+            line(company, a, "100000", "1"),
+            line(company, b, "100000", "1"),
+            line(company, cc, "100000", "1"),
+        ]))
+        .await
+        .unwrap();
+    let keyed = svc
+        .resolve_cart(&cart(company, vec![
+            line_tax(company, a, "100000", "1", Some("PPN")),
+            line_tax(company, b, "100000", "1", Some("PPN")),
+            line_tax(company, cc, "100000", "1", Some("PPN")),
+        ]))
+        .await
+        .unwrap();
+
+    // The pre-D4 pinned numbers (CART-3).
+    let mut shares: Vec<Decimal> = bare.lines.iter().map(|l| l.order_discount_share).collect();
+    shares.sort();
+    assert_eq!(shares, vec![dec("3333.33"), dec("3333.33"), dec("3333.34")]);
+    // One shared key changes nothing about the money.
+    let mut keyed_shares: Vec<Decimal> = keyed.lines.iter().map(|l| l.order_discount_share).collect();
+    keyed_shares.sort();
+    assert_eq!(shares, keyed_shares);
+    assert_eq!(bare.order_discount_total, keyed.order_discount_total);
+    assert_eq!(keyed.order_adjustments[0].by_tax_group.len(), 1);
+    assert_eq!(keyed.order_adjustments[0].by_tax_group[0].tax_key.as_deref(), Some("PPN"));
+    assert_eq!(keyed.order_adjustments[0].by_tax_group[0].discount_amount, dec("10000.00"));
+}
+
+/// TAX-4 — a keyless line among keyed lines is its own group (`None`), so mixed callers are safe.
+#[tokio::test]
+async fn tax4_keyless_line_is_its_own_group() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let la = line_tax(company, a, "100000", "1", Some("PPN"));
+    let lb = line_tax(company, b, "100000", "1", None);
+    let id_b = lb.line_id;
+    let r = svc.resolve_cart(&cart(company, vec![la, lb])).await.unwrap();
+
+    assert_eq!(group_total(&r, Some("PPN")), dec("10000.00"));
+    assert_eq!(group_total(&r, None), dec("10000.00"));
+    assert_eq!(share_of(&r, id_b), (None, dec("10000.00")));
+    assert_eq!(r.order_adjustments[0].by_tax_group.len(), 2);
+    assert_shares_tie_out(&r);
+}
+
+/// TAX-5 — the cart-level `CartLine.tax_key` wins over a key buried in the embedded query.
+#[tokio::test]
+async fn tax5_cart_level_key_wins_over_query_key() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let item = Uuid::new_v4();
+    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let mut l = line_tax(company, item, "100000", "1", Some("CART"));
+    l.query.tax_key = Some("QUERY".into());
+    let id = l.line_id;
+    let r = svc.resolve_cart(&cart(company, vec![l])).await.unwrap();
+
+    assert_eq!(share_of(&r, id), (Some("CART".into()), dec("10000.00")));
+    assert_eq!(r.lines[0].tax_key.as_deref(), Some("CART"));
+    assert_eq!(group_total(&r, Some("QUERY")), Decimal::ZERO, "query-buried key must not win");
+    assert_shares_tie_out(&r);
+}
+
+/// TAX-6 — a group whose lines are already fully consumed by a prior adjustment receives nothing:
+/// the follow-on order rule finds capacity only in the other group, exactly there.
+#[tokio::test]
+async fn tax6_exhausted_group_gets_no_share() {
+    let pool = pool().await;
+    let svc = PromoWriteService::new(pool.clone());
+    let company = Uuid::new_v4();
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+    // A 100%-off stackable bundle on A alone (exhausts A's capacity), plus a stackable fixed 5000
+    // order rule that can only find capacity on B.
+    let bid = bundle(&pool, company, 0, "all_of", None, "discount_percentage", Some(dec("100")), None, "0", true).await;
+    bundle_component(&pool, company, bid, a, "1").await;
+    order_rule(&pool, company, 0, "0", "discount_amount", None, Some(dec("5000")), true, None).await;
+
+    let la = line_tax(company, a, "10000", "1", Some("PPN"));
+    let lb = line_tax(company, b, "100000", "1", Some("FREE"));
+    let id_a = la.line_id;
+    let id_b = lb.line_id;
+    let r = svc.resolve_cart(&cart(company, vec![la, lb])).await.unwrap();
+
+    assert_eq!(r.order_discount_total, dec("15000.00")); // 10000 (bundle) + 5000 (rule)
+    // The bundle took all of A; the order rule's 5000 could only land on B's group.
+    assert_eq!(r.order_adjustments.len(), 2);
+    let (bundle_adj, rule_adj) = (&r.order_adjustments[0], &r.order_adjustments[1]);
+    assert_eq!(bundle_adj.discount_amount, dec("10000.00"));
+    assert_eq!(bundle_adj.allocated.len(), 1);
+    assert_eq!(bundle_adj.allocated[0].line_id, id_a);
+    assert_eq!(bundle_adj.allocated[0].tax_key.as_deref(), Some("PPN"));
+    assert_eq!(bundle_adj.allocated[0].share, dec("10000.00"));
+    assert_eq!(rule_adj.discount_amount, dec("5000.00"));
+    assert_eq!(rule_adj.allocated.len(), 1);
+    assert_eq!(rule_adj.allocated[0].line_id, id_b);
+    assert_eq!(rule_adj.allocated[0].tax_key.as_deref(), Some("FREE"));
+    assert_eq!(rule_adj.allocated[0].share, dec("5000.00"));
+    assert_eq!(rule_adj.by_tax_group.len(), 1);
+    assert_eq!(rule_adj.by_tax_group[0].tax_key.as_deref(), Some("FREE"));
+    assert_shares_tie_out(&r);
+}
+
+/// TAX-7 — serde back-compat: JSON from before the tax split (no `tax_key` anywhere) still
+/// deserializes, and the new shapes round-trip.
+#[test]
+fn tax7_serde_back_compat() {
+    // A pre-D4 PriceQuery (no tax_key field).
+    let old_price_query = serde_json::json!({
+        "company_id": "00000000-0000-0000-0000-000000000001",
+        "list_price": "100000",
+        "quantity": "1",
+        "item_id": "00000000-0000-0000-0000-000000000002",
+        "item_group_id": null,
+        "brand_id": null,
+        "customer_id": null,
+        "customer_group_id": null,
+        "coupon_code": null,
+        "at": "2026-01-01T00:00:00Z"
+    });
+    let q: PriceQuery = serde_json::from_value(old_price_query).expect("old PriceQuery JSON parses");
+    assert_eq!(q.tax_key, None);
+
+    // A pre-D4 CartLine (no tax_key) around that query.
+    let old_cart_line = serde_json::json!({
+        "line_id": "00000000-0000-0000-0000-000000000003",
+        "query": {
+            "company_id": "00000000-0000-0000-0000-000000000001",
+            "list_price": "100000",
+            "quantity": "1",
+            "item_id": "00000000-0000-0000-0000-000000000002",
+            "item_group_id": null,
+            "brand_id": null,
+            "customer_id": null,
+            "customer_group_id": null,
+            "coupon_code": null,
+            "at": "2026-01-01T00:00:00Z"
+        }
+    });
+    let l: CartLine = serde_json::from_value(old_cart_line).expect("old CartLine JSON parses");
+    assert_eq!(l.tax_key, None);
+
+    // The new adjustment shape round-trips through JSON.
+    let adj = backbone_promo::application::service::promo_ports::OrderAdjustment {
+        source: AdjustmentSource::OrderRule("00000000-0000-0000-0000-000000000004".parse().unwrap()),
+        discount_amount: dec("100.00"),
+        allocated: vec![backbone_promo::application::service::promo_ports::AllocationShare {
+            line_id: "00000000-0000-0000-0000-000000000003".parse().unwrap(),
+            tax_key: Some("PPN".into()),
+            share: dec("100.00"),
+        }],
+        by_tax_group: vec![backbone_promo::application::service::promo_ports::TaxGroupTotal {
+            tax_key: Some("PPN".into()),
+            discount_amount: dec("100.00"),
+        }],
+    };
+    let round: backbone_promo::application::service::promo_ports::OrderAdjustment =
+        serde_json::from_value(serde_json::to_value(&adj).unwrap()).unwrap();
+    assert_eq!(round, adj);
 }

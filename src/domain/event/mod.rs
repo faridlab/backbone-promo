@@ -6,6 +6,8 @@ pub mod coupon_code_events;
 pub mod coupon_code_event_handlers;
 pub mod coupon_redemption_events;
 pub mod coupon_redemption_event_handlers;
+pub mod loyalty_order_points_events;
+pub mod loyalty_order_points_event_handlers;
 pub mod loyalty_program_events;
 pub mod loyalty_program_event_handlers;
 pub mod loyalty_point_entry_events;
@@ -23,6 +25,8 @@ pub use coupon_code_events::{CouponCodeEvent, CouponCodeEventPublisher, NoopCoup
 pub use coupon_code_event_handlers::CouponCodeEventHandler;
 pub use coupon_redemption_events::{CouponRedemptionEvent, CouponRedemptionEventPublisher, NoopCouponRedemptionEventPublisher};
 pub use coupon_redemption_event_handlers::CouponRedemptionEventHandler;
+pub use loyalty_order_points_events::{LoyaltyOrderPointsEvent, LoyaltyOrderPointsEventPublisher, NoopLoyaltyOrderPointsEventPublisher};
+pub use loyalty_order_points_event_handlers::LoyaltyOrderPointsEventHandler;
 pub use loyalty_program_events::{LoyaltyProgramEvent, LoyaltyProgramEventPublisher, NoopLoyaltyProgramEventPublisher};
 pub use loyalty_program_event_handlers::LoyaltyProgramEventHandler;
 pub use loyalty_point_entry_events::{LoyaltyPointEntryEvent, LoyaltyPointEntryEventPublisher, NoopLoyaltyPointEntryEventPublisher};

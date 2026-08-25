@@ -64,6 +64,7 @@ async fn prseam1_resolved_price_drives_selling_order() {
         customer_id: Some(customer),
         customer_group_id: None,
         coupon_code: None,
+        tax_key: None,
         at: now(),
     };
 
@@ -77,6 +78,7 @@ async fn prseam1_resolved_price_drives_selling_order() {
     let mk = |num: &str, item: Uuid, price: Decimal| NewSalesOrder {
         order_number: num.to_string(),
         quotation_id: None,
+        delivery_carrier_id: None,
         company_id: company,
         branch_id: None,
         customer_id: customer,
@@ -92,6 +94,8 @@ async fn prseam1_resolved_price_drives_selling_order() {
             quantity: dec("2"),
             unit_price: price,
             line_discount: Decimal::ZERO,
+            invoice_policy: None,
+            is_downpayment: None,
         }],
     };
 
@@ -143,11 +147,13 @@ async fn prseam3_coupon_cap_binds_across_selling_commit() {
         customer_id: Some(cust),
         customer_group_id: None,
         coupon_code: Some("FLASH".into()),
+        tax_key: None,
         at: now(),
     };
     let mk_order = |num: &str, cust: Uuid, price: Decimal| NewSalesOrder {
         order_number: num.to_string(),
         quotation_id: None,
+        delivery_carrier_id: None,
         company_id: company,
         branch_id: None,
         customer_id: cust,
@@ -163,6 +169,8 @@ async fn prseam3_coupon_cap_binds_across_selling_commit() {
             quantity: Decimal::ONE,
             unit_price: price,
             line_discount: Decimal::ZERO,
+            invoice_policy: None,
+            is_downpayment: None,
         }],
     };
     let short = &company.to_string()[..8];

@@ -6,6 +6,7 @@
 
 mod coupon_code_repository;
 mod coupon_redemption_repository;
+mod loyalty_order_points_repository;
 mod loyalty_program_repository;
 mod loyalty_point_entry_repository;
 mod pricing_rule_repository;
@@ -15,9 +16,16 @@ mod promo_bundle_gift_repository;
 
 // Custom persistence modules
 // <<< CUSTOM
-// The hand-written promo SQL's parameter/projection types (see the seven repositories, all declared
-// `user_owned` in metaphor.codegen.yaml).
-pub use loyalty_point_entry_repository::{NewAccrualRow, NewRedemptionRow, PriorRedemptionRow};
+mod loyalty_member_anchor_repository;
+// The hand-written promo SQL's parameter/projection types (see the user-owned repositories,
+// all declared `user_owned` in metaphor.codegen.yaml).
+pub use loyalty_member_anchor_repository::LoyaltyMemberAnchorRepository;
+pub use loyalty_order_points_repository::{
+    NewOrderGrantRow, NewOrderSpendRow, OrderPointsRow,
+};
+pub use loyalty_point_entry_repository::{
+    NewAccrualRow, NewRedemptionRow, NewReversalRow, PriorRedemptionRow, PriorReversalRow,
+};
 pub use pricing_rule_repository::{LineRuleQuery, LineRuleRow, OrderRuleRow};
 pub use promo_bundle_component_repository::BundleComponentRow;
 pub use promo_bundle_gift_repository::BundleGiftRow;
@@ -27,6 +35,7 @@ pub use promo_bundle_repository::BundleRow;
 // Re-exports
 pub use coupon_code_repository::CouponCodeRepository;
 pub use coupon_redemption_repository::CouponRedemptionRepository;
+pub use loyalty_order_points_repository::LoyaltyOrderPointsRepository;
 pub use loyalty_program_repository::LoyaltyProgramRepository;
 pub use loyalty_point_entry_repository::LoyaltyPointEntryRepository;
 pub use pricing_rule_repository::PricingRuleRepository;

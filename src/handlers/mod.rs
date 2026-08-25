@@ -11,6 +11,7 @@ use std::sync::Arc;
 // Import all services
 use crate::application::service::CouponCodeService;
 use crate::application::service::CouponRedemptionService;
+use crate::application::service::LoyaltyOrderPointsService;
 use crate::application::service::LoyaltyProgramService;
 use crate::application::service::LoyaltyPointEntryService;
 use crate::application::service::PricingRuleService;
@@ -40,6 +41,8 @@ pub struct AppState {
     pub coupon_code_service: Arc<CouponCodeService>,
     /// CouponRedemption service
     pub coupon_redemption_service: Arc<CouponRedemptionService>,
+    /// LoyaltyOrderPoints service
+    pub loyalty_order_points_service: Arc<LoyaltyOrderPointsService>,
     /// LoyaltyProgram service
     pub loyalty_program_service: Arc<LoyaltyProgramService>,
     /// LoyaltyPointEntry service
@@ -59,6 +62,7 @@ impl AppState {
     pub fn new(
         coupon_code_service: Arc<CouponCodeService>,
         coupon_redemption_service: Arc<CouponRedemptionService>,
+        loyalty_order_points_service: Arc<LoyaltyOrderPointsService>,
         loyalty_program_service: Arc<LoyaltyProgramService>,
         loyalty_point_entry_service: Arc<LoyaltyPointEntryService>,
         pricing_rule_service: Arc<PricingRuleService>,
@@ -69,6 +73,7 @@ impl AppState {
         Self {
             coupon_code_service,
             coupon_redemption_service,
+            loyalty_order_points_service,
             loyalty_program_service,
             loyalty_point_entry_service,
             pricing_rule_service,
@@ -83,6 +88,7 @@ impl AppState {
         Self {
             coupon_code_service: module.coupon_code_service.clone(),
             coupon_redemption_service: module.coupon_redemption_service.clone(),
+            loyalty_order_points_service: module.loyalty_order_points_service.clone(),
             loyalty_program_service: module.loyalty_program_service.clone(),
             loyalty_point_entry_service: module.loyalty_point_entry_service.clone(),
             pricing_rule_service: module.pricing_rule_service.clone(),
@@ -100,6 +106,7 @@ impl AppState {
 pub struct AppStateBuilder {
     coupon_code_service: Option<Arc<CouponCodeService>>,
     coupon_redemption_service: Option<Arc<CouponRedemptionService>>,
+    loyalty_order_points_service: Option<Arc<LoyaltyOrderPointsService>>,
     loyalty_program_service: Option<Arc<LoyaltyProgramService>>,
     loyalty_point_entry_service: Option<Arc<LoyaltyPointEntryService>>,
     pricing_rule_service: Option<Arc<PricingRuleService>>,
@@ -123,6 +130,12 @@ impl AppStateBuilder {
     /// Set the CouponRedemption service.
     pub fn with_coupon_redemption_service(mut self, service: Arc<CouponRedemptionService>) -> Self {
         self.coupon_redemption_service = Some(service);
+        self
+    }
+
+    /// Set the LoyaltyOrderPoints service.
+    pub fn with_loyalty_order_points_service(mut self, service: Arc<LoyaltyOrderPointsService>) -> Self {
+        self.loyalty_order_points_service = Some(service);
         self
     }
 
@@ -171,6 +184,7 @@ impl AppStateBuilder {
         AppState {
             coupon_code_service: self.coupon_code_service.expect("coupon_code_service is required"),
             coupon_redemption_service: self.coupon_redemption_service.expect("coupon_redemption_service is required"),
+            loyalty_order_points_service: self.loyalty_order_points_service.expect("loyalty_order_points_service is required"),
             loyalty_program_service: self.loyalty_program_service.expect("loyalty_program_service is required"),
             loyalty_point_entry_service: self.loyalty_point_entry_service.expect("loyalty_point_entry_service is required"),
             pricing_rule_service: self.pricing_rule_service.expect("pricing_rule_service is required"),

@@ -12,6 +12,9 @@ use backbone_promo::application::service::promo_write_service::PromoWriteService
 use backbone_pos::application::service::pos_cart_pricing::{
     CartPriceRequest, CartPricingError, CartPricingPort, PricedCart, PricedCartLine, PricedRewardLine,
 };
+use backbone_pos::application::service::pos_ports::{
+    PosRejected, PosTaxComponent, PosTaxComputePort, PosTaxComputeRequest, PosTaxComputeResult,
+};
 use backbone_pos::application::service::pos_write_service::{
     CartSaleLine, NewCartSale, PosWriteService,
 };
@@ -38,6 +41,7 @@ impl CartPricingPort for PromoCartAdapter {
                 .iter()
                 .map(|l| CartLine {
                     line_id: l.line_ref,
+                    tax_key: None,
                     query: PriceQuery {
                         company_id: req.company_id,
                         list_price: l.list_price,
@@ -48,6 +52,7 @@ impl CartPricingPort for PromoCartAdapter {
                         customer_id: req.customer_id,
                         customer_group_id: req.customer_group_id,
                         coupon_code: req.coupon_code.clone(),
+                        tax_key: None,
                         at: now(),
                     },
                 })
@@ -91,15 +96,51 @@ async fn open_session(pool: &sqlx::PgPool, company: Uuid, profile: Uuid) -> Uuid
     .unwrap()
 }
 
-/// PPN is server-owned by the register: the till taxes every ticket at its configured rate, so the
-/// seam needs a real profile row (a non-PKP till — rate 0 — keeps the assert on net_total exact).
-async fn seed_profile(pool: &sqlx::PgPool, company: Uuid, profile: Uuid) {
-    sqlx::query("INSERT INTO pos.pos_profiles (id, company_id, name, tax_rate) VALUES ($1, $2, 'seam till', 0)")
-        .bind(profile)
-        .bind(company)
-        .execute(pool)
-        .await
-        .unwrap();
+/// PPN is server-owned by the register: the till's tax templates are resolved document-grade through
+/// the `PosTaxComputePort`, so the seam needs a real profile row carrying one template ref plus a
+/// port fake that applies it at rate 0 (a non-PKP till) — keeping the assert on net_total exact.
+/// The template id is opaque to POS; promo never sees it.
+async fn seed_profile(pool: &sqlx::PgPool, company: Uuid, profile: Uuid, template: Uuid) {
+    sqlx::query(
+        r#"INSERT INTO pos.pos_profiles (id, company_id, name, tax_template_ids)
+           VALUES ($1, $2, 'seam till', $3::jsonb)"#,
+    )
+    .bind(profile)
+    .bind(company)
+    .bind(serde_json::json!([template.to_string()]))
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// In-test `PosTaxComputePort`: the register's single template at rate 0 — tax-exempt nets pass
+/// through untouched (empty `net_amounts` keeps POS's own first-pass per-line rounding).
+struct ZeroTax;
+
+#[async_trait::async_trait]
+impl PosTaxComputePort for ZeroTax {
+    async fn compute_document(&self, req: &PosTaxComputeRequest) -> Result<PosTaxComputeResult, PosRejected> {
+        let components = req
+            .lines
+            .iter()
+            .map(|l| PosTaxComponent {
+                line_ref: l.line_ref,
+                template_id: l.template_id,
+                account_id: None,
+                real_account_id: None,
+                rate: Decimal::ZERO,
+                tax_amount: Decimal::ZERO,
+                description: Some("seam zero tax".into()),
+            })
+            .collect();
+        Ok(PosTaxComputeResult {
+            net_amounts: Vec::new(),
+            components,
+            excluded_total: req.lines.iter().map(|l| l.net_amount).sum(),
+            tax_total: Decimal::ZERO,
+            included_total: req.lines.iter().map(|l| l.net_amount).sum(),
+        })
+    }
 }
 
 /// CPSEAM-1 — a bundle + an order-total discount, priced by promo, land on a REAL POS ticket whose
@@ -112,7 +153,7 @@ async fn cpseam1_cart_discounts_land_on_a_real_ticket() {
     let adapter = PromoCartAdapter { svc: promo.clone() };
     let company = Uuid::new_v4();
     let profile = Uuid::new_v4();
-    seed_profile(&pool, company, profile).await;
+    seed_profile(&pool, company, profile, Uuid::new_v4()).await;
     let (item_a, item_b) = (Uuid::new_v4(), Uuid::new_v4());
     let session = open_session(&pool, company, profile).await;
 
@@ -130,16 +171,16 @@ async fn cpseam1_cart_discounts_land_on_a_real_ticket() {
         customer_id: None,
         customer_group_id: None,
         coupon_code: None,
+        pos_table_id: None,
+        discount_id: None,
         receipt_number: format!("R-{}", &Uuid::new_v4().to_string()[..8]),
         posting_at: now().naive_utc(),
-        tax_total: Decimal::ZERO,
-        round_to: None,
         lines: vec![
-            CartSaleLine { item_id: item_a, item_group_id: None, brand_id: None, revenue_account_id: None, description: None, list_price: dec("200000"), quantity: dec("1") },
-            CartSaleLine { item_id: item_b, item_group_id: None, brand_id: None, revenue_account_id: None, description: None, list_price: dec("100000"), quantity: dec("1") },
+            CartSaleLine { item_id: item_a, item_group_id: None, brand_id: None, revenue_account_id: None, description: None, course: None, list_price: dec("200000"), quantity: dec("1") },
+            CartSaleLine { item_id: item_b, item_group_id: None, brand_id: None, revenue_account_id: None, description: None, course: None, list_price: dec("100000"), quantity: dec("1") },
         ],
     };
-    let ticket_id = pos.ring_sale_priced(ticket, &adapter).await.unwrap();
+    let ticket_id = pos.ring_sale_priced(ticket, &adapter, &ZeroTax).await.unwrap();
 
     // Subtotal 300k → bundle 10% (30k) → order 5% of 270k (13.5k) → net 256.5k.
     let net_total: Decimal = sqlx::query_scalar("SELECT net_total FROM pos.pos_invoices WHERE id=$1")
@@ -159,7 +200,7 @@ async fn cpseam2_free_item_lands_on_the_ticket() {
     let adapter = PromoCartAdapter { svc: promo.clone() };
     let company = Uuid::new_v4();
     let profile = Uuid::new_v4();
-    seed_profile(&pool, company, profile).await;
+    seed_profile(&pool, company, profile, Uuid::new_v4()).await;
     let (item_a, free_b) = (Uuid::new_v4(), Uuid::new_v4());
     let session = open_session(&pool, company, profile).await;
 
@@ -175,11 +216,12 @@ async fn cpseam2_free_item_lands_on_the_ticket() {
     let ticket = NewCartSale {
         company_id: company, pos_profile_id: profile, opening_entry_id: session, branch_id: None,
         customer_id: None, customer_group_id: None, coupon_code: None,
+        pos_table_id: None, discount_id: None,
         receipt_number: format!("R-{}", &Uuid::new_v4().to_string()[..8]),
-        posting_at: now().naive_utc(), tax_total: Decimal::ZERO, round_to: None,
-        lines: vec![CartSaleLine { item_id: item_a, item_group_id: None, brand_id: None, revenue_account_id: None, description: None, list_price: dec("100000"), quantity: dec("1") }],
+        posting_at: now().naive_utc(),
+        lines: vec![CartSaleLine { item_id: item_a, item_group_id: None, brand_id: None, revenue_account_id: None, description: None, course: None, list_price: dec("100000"), quantity: dec("1") }],
     };
-    let ticket_id = pos.ring_sale_priced(ticket, &adapter).await.unwrap();
+    let ticket_id = pos.ring_sale_priced(ticket, &adapter, &ZeroTax).await.unwrap();
 
     let net_total: Decimal = sqlx::query_scalar("SELECT net_total FROM pos.pos_invoices WHERE id=$1")
         .bind(ticket_id).fetch_one(&pool).await.unwrap();

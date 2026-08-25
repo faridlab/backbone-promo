@@ -8,6 +8,7 @@
 
 pub mod coupon_code_repository;
 pub mod coupon_redemption_repository;
+pub mod loyalty_order_points_repository;
 pub mod loyalty_program_repository;
 pub mod loyalty_point_entry_repository;
 pub mod pricing_rule_repository;
@@ -27,6 +28,12 @@ pub use coupon_redemption_repository::{
     CouponRedemptionPaginationParams,
     CouponRedemptionPaginatedResult,
     CouponRedemptionFilter,
+};
+pub use loyalty_order_points_repository::{
+    LoyaltyOrderPointsRepository,
+    LoyaltyOrderPointsPaginationParams,
+    LoyaltyOrderPointsPaginatedResult,
+    LoyaltyOrderPointsFilter,
 };
 pub use loyalty_program_repository::{
     LoyaltyProgramRepository,

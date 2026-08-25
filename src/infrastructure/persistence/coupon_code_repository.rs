@@ -81,6 +81,42 @@ impl CouponCodeRepository {
         Ok(row.map(|r| (r.get("id"), r.get("pricing_rule_id"))))
     }
 
+    /// Take the coupon row `FOR UPDATE NOWAIT` ahead of a burn — called FIRST in
+    /// `commit_coupon_redemption` so concurrent same-coupon redemptions fail fast (SQLSTATE 55P03,
+    /// mapped by the service to `PricingError::LockBusy`) instead of queuing behind each other.
+    /// Harmless same-coupon concurrency therefore surfaces as a retryable 409 rather than a queue;
+    /// the guarded [`Self::bump_used_count`] remains the correctness bound on `max_use` (an UPDATE
+    /// cannot take NOWAIT itself).
+    ///
+    /// `Ok(false)` = no row matched (unknown id, wrong company, inactive, or soft-deleted) — the
+    /// caller proceeds and the guarded bump refuses, preserving the pre-existing typed outcome
+    /// (`CouponExhausted`) for those shapes.
+    ///
+    /// Takes the CALLER'S connection so this, the ledger claim, and the counter bump commit as one
+    /// unit. The caller has already bound the company on it (`bind_company_on`) — don't re-bind here.
+    pub async fn lock_for_burn(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        coupon_id: Uuid,
+        company_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let row = sqlx::query(
+            r#"
+            SELECT id FROM promo.coupon_codes
+            WHERE id = $1
+              AND company_id = $2
+              AND status = 'active'
+              AND (metadata->>'deleted_at') IS NULL
+            FOR UPDATE NOWAIT
+            "#,
+        )
+        .bind(coupon_id)
+        .bind(company_id)
+        .fetch_optional(conn)
+        .await?;
+        Ok(row.is_some())
+    }
+
     /// Advance `used_count` by one, GUARDED so it can never exceed `max_use` — the guard is what makes
     /// over-redemption impossible under concurrency. `Ok(None)` = no use remained (or the coupon is
     /// inactive), and the caller must roll its transaction back.
