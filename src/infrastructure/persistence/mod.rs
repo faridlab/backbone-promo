@@ -16,9 +16,13 @@ mod promo_bundle_gift_repository;
 
 // Custom persistence modules
 // <<< CUSTOM
+mod coupon_claim_repository;
 mod loyalty_member_anchor_repository;
 // The hand-written promo SQL's parameter/projection types (see the user-owned repositories,
 // all declared `user_owned` in metaphor.codegen.yaml).
+pub use coupon_claim_repository::{
+    ActiveClaimRow, ClaimableCouponRow, CouponClaimRepository, CouponClaimRow,
+};
 pub use loyalty_member_anchor_repository::LoyaltyMemberAnchorRepository;
 pub use loyalty_order_points_repository::{
     NewOrderGrantRow, NewOrderSpendRow, OrderPointsRow,

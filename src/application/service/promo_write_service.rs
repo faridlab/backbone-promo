@@ -1,6 +1,6 @@
 //! The hand-authored promo write path (user-owned; survives regen) — the HUB.
 //!
-//! Promo's write service has five responsibilities, none of which post GL:
+//! Promo's write service has six responsibilities, none of which post GL:
 //!   1. `resolve` — the marquee READ. Single-line effective price via a deterministic winner.
 //!   2. `resolve_cart` — the cart-scoped READ. The same line pass + a bundle pass + an order pass,
 //!      reconciled so `Σ net_line_total == total` exactly, with per-tax-group allocation.
@@ -10,6 +10,10 @@
 //!   5. per-order loyalty accounting — `grant_order_points` / `spend_order_points` /
 //!      `reverse_order_points`: the order-flow verbs a host (POS / selling) composes at confirm,
 //!      payment and return.
+//!   6. cart-stage code claims — `claim_promo_code` / `release_promo_claim` / `claims_for_cart`:
+//!      the server-side, serialized claim reservation (headroom counted under the coupon row
+//!      lock; one active claim per cart; uniform refusal), settled by the burn's same-ref
+//!      transition inside `commit_coupon_redemption`.
 //!
 //! **This file is the hub:** it holds the service's vocabulary — the struct, its constructor, the
 //! `money()` helper, the NOWAIT lock-error mapping, and the legacy loyalty outcome types — plus the
@@ -21,22 +25,24 @@
 //! - [`super::promo_coupon`] — the bounded coupon burn (`commit_coupon_redemption`).
 //! - [`super::promo_loyalty`] — the loyalty ledger (`accrue`, `redeem`).
 //! - [`super::promo_loyalty_order`] — the per-order loyalty verbs (grant / spend / reverse).
+//! - [`super::promo_claim`] — the cart-stage code claims (claim / release / inspect).
 //!
 //! Money is IDR, 2dp, half-away-from-zero. Points are whole (floored on accrual) and are NOT money.
 //!
 //! **Lock order (fixed):** a loyalty transaction takes the program row FIRST, then the member
-//! anchor; the coupon verb locks only the coupon row. No transaction takes {program, anchor} and
-//! {coupon} in opposite orders, so a `LockBusy` is always transient contention, never a deadlock.
+//! anchor; the coupon verbs (the burn and the claim) lock only the coupon row. No transaction
+//! takes {program, anchor} and {coupon} in opposite orders, so a `LockBusy` is always transient
+//! contention, never a deadlock.
 
 use rust_decimal::{Decimal, RoundingStrategy};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::infrastructure::persistence::{
-    CouponCodeRepository, CouponRedemptionRepository, LoyaltyMemberAnchorRepository,
-    LoyaltyOrderPointsRepository, LoyaltyPointEntryRepository, LoyaltyProgramRepository,
-    PricingRuleRepository, PromoBundleComponentRepository, PromoBundleGiftRepository,
-    PromoBundleRepository,
+    CouponClaimRepository, CouponCodeRepository, CouponRedemptionRepository,
+    LoyaltyMemberAnchorRepository, LoyaltyOrderPointsRepository, LoyaltyPointEntryRepository,
+    LoyaltyProgramRepository, PricingRuleRepository, PromoBundleComponentRepository,
+    PromoBundleGiftRepository, PromoBundleRepository,
 };
 
 use super::promo_ports::{
@@ -75,6 +81,7 @@ pub struct PromoWriteService {
     pub(super) entries: LoyaltyPointEntryRepository,
     pub(super) order_points: LoyaltyOrderPointsRepository,
     pub(super) anchors: LoyaltyMemberAnchorRepository,
+    pub(super) claims: CouponClaimRepository,
 }
 
 impl PromoWriteService {
@@ -89,6 +96,7 @@ impl PromoWriteService {
         let entries = LoyaltyPointEntryRepository::new(pool.clone());
         let order_points = LoyaltyOrderPointsRepository::new(pool.clone());
         let anchors = LoyaltyMemberAnchorRepository::new();
+        let claims = CouponClaimRepository::new();
         Self {
             pool,
             rules,
@@ -101,6 +109,7 @@ impl PromoWriteService {
             entries,
             order_points,
             anchors,
+            claims,
         }
     }
 }

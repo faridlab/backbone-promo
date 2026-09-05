@@ -29,6 +29,8 @@ pub mod promo_cart;
 pub mod promo_coupon;
 pub mod promo_loyalty;
 pub mod promo_loyalty_order;
+// The cart-stage code claims (claim / release / inspect) — same impl-chunk pattern.
+pub mod promo_claim;
 // END CUSTOM
 
 pub use coupon_code_service::CouponCodeService;
@@ -43,14 +45,15 @@ pub use promo_bundle_gift_service::PromoBundleGiftService;
 // <<< CUSTOM
 pub use promo_events::{
     CouponRedeemed, LoggingSink, LoyaltyOrderPointsGranted, LoyaltyOrderPointsReversed,
-    LoyaltyOrderPointsSpent, LoyaltyPointsEarned, LoyaltyPointsRedeemed, PromoEvent,
-    PromoEventSink,
+    LoyaltyOrderPointsSpent, LoyaltyPointsEarned, LoyaltyPointsRedeemed, PromoCodeClaimed,
+    PromoCodeClaimReleased, PromoEvent, PromoEventSink,
 };
 pub use promo_ports::{
-    AccrualRequest, AllocationShare, CartLine, CartQuery, LockResource, OrderAdjustment,
-    OrderPointsGrantOutcome, OrderPointsGrantRequest, OrderPointsReversalOutcome,
-    OrderPointsReversalRequest, OrderPointsSpendOutcome, OrderPointsSpendRequest, PriceQuery,
-    PriceResolverPort, PricingError, RedemptionRequest, ResolvedCart, ResolvedLine, ResolvedPrice,
+    AccrualRequest, AllocationShare, CartLine, CartQuery, CodeClaimView, CouponClaimStatus,
+    LockResource, OrderAdjustment, OrderPointsGrantOutcome, OrderPointsGrantRequest,
+    OrderPointsReversalOutcome, OrderPointsReversalRequest, OrderPointsSpendOutcome,
+    OrderPointsSpendRequest, PriceQuery, PriceResolverPort, PricingError, PromoCodeClaimOutcome,
+    PromoCodeClaimRequest, RedemptionRequest, ResolvedCart, ResolvedLine, ResolvedPrice,
     TaxGroupTotal,
 };
 pub use promo_write_service::{

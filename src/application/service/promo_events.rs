@@ -44,6 +44,32 @@ pub struct LoyaltyPointsRedeemed {
     pub source_id: Uuid,
 }
 
+/// A promo code was claimed onto a cart — the reservation minted under the coupon row lock.
+/// The claim holds the cart's code slot and one unit of usage headroom until it is released or
+/// settled by the burn.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PromoCodeClaimed {
+    pub claim_id: Uuid,
+    pub company_id: Uuid,
+    pub coupon_id: Uuid,
+    pub pricing_rule_id: Uuid,
+    pub cart_ref_type: String,
+    pub cart_ref_id: Uuid,
+    /// The canonical (stored, upper-cased) code the typed string resolved to.
+    pub code: String,
+}
+
+/// A cart's active code claim was released — its headroom unit and cart slot freed (the
+/// shopper removed the code, or the cart was abandoned).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PromoCodeClaimReleased {
+    pub claim_id: Uuid,
+    pub company_id: Uuid,
+    pub coupon_id: Uuid,
+    pub cart_ref_type: String,
+    pub cart_ref_id: Uuid,
+}
+
 /// Points granted for one logical order (the order-flow earn leg). Idempotent per order.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LoyaltyOrderPointsGranted {
@@ -90,6 +116,8 @@ pub struct LoyaltyOrderPointsReversed {
 #[serde(tag = "type")]
 pub enum PromoEvent {
     CouponRedeemed(CouponRedeemed),
+    PromoCodeClaimed(PromoCodeClaimed),
+    PromoCodeClaimReleased(PromoCodeClaimReleased),
     LoyaltyPointsEarned(LoyaltyPointsEarned),
     LoyaltyPointsRedeemed(LoyaltyPointsRedeemed),
     LoyaltyOrderPointsGranted(LoyaltyOrderPointsGranted),

@@ -115,6 +115,7 @@ async fn csseam1_cart_discounts_land_on_a_real_sales_order() {
         customer_id: customer,
         customer_group_id: None,
         coupon_code: None,
+        delivery_carrier_id: None,
         order_date: now().date_naive(),
         delivery_date: None,
         currency: Some("IDR".into()),
@@ -150,6 +151,7 @@ async fn csseam2_no_promo_is_passthrough() {
         customer_id: customer,
         customer_group_id: None,
         coupon_code: None,
+        delivery_carrier_id: None,
         order_date: now().date_naive(),
         delivery_date: None,
         currency: Some("IDR".into()),
@@ -194,7 +196,8 @@ async fn csseam3_free_item_lands_on_the_order() {
     let order = NewCartSalesOrder {
         order_number: format!("SO-FREE-{}", &Uuid::new_v4().to_string()[..8]),
         company_id: company, branch_id: None, customer_id: Uuid::new_v4(), customer_group_id: None,
-        coupon_code: None, order_date: now().date_naive(), delivery_date: None,
+        coupon_code: None, delivery_carrier_id: None,
+        order_date: now().date_naive(), delivery_date: None,
         currency: Some("IDR".into()), tax_rate: Decimal::ZERO, notes: None,
         lines: vec![CartOrderLine { item_id: item_a, item_group_id: None, brand_id: None, revenue_account_id: None, description: None, list_price: dec("100000"), quantity: dec("1") }],
     };

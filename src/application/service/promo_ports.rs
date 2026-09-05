@@ -217,6 +217,86 @@ pub struct RedemptionRequest {
     pub at: chrono::DateTime<chrono::Utc>,
 }
 
+// ---- Cart-stage code claims (the coupon-claim serialization substrate) --------------------------
+//
+// The verbs above burn at COMMIT time (the sale's document). A shopper presenting a code on a
+// cart needs the entitlement adjudicated at CLAIM time: the code resolved server-side from the
+// typed string, usage headroom counted under the coupon row lock (the SAME `FOR UPDATE NOWAIT`
+// the burn takes), one active claim per cart, and the claim state durable + inspectable. The
+// claim never burns — `used_count` advances only at commit — it reserves headroom
+// (`used_count + active claims <= max_use`) so two carts racing the last use of a capped code
+// learn the outcome NOW, not at checkout. Loyalty reward claims ride the EXISTING loyalty verbs
+// (`redeem` / the per-order spend leg): serialized program→member-anchor, bounded by the
+// balance, durable in the ledger — there is deliberately no second loyalty claim path.
+
+/// A request to claim a promo code onto a cart. The only shopper-controlled input is `code` —
+/// the raw typed string, normalized (trimmed, upper-cased) SERVER-side. Everything the claim
+/// rests on (which coupon, which rule, whether it is usable, how much headroom remains) is
+/// derived under the coupon row lock; a request never carries a discount, a rule id, or any
+/// other client-computed claim fact.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PromoCodeClaimRequest {
+    pub company_id: Uuid,
+    /// The claiming document's kind, e.g. `storefront_cart` — the claim grain. Claim and burn
+    /// under the SAME ref: the burn settles the claim automatically.
+    pub cart_ref_type: String,
+    /// The claiming document's id (the caller owns it).
+    pub cart_ref_id: Uuid,
+    /// The code exactly as the shopper typed it. Server-normalized before any lookup.
+    pub code: String,
+    /// The instant claim validity is adjudicated at (the caller's clock, like every `at` here).
+    pub at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Outcome of [`PromoWriteService::claim_promo_code`]. Server-derived facts only — ids and the
+/// canonical code, never amounts (pricing stays a `resolve_cart` read).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PromoCodeClaimOutcome {
+    pub claim_id: Uuid,
+    pub coupon_id: Uuid,
+    pub pricing_rule_id: Uuid,
+    /// The canonical (stored, upper-cased) code — what the typed string resolved to.
+    pub code: String,
+    /// True when this cart had already claimed this same code (idempotent replay — no second
+    /// row, no second unit of headroom consumed).
+    pub already: bool,
+}
+
+/// The lifecycle of one claim row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CouponClaimStatus {
+    /// Holding the cart's code slot and one unit of usage headroom.
+    Claimed,
+    /// Explicitly given up (shopper removed the code, cart abandoned) — headroom freed.
+    Released,
+    /// The claiming document committed; the burn settled this claim.
+    Redeemed,
+}
+
+impl CouponClaimStatus {
+    /// The stored `promo.coupon_claim_status` name.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Claimed => "claimed",
+            Self::Released => "released",
+            Self::Redeemed => "redeemed",
+        }
+    }
+}
+
+/// One claim row in a cart's history — the inspectable claim state.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CodeClaimView {
+    pub claim_id: Uuid,
+    pub coupon_id: Uuid,
+    pub pricing_rule_id: Uuid,
+    /// The canonical (stored) code this row claimed.
+    pub code: String,
+    pub status: CouponClaimStatus,
+    pub claimed_at: chrono::DateTime<chrono::Utc>,
+    pub settled_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 // ---- Per-order loyalty accounting (the order-flow verbs) ---------------------------------------
 //
 // The per-order verbs are the compose surface a host (POS / selling) drives at order confirm,
@@ -339,6 +419,15 @@ pub enum PricingError {
     /// `Retry-After: 1`.
     #[error("lock busy: another transaction holds {resource:?}")]
     LockBusy { resource: LockResource },
+    /// The code claim was refused. Deliberately UNIFORM: unknown, inactive, expired-window,
+    /// exhausted, and cart-occupied all surface as this one variant with no distinguishing
+    /// detail — a public claim route must not become a code-enumeration oracle (a wrong guess
+    /// and a right-but-spent code read identically to the client). A host maps it to ONE
+    /// response for every state; `LockBusy` keeps the standing 409-retry contract beside it
+    /// (contention, not adjudication — it presumes a code that already resolved, and the
+    /// host's single jittered retry answers it before the shopper sees anything).
+    #[error("claim refused")]
+    ClaimRefused,
     #[error("invalid input: {0}")]
     Invalid(String),
 }

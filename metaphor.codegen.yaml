@@ -24,6 +24,9 @@ user_owned:
   # Per-order points ledger: the grant/spend/reverse order verbs. Same impl-chunk pattern
   # as the loyalty/coupon/cart chunks above.
   - "src/application/service/promo_loyalty_order.rs"
+  # Cart-stage code claims: the claim/release/inspect verbs (server-side adjudication,
+  # serialized on the coupon row lock). Same impl-chunk pattern.
+  - "src/application/service/promo_claim.rs"
   # Guarded route composer: wraps the company-scoped entity read surface in company_auth (ADR-0008
   # RLS fence). Hand-authored, mirrors backbone-pos/backbone-inventory guarded_routes.rs.
   - "src/presentation/http/guarded_routes.rs"
@@ -47,6 +50,10 @@ user_owned:
   # The NOWAIT member-balance anchor (speculative insert + FOR UPDATE NOWAIT) and the
   # per-order points ledger rows behind grant/spend/reverse.
   - "src/infrastructure/persistence/loyalty_member_anchor_repository.rs"
+  # The cart-stage coupon claim state: the locked adjudication read, the claim insert
+  # (partial-unique-backed one-active-per-cart), the burn's same-ref settle, the release,
+  # and the inspectable history read.
+  - "src/infrastructure/persistence/coupon_claim_repository.rs"
   - "src/infrastructure/persistence/loyalty_order_points_repository.rs"
   - "src/infrastructure/persistence/loyalty_program_repository.rs"
   - "src/infrastructure/persistence/pricing_rule_repository.rs"
@@ -77,6 +84,16 @@ user_owned:
   - "migrations/20260825100300_loyalty_balance_conservation_trigger.down.sql"
   - "migrations/20260825100400_s7_backstop_checks.up.sql"
   - "migrations/20260825100400_s7_backstop_checks.down.sql"
+  # Hand-written claim-serialization migrations the schema cannot re-derive: the cart-stage
+  # coupon claim table (partial-unique one-active-claim-per-cart, ADR-0014-fenced) and the
+  # case-folded coupon-code uniqueness (UPPER(code) expression index).
+  - "migrations/20260904100000_create_coupon_claims.up.sql"
+  - "migrations/20260904100000_create_coupon_claims.down.sql"
+  - "migrations/20260904100100_coupon_code_case_folded_unique.up.sql"
+  - "migrations/20260904100100_coupon_code_case_folded_unique.down.sql"
+  # Claim-serialization probes (adjudication, uniform refusal, exactly-one-wins concurrency,
+  # release/settle lifecycle, DB-backed uniqueness, NOWAIT lock proof, RLS fence).
+  - "tests/claim_serialization_probes.rs"
   - "tests/cart_pos_seam.rs"
   - "tests/cart_resolution.rs"
   - "tests/cart_selling_seam.rs"

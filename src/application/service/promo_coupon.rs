@@ -68,6 +68,17 @@ impl PromoWriteService {
             .claim(&mut tx, company_id, coupon_id, source_type, source_id)
             .await?;
 
+        // Settle the cart-stage claim minted under THIS document ref (the claim-and-burn-under-
+        // the-same-ref contract): claimed → redeemed, inside this transaction, so the flip is
+        // atomic with the burn. Idempotent by its `status = 'claimed'` guard — a replayed burn
+        // finds nothing to settle, and a burn with no prior claim (the plain selling path)
+        // touches zero rows. On the exhausted refusal below, the rolled-back transaction
+        // discards this settle with everything else. `settled_at` is the database clock: the
+        // burn verb takes no caller instant, and the commit instant IS the settle instant.
+        self.claims
+            .settle_redeemed(&mut tx, company_id, coupon_id, source_type, source_id)
+            .await?;
+
         let rule_id: Uuid = match claimed {
             // Fresh source: advance the counter, bounded. Exhausted → roll back the ledger claim.
             Some(rule_id) => {
