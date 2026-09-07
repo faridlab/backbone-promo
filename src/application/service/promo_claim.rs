@@ -203,10 +203,16 @@ impl PromoWriteService {
         tx.commit().await?;
         if let Some(claim_id) = released {
             // The coupon id rides the event so consumers can recompute headroom without a join.
-            let coupon_id = self
-                .claims
-                .coupon_of_claim(&self.pool, company_id, claim_id)
-                .await?;
+            // The read runs inside a company scope: the claims table is RLS-fenced, the pool
+            // carries no company binding on the public cart path, and the scoped-execute
+            // helper only fences when a scope is present — without this wrap the lookup runs
+            // raw, sees zero rows, and the release surfaces as a refusal.
+            let coupon_id = company_scope::with_company_scope(
+                Some(company_id),
+                self.claims
+                    .coupon_of_claim(&self.pool, company_id, claim_id),
+            )
+            .await?;
             sink.publish(&PromoEvent::PromoCodeClaimReleased(PromoCodeClaimReleased {
                 claim_id,
                 company_id,
