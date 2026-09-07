@@ -17,6 +17,7 @@
 //! Per the module's 4-layer rule the SQL lives here; the claim verbs in
 //! `application/service/promo_claim.rs` orchestrate.
 
+use backbone_orm::company_scope;
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -247,25 +248,30 @@ impl CouponClaimRepository {
     }
 
     /// The coupon a claim row holds — the released event's join-free coupon reference.
-    /// Company scoping is the caller's (`with_company_scope`).
+    /// Rides the scoped-execute helper so the read is fenced to the caller's company
+    /// scope (`with_company_scope` at the verb) — a bare pool fetch sees zero rows
+    /// on an RLS-fenced table when the connecting role carries no company binding.
     pub async fn coupon_of_claim(
         &self,
         pool: &sqlx::PgPool,
         company_id: Uuid,
         claim_id: Uuid,
     ) -> Result<Uuid, sqlx::Error> {
-        sqlx::query_scalar(
-            r#"SELECT coupon_id FROM promo.coupon_claims
-               WHERE company_id = $1 AND id = $2"#,
+        company_scope::fetch_one_scalar_scoped(
+            pool,
+            sqlx::query_scalar(
+                r#"SELECT coupon_id FROM promo.coupon_claims
+                   WHERE company_id = $1 AND id = $2"#,
+            )
+            .bind(company_id)
+            .bind(claim_id),
         )
-        .bind(company_id)
-        .bind(claim_id)
-        .fetch_one(pool)
         .await
     }
 
-    /// The cart's claim history (every status) — the inspectable state. Company
-    /// scoping is the caller's (`with_company_scope`), mirroring `find_usable`.
+    /// The cart's claim history (every status) — the inspectable state. Rides the
+    /// scoped-execute helper so the read is fenced to the caller's company scope
+    /// (`with_company_scope` at the verb), mirroring `find_usable`.
     pub async fn list_for_cart(
         &self,
         pool: &sqlx::PgPool,
@@ -273,17 +279,19 @@ impl CouponClaimRepository {
         cart_ref_type: &str,
         cart_ref_id: Uuid,
     ) -> Result<Vec<CouponClaimRow>, sqlx::Error> {
-        let rows = sqlx::query(
-            r#"SELECT id, coupon_id, pricing_rule_id, code, status::text AS status,
-                      claimed_at, settled_at
-               FROM promo.coupon_claims
-               WHERE company_id = $1 AND cart_ref_type = $2 AND cart_ref_id = $3
-               ORDER BY claimed_at"#,
+        let rows = company_scope::fetch_all_rows_scoped(
+            pool,
+            sqlx::query(
+                r#"SELECT id, coupon_id, pricing_rule_id, code, status::text AS status,
+                          claimed_at, settled_at
+                   FROM promo.coupon_claims
+                   WHERE company_id = $1 AND cart_ref_type = $2 AND cart_ref_id = $3
+                   ORDER BY claimed_at"#,
+            )
+            .bind(company_id)
+            .bind(cart_ref_type)
+            .bind(cart_ref_id),
         )
-        .bind(company_id)
-        .bind(cart_ref_type)
-        .bind(cart_ref_id)
-        .fetch_all(pool)
         .await?;
         Ok(rows
             .into_iter()
