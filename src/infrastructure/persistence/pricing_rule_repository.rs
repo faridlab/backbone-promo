@@ -12,7 +12,11 @@ use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
+// The typed multi-row read twins live only in the legacy `company_scope` module. Their
+// connection discipline is what this repository needs — request-dedicated connection when
+// the composing service bound one, plain pool otherwise. The helper's legacy task-local
+// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
+use backbone_orm::company_scope::fetch_all_rows_scoped;
 
 use crate::domain::entity::PricingRule;
 
@@ -41,7 +45,6 @@ impl PricingRuleRepository {
 
 /// The dimensions a line-scope rule search filters on. Mirrors the query's bind list, not an entity.
 pub struct LineRuleQuery {
-    pub company_id: Uuid,
     pub at: chrono::DateTime<chrono::Utc>,
     pub item_id: Uuid,
     pub item_group_id: Option<Uuid>,
@@ -92,15 +95,14 @@ impl PricingRuleRepository {
     /// Structural `scope=line` candidates: active, in-window, selector + audience + qty/amount all
     /// match.
     ///
-    /// RLS scope (ADR-0008): the query carries its company — the caller wraps this in
-    /// `with_company_scope(Some(company_id))` so it is fenced on `app.company_id` even off the request
-    /// path. The explicit `company_id = $1` filter stays as defense-in-depth.
+    /// Tenant-agnostic (ADR-0029): the module ships no row fence — row scoping is the composing
+    /// service's tenancy decorator.
     pub async fn find_line_candidates(
         &self,
         pool: &PgPool,
         q: &LineRuleQuery,
     ) -> Result<Vec<LineRuleRow>, sqlx::Error> {
-        let rows = company_scope::fetch_all_rows_scoped(
+        let rows = fetch_all_rows_scoped(
             pool,
             sqlx::query(
                 r#"
@@ -108,26 +110,24 @@ impl PricingRuleRepository {
                        coupon_required, rate_or_discount::text AS rate_or_discount,
                        rate, discount_percentage, discount_amount, discount_upto, valid_from
                 FROM promo.pricing_rules
-                WHERE company_id = $1
-                  AND status = 'active'
+                WHERE status = 'active'
                   AND scope = 'line'
                   AND (metadata->>'deleted_at') IS NULL
-                  AND valid_from <= $2
-                  AND (valid_to IS NULL OR valid_to >= $2)
+                  AND valid_from <= $1
+                  AND (valid_to IS NULL OR valid_to >= $1)
                   AND (
                         apply_on = 'all'
-                     OR (apply_on = 'item'       AND item_id = $3)
-                     OR (apply_on = 'item_group' AND item_group_id = $4)
-                     OR (apply_on = 'brand'      AND brand_id = $5)
+                     OR (apply_on = 'item'       AND item_id = $2)
+                     OR (apply_on = 'item_group' AND item_group_id = $3)
+                     OR (apply_on = 'brand'      AND brand_id = $4)
                   )
-                  AND (customer_id IS NULL OR customer_id = $6)
-                  AND (customer_group_id IS NULL OR customer_group_id = $7)
-                  AND min_qty <= $8
-                  AND (max_qty IS NULL OR max_qty >= $8)
-                  AND min_amount <= $9
+                  AND (customer_id IS NULL OR customer_id = $5)
+                  AND (customer_group_id IS NULL OR customer_group_id = $6)
+                  AND min_qty <= $7
+                  AND (max_qty IS NULL OR max_qty >= $7)
+                  AND min_amount <= $8
                 "#,
             )
-            .bind(q.company_id)
             .bind(q.at)
             .bind(q.item_id)
             .bind(q.item_group_id)
@@ -158,19 +158,19 @@ impl PricingRuleRepository {
     }
 
     /// Structural `scope=order` candidates: active, in-window, audience matches, and the cart's
-    /// subtotal clears the rule's `min_order_amount` floor. Same caller-supplied scope +
-    /// defense-in-depth `company_id = $1` as [`Self::find_line_candidates`].
+    /// subtotal clears the rule's `min_order_amount` floor. Same structural-filters-only contract
+    /// as [`Self::find_line_candidates`]; rows are scoped by the composing service's tenancy
+    /// decorator (ADR-0029).
     pub async fn find_order_candidates(
         &self,
         pool: &PgPool,
-        company_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
         customer_id: Option<Uuid>,
         customer_group_id: Option<Uuid>,
         subtotal: Decimal,
         total_qty: Decimal,
     ) -> Result<Vec<OrderRuleRow>, sqlx::Error> {
-        let rows = company_scope::fetch_all_rows_scoped(
+        let rows = fetch_all_rows_scoped(
             pool,
             sqlx::query(
                 r#"
@@ -178,19 +178,17 @@ impl PricingRuleRepository {
                        rate_or_discount::text AS rate_or_discount,
                        discount_percentage, discount_amount, discount_upto, stackable, valid_from
                 FROM promo.pricing_rules
-                WHERE company_id = $1
-                  AND status = 'active'
+                WHERE status = 'active'
                   AND scope = 'order'
                   AND (metadata->>'deleted_at') IS NULL
-                  AND valid_from <= $2
-                  AND (valid_to IS NULL OR valid_to >= $2)
-                  AND (customer_id IS NULL OR customer_id = $3)
-                  AND (customer_group_id IS NULL OR customer_group_id = $4)
-                  AND min_order_amount <= $5
-                  AND (min_order_qty IS NULL OR min_order_qty <= $6)
+                  AND valid_from <= $1
+                  AND (valid_to IS NULL OR valid_to >= $1)
+                  AND (customer_id IS NULL OR customer_id = $2)
+                  AND (customer_group_id IS NULL OR customer_group_id = $3)
+                  AND min_order_amount <= $4
+                  AND (min_order_qty IS NULL OR min_order_qty <= $5)
                 "#,
             )
-            .bind(company_id)
             .bind(at)
             .bind(customer_id)
             .bind(customer_group_id)

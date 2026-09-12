@@ -49,7 +49,6 @@ impl From<CouponCodeId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CouponCodeDto {
     pub id: CouponCodeId,
-    pub company_id: Uuid,
     pub code: String,
     pub pricing_rule_id: Uuid,
     pub description: Option<String>,
@@ -112,7 +111,6 @@ impl From<CouponRedemptionId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CouponRedemptionDto {
     pub id: CouponRedemptionId,
-    pub company_id: Uuid,
     pub coupon_id: Uuid,
     pub pricing_rule_id: Uuid,
     pub source_type: String,
@@ -171,7 +169,6 @@ impl From<LoyaltyOrderPointsId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoyaltyOrderPointsDto {
     pub id: LoyaltyOrderPointsId,
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: String,
@@ -237,7 +234,6 @@ impl From<LoyaltyProgramId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoyaltyProgramDto {
     pub id: LoyaltyProgramId,
-    pub company_id: Uuid,
     pub program_name: String,
     pub program_type: LoyaltyProgramType,
     pub collection_factor: Decimal,
@@ -301,7 +297,6 @@ impl From<LoyaltyPointEntryId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoyaltyPointEntryDto {
     pub id: LoyaltyPointEntryId,
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub entry_type: LoyaltyEntryType,
@@ -364,7 +359,6 @@ impl From<PricingRuleId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PricingRuleDto {
     pub id: PricingRuleId,
-    pub company_id: Uuid,
     pub title: String,
     pub priority: i32,
     pub scope: RuleScope,
@@ -445,7 +439,6 @@ impl From<PromoBundleId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromoBundleDto {
     pub id: PromoBundleId,
-    pub company_id: Uuid,
     pub title: String,
     pub priority: i32,
     pub match_type: BundleMatch,
@@ -516,7 +509,6 @@ impl From<PromoBundleComponentId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromoBundleComponentDto {
     pub id: PromoBundleComponentId,
-    pub company_id: Uuid,
     pub bundle_id: Uuid,
     pub apply_on: ApplyOn,
     pub item_id: Option<Uuid>,
@@ -576,7 +568,6 @@ impl From<PromoBundleGiftId> for Uuid {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromoBundleGiftDto {
     pub id: PromoBundleGiftId,
-    pub company_id: Uuid,
     pub bundle_id: Uuid,
     pub gift_item_id: Uuid,
     pub gift_qty: Decimal,

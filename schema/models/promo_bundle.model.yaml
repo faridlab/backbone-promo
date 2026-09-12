@@ -21,10 +21,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique bundle id"
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Books owner # logical FK to organization.Company.id"
       title:
         type: string
         attributes: ["@required", "@max(140)"]
@@ -102,10 +98,6 @@ models:
 
     indexes:
       - type: index
-        fields: [company_id, status]
-      - type: index
-        fields: [company_id, priority]
-      - type: index
         fields: [valid_from, valid_to]
 
   - name: PromoBundleComponent
@@ -117,10 +109,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique component id"
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Books owner # logical FK to organization.Company.id"
       bundle_id:
         type: uuid
         attributes: ["@required", "@foreign_key(PromoBundle.id)"]
@@ -156,8 +144,6 @@ models:
     indexes:
       - type: index
         fields: [bundle_id]
-      - type: index
-        fields: [company_id, bundle_id]
 
   - name: PromoBundleGift
     collection: promo_bundle_gifts
@@ -168,10 +154,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique gift id"
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Books owner # logical FK to organization.Company.id"
       bundle_id:
         type: uuid
         attributes: ["@required", "@foreign_key(PromoBundle.id)"]
@@ -195,8 +177,6 @@ models:
     indexes:
       - type: index
         fields: [bundle_id]
-      - type: index
-        fields: [company_id, bundle_id]
 
 enums:
   - name: PromoBundleStatus

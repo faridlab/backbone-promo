@@ -19,10 +19,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique rule id"
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Books owner # logical FK to organization.Company.id"
       title:
         type: string
         attributes: ["@required", "@max(140)"]
@@ -140,12 +136,6 @@ models:
         description: "Audit metadata"
 
     indexes:
-      - type: index
-        fields: [company_id, status, apply_on]
-      - type: index
-        fields: [company_id, item_id, status]
-      - type: index
-        fields: [company_id, priority]
       - type: index
         fields: [valid_from, valid_to]
 

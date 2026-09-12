@@ -12,7 +12,11 @@ use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
+// The typed multi-row read twins live only in the legacy `company_scope` module. Their
+// connection discipline is what this repository needs — request-dedicated connection when
+// the composing service bound one, plain pool otherwise. The helper's legacy task-local
+// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
+use backbone_orm::company_scope::fetch_optional_row_scoped;
 
 use crate::domain::entity::CouponCode;
 
@@ -48,32 +52,28 @@ impl CouponCodeRepository {
     /// Side-effect-free: previewing a price must never consume a use — the burn is
     /// [`CouponRedemptionRepository::claim`] + [`Self::bump_used_count`], inside a transaction.
     ///
-    /// RLS scope (ADR-0008): company on the parameter — the caller wraps this in
-    /// `with_company_scope(Some(company_id))`. The explicit `company_id = $1` stays as
-    /// defense-in-depth. The code is expected already upper-cased by the caller.
+    /// Tenant-agnostic (ADR-0029): the module ships no row fence — row scoping is the composing
+    /// service's tenancy decorator. The code is expected already upper-cased by the caller.
     pub async fn find_usable(
         &self,
         pool: &PgPool,
-        company_id: Uuid,
         code: &str,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<(Uuid, Uuid)>, sqlx::Error> {
-        let row = company_scope::fetch_optional_row_scoped(
+        let row = fetch_optional_row_scoped(
             pool,
             sqlx::query(
                 r#"
                 SELECT id, pricing_rule_id
                 FROM promo.coupon_codes
-                WHERE company_id = $1
-                  AND code = $2
+                WHERE code = $1
                   AND status = 'active'
                   AND (metadata->>'deleted_at') IS NULL
-                  AND valid_from <= $3
-                  AND (valid_upto IS NULL OR valid_upto >= $3)
+                  AND valid_from <= $2
+                  AND (valid_upto IS NULL OR valid_upto >= $2)
                   AND (max_use IS NULL OR used_count < max_use)
                 "#,
             )
-            .bind(company_id)
             .bind(code)
             .bind(at),
         )
@@ -88,30 +88,27 @@ impl CouponCodeRepository {
     /// the guarded [`Self::bump_used_count`] remains the correctness bound on `max_use` (an UPDATE
     /// cannot take NOWAIT itself).
     ///
-    /// `Ok(false)` = no row matched (unknown id, wrong company, inactive, or soft-deleted) — the
-    /// caller proceeds and the guarded bump refuses, preserving the pre-existing typed outcome
-    /// (`CouponExhausted`) for those shapes.
+    /// `Ok(false)` = no row matched (unknown id, inactive, soft-deleted, or outside the caller's
+    /// scope) — the caller proceeds and the guarded bump refuses, preserving the pre-existing typed
+    /// outcome (`CouponExhausted`) for those shapes.
     ///
     /// Takes the CALLER'S connection so this, the ledger claim, and the counter bump commit as one
-    /// unit. The caller has already bound the company on it (`bind_company_on`) — don't re-bind here.
+    /// unit.
     pub async fn lock_for_burn(
         &self,
         conn: &mut sqlx::PgConnection,
         coupon_id: Uuid,
-        company_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let row = sqlx::query(
             r#"
             SELECT id FROM promo.coupon_codes
             WHERE id = $1
-              AND company_id = $2
               AND status = 'active'
               AND (metadata->>'deleted_at') IS NULL
             FOR UPDATE NOWAIT
             "#,
         )
         .bind(coupon_id)
-        .bind(company_id)
         .fetch_optional(conn)
         .await?;
         Ok(row.is_some())
@@ -121,21 +118,17 @@ impl CouponCodeRepository {
     /// over-redemption impossible under concurrency. `Ok(None)` = no use remained (or the coupon is
     /// inactive), and the caller must roll its transaction back.
     ///
-    /// Takes the CALLER'S connection so this and the redemption-ledger claim commit as one unit. The
-    /// caller has already bound the company on it (`bind_company_on`) — don't re-bind here. The
-    /// explicit `company_id = $2` stays as defense-in-depth.
+    /// Takes the CALLER'S connection so this and the redemption-ledger claim commit as one unit.
     pub async fn bump_used_count(
         &self,
         conn: &mut sqlx::PgConnection,
         coupon_id: Uuid,
-        company_id: Uuid,
     ) -> Result<Option<Uuid>, sqlx::Error> {
         let row = sqlx::query(
             r#"
             UPDATE promo.coupon_codes
             SET used_count = used_count + 1
             WHERE id = $1
-              AND company_id = $2
               AND status = 'active'
               AND (metadata->>'deleted_at') IS NULL
               AND (max_use IS NULL OR used_count < max_use)
@@ -143,7 +136,6 @@ impl CouponCodeRepository {
             "#,
         )
         .bind(coupon_id)
-        .bind(company_id)
         .fetch_optional(conn)
         .await?;
         Ok(row.map(|r| r.get("pricing_rule_id")))

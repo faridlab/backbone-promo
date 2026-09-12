@@ -10,14 +10,20 @@
 //! Unit-shaped on purpose: the mutating statements run on the CALLER'S
 //! transaction (the claim serializes on the coupon row the caller locked first;
 //! the settle runs inside the burn's transaction), and the inspecting read takes
-//! the pool as a parameter — the `find_usable` precedent. The table is
-//! RLS-fenced (ADR-0014 strict), so every tx method rides the caller's
-//! already-bound connection and the read is company-scoped by the caller.
+//! the pool as a parameter — the `find_usable` precedent. Every statement here is
+//! tenant-agnostic: the module ships no row fence of its own, and row isolation
+//! is the COMPOSING service's tenancy decorator (ADR-0029). The pool reads ride
+//! the scoped-read helpers, which take the request-dedicated connection when the
+//! composing service bound one and the plain pool otherwise.
 //!
 //! Per the module's 4-layer rule the SQL lives here; the claim verbs in
 //! `application/service/promo_claim.rs` orchestrate.
 
-use backbone_orm::company_scope;
+// The typed multi-row read twins live only in the legacy `company_scope` module. Their
+// connection discipline is what this repository needs — request-dedicated connection when
+// the composing service bound one, plain pool otherwise. The helper's legacy task-local
+// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
+use backbone_orm::company_scope::{fetch_all_rows_scoped, fetch_one_scalar_scoped};
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -71,7 +77,7 @@ impl CouponClaimRepository {
     /// The row's `used_count` / `max_use` are read UNDER the lock, so the
     /// headroom decision below is raced by nobody.
     ///
-    /// `Ok(None)` = no row matched (unknown code, wrong company, inactive,
+    /// `Ok(None)` = no row matched (unknown code, inactive,
     /// soft-deleted, out of window, or already exhausted at rest) — the caller
     /// refuses uniformly without distinguishing the cause. A lock loss surfaces
     /// as SQLSTATE 55P03; the service maps that one code to
@@ -79,7 +85,6 @@ impl CouponClaimRepository {
     pub async fn lock_claimable(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         code: &str,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<ClaimableCouponRow>, sqlx::Error> {
@@ -87,17 +92,15 @@ impl CouponClaimRepository {
             r#"
             SELECT id, pricing_rule_id, code, used_count, max_use
             FROM promo.coupon_codes
-            WHERE company_id = $1
-              AND code = $2
+            WHERE code = $1
               AND status = 'active'
               AND (metadata->>'deleted_at') IS NULL
-              AND valid_from <= $3
-              AND (valid_upto IS NULL OR valid_upto >= $3)
+              AND valid_from <= $2
+              AND (valid_upto IS NULL OR valid_upto >= $2)
               AND (max_use IS NULL OR used_count < max_use)
             FOR UPDATE NOWAIT
             "#,
         )
-        .bind(company_id)
         .bind(code)
         .bind(at)
         .fetch_optional(&mut *conn)
@@ -117,14 +120,12 @@ impl CouponClaimRepository {
     pub async fn count_active_for_coupon(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         coupon_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM promo.coupon_claims
-               WHERE company_id = $1 AND coupon_id = $2 AND status = 'claimed'"#,
+               WHERE coupon_id = $1 AND status = 'claimed'"#,
         )
-        .bind(company_id)
         .bind(coupon_id)
         .fetch_one(&mut *conn)
         .await
@@ -137,17 +138,15 @@ impl CouponClaimRepository {
     pub async fn find_active_for_cart(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         cart_ref_type: &str,
         cart_ref_id: Uuid,
     ) -> Result<Option<ActiveClaimRow>, sqlx::Error> {
         let row = sqlx::query(
             r#"SELECT id, coupon_id, pricing_rule_id, code
                FROM promo.coupon_claims
-               WHERE company_id = $1 AND cart_ref_type = $2 AND cart_ref_id = $3
+               WHERE cart_ref_type = $1 AND cart_ref_id = $2
                  AND status = 'claimed'"#,
         )
-        .bind(company_id)
         .bind(cart_ref_type)
         .bind(cart_ref_id)
         .fetch_optional(&mut *conn)
@@ -166,7 +165,6 @@ impl CouponClaimRepository {
     pub async fn insert_claim(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         cart_ref_type: &str,
         cart_ref_id: Uuid,
         coupon: &ClaimableCouponRow,
@@ -174,12 +172,11 @@ impl CouponClaimRepository {
     ) -> Result<Uuid, sqlx::Error> {
         let id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO promo.coupon_claims
-                   (company_id, cart_ref_type, cart_ref_id, coupon_id, code,
+                   (cart_ref_type, cart_ref_id, coupon_id, code,
                     pricing_rule_id, status, claimed_at)
-               VALUES ($1, $2, $3, $4, $5, $6, 'claimed', $7)
+               VALUES ($1, $2, $3, $4, $5, 'claimed', $6)
                RETURNING id"#,
         )
-        .bind(company_id)
         .bind(cart_ref_type)
         .bind(cart_ref_id)
         .bind(coupon.coupon_id)
@@ -197,19 +194,17 @@ impl CouponClaimRepository {
     pub async fn release_for_cart(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         cart_ref_type: &str,
         cart_ref_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
             r#"UPDATE promo.coupon_claims
-               SET status = 'released', settled_at = $4
-               WHERE company_id = $1 AND cart_ref_type = $2 AND cart_ref_id = $3
+               SET status = 'released', settled_at = $3
+               WHERE cart_ref_type = $1 AND cart_ref_id = $2
                  AND status = 'claimed'
                RETURNING id"#,
         )
-        .bind(company_id)
         .bind(cart_ref_type)
         .bind(cart_ref_id)
         .bind(at)
@@ -226,7 +221,6 @@ impl CouponClaimRepository {
     pub async fn settle_redeemed(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         coupon_id: Uuid,
         cart_ref_type: &str,
         cart_ref_id: Uuid,
@@ -234,11 +228,10 @@ impl CouponClaimRepository {
         let res = sqlx::query(
             r#"UPDATE promo.coupon_claims
                SET status = 'redeemed', settled_at = NOW()
-               WHERE company_id = $1 AND coupon_id = $2
-                 AND cart_ref_type = $3 AND cart_ref_id = $4
+               WHERE coupon_id = $1
+                 AND cart_ref_type = $2 AND cart_ref_id = $3
                  AND status = 'claimed'"#,
         )
-        .bind(company_id)
         .bind(coupon_id)
         .bind(cart_ref_type)
         .bind(cart_ref_id)
@@ -248,47 +241,44 @@ impl CouponClaimRepository {
     }
 
     /// The coupon a claim row holds — the released event's join-free coupon reference.
-    /// Rides the scoped-execute helper so the read is fenced to the caller's company
-    /// scope (`with_company_scope` at the verb) — a bare pool fetch sees zero rows
-    /// on an RLS-fenced table when the connecting role carries no company binding.
+    /// Rides the scoped-read helper: request-dedicated connection when the composing
+    /// service bound one, plain pool otherwise; row scoping is the composing service's
+    /// tenancy decorator (ADR-0029).
     pub async fn coupon_of_claim(
         &self,
         pool: &sqlx::PgPool,
-        company_id: Uuid,
         claim_id: Uuid,
     ) -> Result<Uuid, sqlx::Error> {
-        company_scope::fetch_one_scalar_scoped(
+        fetch_one_scalar_scoped(
             pool,
             sqlx::query_scalar(
                 r#"SELECT coupon_id FROM promo.coupon_claims
-                   WHERE company_id = $1 AND id = $2"#,
+                   WHERE id = $1"#,
             )
-            .bind(company_id)
             .bind(claim_id),
         )
         .await
     }
 
     /// The cart's claim history (every status) — the inspectable state. Rides the
-    /// scoped-execute helper so the read is fenced to the caller's company scope
-    /// (`with_company_scope` at the verb), mirroring `find_usable`.
+    /// scoped-read helper — request-dedicated connection when the composing service
+    /// bound one, plain pool otherwise; row scoping is the composing service's
+    /// tenancy decorator (ADR-0029) — mirroring `find_usable`.
     pub async fn list_for_cart(
         &self,
         pool: &sqlx::PgPool,
-        company_id: Uuid,
         cart_ref_type: &str,
         cart_ref_id: Uuid,
     ) -> Result<Vec<CouponClaimRow>, sqlx::Error> {
-        let rows = company_scope::fetch_all_rows_scoped(
+        let rows = fetch_all_rows_scoped(
             pool,
             sqlx::query(
                 r#"SELECT id, coupon_id, pricing_rule_id, code, status::text AS status,
                           claimed_at, settled_at
                    FROM promo.coupon_claims
-                   WHERE company_id = $1 AND cart_ref_type = $2 AND cart_ref_id = $3
+                   WHERE cart_ref_type = $1 AND cart_ref_id = $2
                    ORDER BY claimed_at"#,
             )
-            .bind(company_id)
             .bind(cart_ref_type)
             .bind(cart_ref_id),
         )

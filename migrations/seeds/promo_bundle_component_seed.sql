@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.promo_bundle_components (
 --     id,
---     company_id,
 --     bundle_id,
 --     apply_on,
 --     item_id,

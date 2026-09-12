@@ -49,7 +49,6 @@ impl std::ops::Deref for PromoBundleGiftId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PromoBundleGift {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub bundle_id: Uuid,
     pub gift_item_id: Uuid,
     pub gift_qty: Decimal,
@@ -65,10 +64,9 @@ impl PromoBundleGift {
     }
 
     /// Create a new PromoBundleGift with required fields
-    pub fn new(company_id: Uuid, bundle_id: Uuid, gift_item_id: Uuid, gift_qty: Decimal) -> Self {
+    pub fn new(bundle_id: Uuid, gift_item_id: Uuid, gift_qty: Decimal) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             bundle_id,
             gift_item_id,
             gift_qty,
@@ -135,9 +133,6 @@ impl PromoBundleGift {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "bundle_id" => {
                     if let Ok(v) = serde_json::from_value(value) { self.bundle_id = v; }
                 }
@@ -201,16 +196,12 @@ impl backbone_orm::EntityRepoMeta for PromoBundleGift {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("bundle_id".to_string(), "uuid".to_string());
         m.insert("gift_item_id".to_string(), "uuid".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
         &[]
-    }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
     }
 }
 
@@ -220,19 +211,12 @@ impl backbone_orm::EntityRepoMeta for PromoBundleGift {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct PromoBundleGiftBuilder {
-    company_id: Option<Uuid>,
     bundle_id: Option<Uuid>,
     gift_item_id: Option<Uuid>,
     gift_qty: Option<Decimal>,
 }
 
 impl PromoBundleGiftBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the bundle_id field (required)
     pub fn bundle_id(mut self, value: Uuid) -> Self {
         self.bundle_id = Some(value);
@@ -255,13 +239,11 @@ impl PromoBundleGiftBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<PromoBundleGift, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let bundle_id = self.bundle_id.ok_or_else(|| "bundle_id is required".to_string())?;
         let gift_item_id = self.gift_item_id.ok_or_else(|| "gift_item_id is required".to_string())?;
 
         Ok(PromoBundleGift {
             id: Uuid::new_v4(),
-            company_id,
             bundle_id,
             gift_item_id,
             gift_qty: self.gift_qty.unwrap_or(Decimal::from(1)),

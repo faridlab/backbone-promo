@@ -54,7 +54,6 @@ impl std::ops::Deref for PricingRuleId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PricingRule {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub title: String,
     pub priority: i32,
     pub scope: RuleScope,
@@ -92,10 +91,9 @@ impl PricingRule {
     }
 
     /// Create a new PricingRule with required fields
-    pub fn new(company_id: Uuid, title: String, priority: i32, scope: RuleScope, min_order_amount: Decimal, stackable: bool, apply_on: ApplyOn, min_qty: Decimal, min_amount: Decimal, rate_or_discount: RateOrDiscount, currency: String, valid_from: DateTime<Utc>, coupon_required: bool, status: PricingRuleStatus) -> Self {
+    pub fn new(title: String, priority: i32, scope: RuleScope, min_order_amount: Decimal, stackable: bool, apply_on: ApplyOn, min_qty: Decimal, min_amount: Decimal, rate_or_discount: RateOrDiscount, currency: String, valid_from: DateTime<Utc>, coupon_required: bool, status: PricingRuleStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             title,
             priority,
             scope,
@@ -265,9 +263,6 @@ impl PricingRule {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "title" => {
                     if let Ok(v) = serde_json::from_value(value) { self.title = v; }
                 }
@@ -397,7 +392,6 @@ impl backbone_orm::EntityRepoMeta for PricingRule {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("item_id".to_string(), "uuid".to_string());
         m.insert("item_group_id".to_string(), "uuid".to_string());
         m.insert("brand_id".to_string(), "uuid".to_string());
@@ -412,9 +406,6 @@ impl backbone_orm::EntityRepoMeta for PricingRule {
     fn search_fields() -> &'static [&'static str] {
         &["title", "currency"]
     }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
-    }
 }
 
 /// Builder for PricingRule entity
@@ -423,7 +414,6 @@ impl backbone_orm::EntityRepoMeta for PricingRule {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct PricingRuleBuilder {
-    company_id: Option<Uuid>,
     title: Option<String>,
     priority: Option<i32>,
     scope: Option<RuleScope>,
@@ -452,12 +442,6 @@ pub struct PricingRuleBuilder {
 }
 
 impl PricingRuleBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the title field (required)
     pub fn title(mut self, value: String) -> Self {
         self.title = Some(value);
@@ -612,13 +596,11 @@ impl PricingRuleBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<PricingRule, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let title = self.title.ok_or_else(|| "title is required".to_string())?;
         let valid_from = self.valid_from.ok_or_else(|| "valid_from is required".to_string())?;
 
         Ok(PricingRule {
             id: Uuid::new_v4(),
-            company_id,
             title,
             priority: self.priority.unwrap_or(0),
             scope: self.scope.unwrap_or_default(),

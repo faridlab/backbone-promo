@@ -12,8 +12,6 @@ use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
-
 use crate::domain::entity::CouponRedemption;
 
 /// Table name for CouponRedemption entities
@@ -42,36 +40,51 @@ impl CouponRedemptionRepository {
 /// Hand-written CouponRedemption SQL. Lives here (not in the write service) per the module's 4-layer
 /// rule: services orchestrate and own the unit of work, repositories hold the SQL.
 impl CouponRedemptionRepository {
-    /// Claim the (company, coupon, source_type, source_id) redemption slot exactly once, selecting the
+    /// Claim the (coupon, source_type, source_id) redemption slot exactly once, selecting the
     /// coupon's own `pricing_rule_id` into the ledger row. `Ok(None)` = this source already redeemed (a
     /// replay), and the caller must NOT burn a second use — it re-reads via [`Self::find_existing`].
     ///
+    /// Arbitration is SELECT-first: the module's own chain no longer carries the
+    /// one-redemption-per-source unique (the composing service's decorator re-declares it
+    /// org-scoped, ADR-0029), so an insert-conflict cannot be the gate on an undecorated
+    /// database. The caller's NOWAIT coupon-row lock serializes writers for one coupon; the
+    /// read decides replay vs fresh, and the insert's untargeted `ON CONFLICT DO NOTHING`
+    /// stays as the decorated-database belt (the decorator's unique is unnamed-able by the
+    /// module — no conflict target).
+    ///
     /// Takes the CALLER'S connection so this and the guarded counter bump commit as one unit (an
-    /// exhausted coupon rolls the claim back). The caller has already bound the company on it
-    /// (`bind_company_on`) — don't re-bind here. The explicit `c.company_id = $1` stays as
-    /// defense-in-depth.
+    /// exhausted coupon rolls the claim back).
     pub async fn claim(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         coupon_id: Uuid,
         source_type: &str,
         source_id: Uuid,
     ) -> Result<Option<Uuid>, sqlx::Error> {
+        let existing = sqlx::query_scalar::<_, Uuid>(
+            r#"SELECT pricing_rule_id FROM promo.coupon_redemptions
+               WHERE coupon_id = $1 AND source_type = $2 AND source_id = $3
+                 AND (metadata->>'deleted_at') IS NULL"#,
+        )
+        .bind(coupon_id)
+        .bind(source_type)
+        .bind(source_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if existing.is_some() {
+            return Ok(None);
+        }
         let row = sqlx::query(
             r#"
-            INSERT INTO promo.coupon_redemptions (company_id, coupon_id, pricing_rule_id,
+            INSERT INTO promo.coupon_redemptions (coupon_id, pricing_rule_id,
                 source_type, source_id)
-            SELECT $1, $2, c.pricing_rule_id, $3, $4
+            SELECT $1, c.pricing_rule_id, $2, $3
             FROM promo.coupon_codes c
-            WHERE c.id = $2 AND c.company_id = $1
-            ON CONFLICT (company_id, coupon_id, source_type, source_id)
-                WHERE (metadata->>'deleted_at') IS NULL
-            DO NOTHING
+            WHERE c.id = $1
+            ON CONFLICT DO NOTHING
             RETURNING pricing_rule_id
             "#,
         )
-        .bind(company_id)
         .bind(coupon_id)
         .bind(source_type)
         .bind(source_id)
@@ -86,17 +99,15 @@ impl CouponRedemptionRepository {
     pub async fn find_existing(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         coupon_id: Uuid,
         source_type: &str,
         source_id: Uuid,
     ) -> Result<Uuid, sqlx::Error> {
         sqlx::query_scalar(
             r#"SELECT pricing_rule_id FROM promo.coupon_redemptions
-               WHERE company_id = $1 AND coupon_id = $2 AND source_type = $3 AND source_id = $4
+               WHERE coupon_id = $1 AND source_type = $2 AND source_id = $3
                  AND (metadata->>'deleted_at') IS NULL"#,
         )
-        .bind(company_id)
         .bind(coupon_id)
         .bind(source_type)
         .bind(source_id)

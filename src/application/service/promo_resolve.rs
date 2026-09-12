@@ -7,9 +7,9 @@
 //! not consume a coupon).
 //!
 //! Per the module's 4-layer rule this file holds no SQL — the candidate search and the coupon lookup
-//! live on `PricingRuleRepository` / `CouponCodeRepository`, scoped by the company on the query.
+//! live on `PricingRuleRepository` / `CouponCodeRepository`. The module is tenant-agnostic: row
+//! scoping is the composing service's tenancy decorator, not a module-owned filter (ADR-0029).
 
-use backbone_orm::company_scope;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -63,31 +63,29 @@ impl PromoWriteService {
 
         // If a coupon was presented, resolve it to the rule it unlocks (must be valid + not exhausted).
         let unlocked: Option<(Uuid, Uuid)> = match &q.coupon_code {
-            Some(code) => self.lookup_valid_coupon(q.company_id, code, q.at).await?,
+            Some(code) => self.lookup_valid_coupon(code, q.at).await?,
             None => None,
         };
         let unlocked_rule = unlocked.map(|(_, rule_id)| rule_id);
         let unlocked_coupon = unlocked.map(|(coupon_id, _)| coupon_id);
 
         // Structural candidates: active, in-window, selector + audience + qty/amount all match.
-        // RLS scope (ADR-0008): the query carries its company — scope the read so it is fenced on
-        // `app.company_id` even off the request path. The explicit `company_id = $1` filter stays as
-        // defense-in-depth.
-        let rows = company_scope::with_company_scope(
-            Some(q.company_id),
-            self.rules.find_line_candidates(&self.pool, &LineRuleQuery {
-                company_id: q.company_id,
-                at: q.at,
-                item_id: q.item_id,
-                item_group_id: q.item_group_id,
-                brand_id: q.brand_id,
-                customer_id: q.customer_id,
-                customer_group_id: q.customer_group_id,
-                quantity: q.quantity,
-                gross,
-            }),
-        )
-        .await?;
+        let rows = self
+            .rules
+            .find_line_candidates(
+                &self.pool,
+                &LineRuleQuery {
+                    at: q.at,
+                    item_id: q.item_id,
+                    item_group_id: q.item_group_id,
+                    brand_id: q.brand_id,
+                    customer_id: q.customer_id,
+                    customer_group_id: q.customer_group_id,
+                    quantity: q.quantity,
+                    gross,
+                },
+            )
+            .await?;
 
         let mut candidates: Vec<Candidate> = rows
             .into_iter()
@@ -162,15 +160,12 @@ impl PromoWriteService {
     /// Returns `(coupon_id, pricing_rule_id)`. `None` if no such usable coupon exists.
     pub(super) async fn lookup_valid_coupon(
         &self,
-        company_id: Uuid,
         code: &str,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<(Uuid, Uuid)>, PricingError> {
-        // RLS scope (ADR-0008): company on the parameter — scope the lookup.
-        Ok(company_scope::with_company_scope(
-            Some(company_id),
-            self.coupons.find_usable(&self.pool, company_id, &code.to_uppercase(), at),
-        )
-        .await?)
+        Ok(self
+            .coupons
+            .find_usable(&self.pool, &code.to_uppercase(), at)
+            .await?)
     }
 }

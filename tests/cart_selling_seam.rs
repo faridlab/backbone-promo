@@ -28,8 +28,10 @@ struct PromoCartAdapter {
 #[async_trait::async_trait]
 impl CartPricingPort for PromoCartAdapter {
     async fn price_cart(&self, req: &CartPriceRequest) -> Result<PricedCart, CartPricingError> {
+        // `req.company_id` is selling's documented legacy tenant twin (ADR-0029) — post-strip,
+        // promo's cart contract carries no tenant axis, so the adapter forwards only the pricing
+        // dimensions; the composing service's org scope decorates every row the resolver touches.
         let q = CartQuery {
-            company_id: req.company_id,
             customer_id: req.customer_id,
             customer_group_id: req.customer_group_id,
             coupon_code: req.coupon_code.clone(),
@@ -41,7 +43,6 @@ impl CartPricingPort for PromoCartAdapter {
                     line_id: l.line_ref,
                     tax_key: None,
                     query: PriceQuery {
-                        company_id: req.company_id,
                         list_price: l.list_price,
                         quantity: l.quantity,
                         item_id: l.item_id,
@@ -94,23 +95,22 @@ async fn order_totals(pool: &sqlx::PgPool, id: Uuid) -> (Decimal, Decimal) {
 #[tokio::test]
 async fn csseam1_cart_discounts_land_on_a_real_sales_order() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let promo = Arc::new(PromoWriteService::new(pool.clone()));
     let selling = SellingWriteService::new(pool.clone());
     let adapter = PromoCartAdapter { svc: promo.clone() };
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
     let (item_a, item_b) = (Uuid::new_v4(), Uuid::new_v4());
 
     // Promo: buy A+B → 10% off the matched set, and spend ≥ 250k → 5% off the order (stackable).
-    let bid = bundle(&pool, company, 10, "all_of", None, "discount_percentage", Some(dec("10")), None, "0", true).await;
-    bundle_component(&pool, company, bid, item_a, "1").await;
-    bundle_component(&pool, company, bid, item_b, "1").await;
-    order_rule(&pool, company, 0, "250000", "discount_percentage", Some(dec("5")), None, true, None).await;
+    let bid = bundle(&pool, 10, "all_of", None, "discount_percentage", Some(dec("10")), None, "0", true).await;
+    bundle_component(&pool, bid, item_a, "1").await;
+    bundle_component(&pool, bid, item_b, "1").await;
+    order_rule(&pool, 0, "250000", "discount_percentage", Some(dec("5")), None, true, None).await;
 
     // Selling prices the basket through promo and persists a real order.
     let order = NewCartSalesOrder {
         order_number: format!("SO-CART-{}", &Uuid::new_v4().to_string()[..8]),
-        company_id: company,
         branch_id: None,
         customer_id: customer,
         customer_group_id: None,
@@ -138,15 +138,14 @@ async fn csseam1_cart_discounts_land_on_a_real_sales_order() {
 #[tokio::test]
 async fn csseam2_no_promo_is_passthrough() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let promo = Arc::new(PromoWriteService::new(pool.clone()));
     let selling = SellingWriteService::new(pool.clone());
     let adapter = PromoCartAdapter { svc: promo.clone() };
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
 
     let order = NewCartSalesOrder {
         order_number: format!("SO-CART-{}", &Uuid::new_v4().to_string()[..8]),
-        company_id: company,
         branch_id: None,
         customer_id: customer,
         customer_group_id: None,
@@ -177,25 +176,25 @@ async fn csseam2_no_promo_is_passthrough() {
 #[tokio::test]
 async fn csseam3_free_item_lands_on_the_order() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let promo = Arc::new(PromoWriteService::new(pool.clone()));
     let selling = SellingWriteService::new(pool.clone());
     let adapter = PromoCartAdapter { svc: promo.clone() };
-    let company = Uuid::new_v4();
     let (item_a, free_b) = (Uuid::new_v4(), Uuid::new_v4());
 
     // buy A → get 1 free B.
     let bid = sqlx::query_scalar::<_, Uuid>(
         r#"INSERT INTO promo.promo_bundles
-             (company_id, title, priority, match_type, reward, reward_item_id, reward_qty,
+             (title, priority, match_type, reward, reward_item_id, reward_qty,
               min_order_amount, stackable, valid_from, status)
-           VALUES ($1,'free',0,'all_of'::bundle_match,'discount_percentage'::rate_or_discount,
-                   $2,'1','0',false,now() - interval '1 day', 'active') RETURNING id"#,
-    ).bind(company).bind(free_b).fetch_one(&pool).await.unwrap();
-    bundle_component(&pool, company, bid, item_a, "1").await;
+           VALUES ('free',0,'all_of'::bundle_match,'discount_percentage'::rate_or_discount,
+                   $1,'1','0',false,now() - interval '1 day', 'active') RETURNING id"#,
+    ).bind(free_b).fetch_one(&pool).await.unwrap();
+    bundle_component(&pool, bid, item_a, "1").await;
 
     let order = NewCartSalesOrder {
         order_number: format!("SO-FREE-{}", &Uuid::new_v4().to_string()[..8]),
-        company_id: company, branch_id: None, customer_id: Uuid::new_v4(), customer_group_id: None,
+        branch_id: None, customer_id: Uuid::new_v4(), customer_group_id: None,
         coupon_code: None, delivery_carrier_id: None,
         order_date: now().date_naive(), delivery_date: None,
         currency: Some("IDR".into()), tax_rate: Decimal::ZERO, notes: None,

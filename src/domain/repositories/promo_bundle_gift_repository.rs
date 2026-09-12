@@ -44,7 +44,6 @@ pub struct PromoBundleGiftPaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct PromoBundleGiftFilter {
-    pub company_id: Option<Uuid>,
     pub bundle_id: Option<Uuid>,
     pub gift_item_id: Option<Uuid>,
 }
@@ -52,7 +51,7 @@ pub struct PromoBundleGiftFilter {
 impl PromoBundleGiftFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.bundle_id.is_some() || self.gift_item_id.is_some()
+        self.bundle_id.is_some() || self.gift_item_id.is_some()
     }
 }
 

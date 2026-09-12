@@ -44,7 +44,6 @@ pub struct PromoBundlePaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct PromoBundleFilter {
-    pub company_id: Option<Uuid>,
     pub title: Option<String>,
     pub match_type: Option<BundleMatch>,
     pub reward: Option<RateOrDiscount>,
@@ -57,7 +56,7 @@ pub struct PromoBundleFilter {
 impl PromoBundleFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.match_type.is_some() || self.reward.is_some() || self.reward_item_id.is_some() || self.currency.is_some() || self.stackable.is_some() || self.status.is_some()
+        self.title.is_some() || self.match_type.is_some() || self.reward.is_some() || self.reward_item_id.is_some() || self.currency.is_some() || self.stackable.is_some() || self.status.is_some()
     }
 }
 

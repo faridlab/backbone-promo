@@ -40,7 +40,6 @@ impl LoyaltyOrderPointsRepository {
 
 /// The grant leg a fresh order row is born carrying.
 pub struct NewOrderGrantRow<'a> {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: &'a str,
@@ -54,7 +53,6 @@ pub struct NewOrderGrantRow<'a> {
 /// The spend leg a fresh order row is born carrying (an order that only SPENT — its member's points
 /// were earned elsewhere).
 pub struct NewOrderSpendRow<'a> {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: &'a str,
@@ -81,9 +79,13 @@ pub struct OrderPointsRow {
 /// Hand-written LoyaltyOrderPoints SQL. Lives here (not in the write service) per the module's
 /// 4-layer rule: services orchestrate and own the unit of work, repositories hold the SQL.
 ///
-/// Every method rides the CALLER'S transaction (the company scope is already bound — don't
-/// re-bind here). The partial-unique upserts name the index's WHERE predicate in the conflict
-/// target — the same pattern the entry ledger's claim uses.
+/// Every method rides the CALLER'S transaction. Every statement is tenant-agnostic: the module
+/// ships no row fence of its own — row isolation is the COMPOSING service's tenancy decorator
+/// (ADR-0029). The upserts use untargeted `ON CONFLICT DO NOTHING`: the one-row-per-order unique
+/// is decorator-declared org-scoped, so the module cannot name it — and, as on an undecorated
+/// database that unique does not exist, both upserts are SELECT-first arbitrated (same law as the
+/// coupon and accrual claims): the caller holds the member-anchor lock, a read decides fresh vs
+/// existing, and the insert's DO NOTHING stays as the decorated-database belt.
 impl LoyaltyOrderPointsRepository {
     /// Insert the order row born with its grant leg. `Ok(None)` = a row already exists for this
     /// order under this program (idempotent replay — read it back with [`Self::find_by_order_ref`]).
@@ -92,19 +94,29 @@ impl LoyaltyOrderPointsRepository {
         conn: &mut PgConnection,
         g: &NewOrderGrantRow<'_>,
     ) -> Result<Option<Uuid>, sqlx::Error> {
+        let existing = sqlx::query_scalar::<_, Uuid>(
+            r#"SELECT id FROM promo.loyalty_order_points
+               WHERE loyalty_program_id = $1 AND order_ref_type = $2 AND order_ref_id = $3
+                 AND (metadata->>'deleted_at') IS NULL"#,
+        )
+        .bind(g.loyalty_program_id)
+        .bind(g.order_ref_type)
+        .bind(g.order_ref_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if existing.is_some() {
+            return Ok(None);
+        }
         let row = sqlx::query(
             r#"
             INSERT INTO promo.loyalty_order_points
-                (company_id, loyalty_program_id, customer_id, order_ref_type, order_ref_id,
+                (loyalty_program_id, customer_id, order_ref_type, order_ref_id,
                  coupon_code_id, grant_base_amount, granted_points, granted_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (company_id, loyalty_program_id, order_ref_type, order_ref_id)
-                WHERE (metadata->>'deleted_at') IS NULL
-            DO NOTHING
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT DO NOTHING
             RETURNING id
             "#,
         )
-        .bind(g.company_id)
         .bind(g.loyalty_program_id)
         .bind(g.customer_id)
         .bind(g.order_ref_type)
@@ -119,25 +131,36 @@ impl LoyaltyOrderPointsRepository {
     }
 
     /// Insert the order row born with its spend leg (an order that only spent). `Ok(None)` = a row
-    /// already exists — set the spend leg on it with [`Self::set_spent`] instead.
+    /// already exists — set the spend leg on it with [`Self::set_spent`] instead. Same SELECT-first
+    /// arbitration as [`Self::insert_grant`].
     pub async fn insert_spend(
         &self,
         conn: &mut PgConnection,
         s: &NewOrderSpendRow<'_>,
     ) -> Result<Option<Uuid>, sqlx::Error> {
+        let existing = sqlx::query_scalar::<_, Uuid>(
+            r#"SELECT id FROM promo.loyalty_order_points
+               WHERE loyalty_program_id = $1 AND order_ref_type = $2 AND order_ref_id = $3
+                 AND (metadata->>'deleted_at') IS NULL"#,
+        )
+        .bind(s.loyalty_program_id)
+        .bind(s.order_ref_type)
+        .bind(s.order_ref_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if existing.is_some() {
+            return Ok(None);
+        }
         let row = sqlx::query(
             r#"
             INSERT INTO promo.loyalty_order_points
-                (company_id, loyalty_program_id, customer_id, order_ref_type, order_ref_id,
+                (loyalty_program_id, customer_id, order_ref_type, order_ref_id,
                  spent_points, spent_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (company_id, loyalty_program_id, order_ref_type, order_ref_id)
-                WHERE (metadata->>'deleted_at') IS NULL
-            DO NOTHING
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT DO NOTHING
             RETURNING id
             "#,
         )
-        .bind(s.company_id)
         .bind(s.loyalty_program_id)
         .bind(s.customer_id)
         .bind(s.order_ref_type)
@@ -153,7 +176,6 @@ impl LoyaltyOrderPointsRepository {
     pub async fn find_by_order_ref(
         &self,
         conn: &mut PgConnection,
-        company_id: Uuid,
         loyalty_program_id: Uuid,
         order_ref_type: &str,
         order_ref_id: Uuid,
@@ -163,12 +185,11 @@ impl LoyaltyOrderPointsRepository {
             SELECT id, customer_id, coupon_code_id, grant_base_amount, granted_points, spent_points,
                    granted_reversed_points, spent_reversed_points, granted_at, spent_at
             FROM promo.loyalty_order_points
-            WHERE company_id = $1 AND loyalty_program_id = $2
-              AND order_ref_type = $3 AND order_ref_id = $4
+            WHERE loyalty_program_id = $1
+              AND order_ref_type = $2 AND order_ref_id = $3
               AND (metadata->>'deleted_at') IS NULL
             "#,
         )
-        .bind(company_id)
         .bind(loyalty_program_id)
         .bind(order_ref_type)
         .bind(order_ref_id)
@@ -193,7 +214,6 @@ impl LoyaltyOrderPointsRepository {
     pub async fn set_granted(
         &self,
         conn: &mut PgConnection,
-        company_id: Uuid,
         loyalty_program_id: Uuid,
         order_ref_type: &str,
         order_ref_id: Uuid,
@@ -204,13 +224,12 @@ impl LoyaltyOrderPointsRepository {
         sqlx::query(
             r#"
             UPDATE promo.loyalty_order_points
-            SET grant_base_amount = $5, granted_points = $6, granted_at = $7
-            WHERE company_id = $1 AND loyalty_program_id = $2
-              AND order_ref_type = $3 AND order_ref_id = $4
+            SET grant_base_amount = $4, granted_points = $5, granted_at = $6
+            WHERE loyalty_program_id = $1
+              AND order_ref_type = $2 AND order_ref_id = $3
               AND (metadata->>'deleted_at') IS NULL
             "#,
         )
-        .bind(company_id)
         .bind(loyalty_program_id)
         .bind(order_ref_type)
         .bind(order_ref_id)
@@ -226,7 +245,6 @@ impl LoyaltyOrderPointsRepository {
     pub async fn set_spent(
         &self,
         conn: &mut PgConnection,
-        company_id: Uuid,
         loyalty_program_id: Uuid,
         order_ref_type: &str,
         order_ref_id: Uuid,
@@ -236,13 +254,12 @@ impl LoyaltyOrderPointsRepository {
         sqlx::query(
             r#"
             UPDATE promo.loyalty_order_points
-            SET spent_points = $5, spent_at = $6
-            WHERE company_id = $1 AND loyalty_program_id = $2
-              AND order_ref_type = $3 AND order_ref_id = $4
+            SET spent_points = $4, spent_at = $5
+            WHERE loyalty_program_id = $1
+              AND order_ref_type = $2 AND order_ref_id = $3
               AND (metadata->>'deleted_at') IS NULL
             "#,
         )
-        .bind(company_id)
         .bind(loyalty_program_id)
         .bind(order_ref_type)
         .bind(order_ref_id)
@@ -260,7 +277,6 @@ impl LoyaltyOrderPointsRepository {
     pub async fn add_reversal_counters(
         &self,
         conn: &mut PgConnection,
-        company_id: Uuid,
         loyalty_program_id: Uuid,
         order_ref_type: &str,
         order_ref_id: Uuid,
@@ -270,14 +286,13 @@ impl LoyaltyOrderPointsRepository {
         sqlx::query(
             r#"
             UPDATE promo.loyalty_order_points
-            SET granted_reversed_points = granted_reversed_points + $5,
-                spent_reversed_points = spent_reversed_points + $6
-            WHERE company_id = $1 AND loyalty_program_id = $2
-              AND order_ref_type = $3 AND order_ref_id = $4
+            SET granted_reversed_points = granted_reversed_points + $4,
+                spent_reversed_points = spent_reversed_points + $5
+            WHERE loyalty_program_id = $1
+              AND order_ref_type = $2 AND order_ref_id = $3
               AND (metadata->>'deleted_at') IS NULL
             "#,
         )
-        .bind(company_id)
         .bind(loyalty_program_id)
         .bind(order_ref_type)
         .bind(order_ref_id)

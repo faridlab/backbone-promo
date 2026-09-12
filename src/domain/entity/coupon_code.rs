@@ -50,7 +50,6 @@ impl std::ops::Deref for CouponCodeId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct CouponCode {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub code: String,
     pub pricing_rule_id: Uuid,
     pub description: Option<String>,
@@ -71,10 +70,9 @@ impl CouponCode {
     }
 
     /// Create a new CouponCode with required fields
-    pub fn new(company_id: Uuid, code: String, pricing_rule_id: Uuid, used_count: i32, valid_from: DateTime<Utc>, status: CouponCodeStatus) -> Self {
+    pub fn new(code: String, pricing_rule_id: Uuid, used_count: i32, valid_from: DateTime<Utc>, status: CouponCodeStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             code,
             pricing_rule_id,
             description: None,
@@ -173,9 +171,6 @@ impl CouponCode {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "code" => {
                     if let Ok(v) = serde_json::from_value(value) { self.code = v; }
                 }
@@ -254,16 +249,12 @@ impl backbone_orm::EntityRepoMeta for CouponCode {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("pricing_rule_id".to_string(), "uuid".to_string());
         m.insert("status".to_string(), "coupon_code_status".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
         &["code"]
-    }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
     }
 }
 
@@ -273,7 +264,6 @@ impl backbone_orm::EntityRepoMeta for CouponCode {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct CouponCodeBuilder {
-    company_id: Option<Uuid>,
     code: Option<String>,
     pricing_rule_id: Option<Uuid>,
     description: Option<String>,
@@ -285,12 +275,6 @@ pub struct CouponCodeBuilder {
 }
 
 impl CouponCodeBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the code field (required)
     pub fn code(mut self, value: String) -> Self {
         self.code = Some(value);
@@ -343,14 +327,12 @@ impl CouponCodeBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<CouponCode, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let code = self.code.ok_or_else(|| "code is required".to_string())?;
         let pricing_rule_id = self.pricing_rule_id.ok_or_else(|| "pricing_rule_id is required".to_string())?;
         let valid_from = self.valid_from.ok_or_else(|| "valid_from is required".to_string())?;
 
         Ok(CouponCode {
             id: Uuid::new_v4(),
-            company_id,
             code,
             pricing_rule_id,
             description: self.description,

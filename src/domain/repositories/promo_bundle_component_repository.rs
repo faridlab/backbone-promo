@@ -44,7 +44,6 @@ pub struct PromoBundleComponentPaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct PromoBundleComponentFilter {
-    pub company_id: Option<Uuid>,
     pub bundle_id: Option<Uuid>,
     pub apply_on: Option<ApplyOn>,
     pub item_id: Option<Uuid>,
@@ -55,7 +54,7 @@ pub struct PromoBundleComponentFilter {
 impl PromoBundleComponentFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.bundle_id.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some()
+        self.bundle_id.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some()
     }
 }
 

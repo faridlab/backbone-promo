@@ -15,23 +15,24 @@ use uuid::Uuid;
 #[tokio::test]
 async fn ip1_coupon_redemption_bounded_and_idempotent() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
     let sink = LoggingSink;
-    let (company, item) = (Uuid::new_v4(), Uuid::new_v4());
+    let item = Uuid::new_v4();
     let rule_id = rule(&pool, common::RuleSpec {
         coupon_required: true,
         discount_percentage: Some(dec("50")),
-        ..common::RuleSpec::for_item(company, item)
+        ..common::RuleSpec::for_item(item)
     })
     .await;
 
     // --- Bound: max_use=1, two DIFFERENT sales → second is rejected, counter never exceeds cap.
-    let capped = coupon(&pool, company, "ONCE", rule_id, Some(1)).await;
-    svc.commit_coupon_redemption(company, capped, "sales_order", Uuid::new_v4(), &sink)
+    let capped = coupon(&pool, "ONCE", rule_id, Some(1)).await;
+    svc.commit_coupon_redemption(capped, "sales_order", Uuid::new_v4(), &sink)
         .await
         .unwrap();
     let err = svc
-        .commit_coupon_redemption(company, capped, "sales_order", Uuid::new_v4(), &sink)
+        .commit_coupon_redemption(capped, "sales_order", Uuid::new_v4(), &sink)
         .await
         .unwrap_err();
     assert!(matches!(err, PricingError::CouponExhausted));
@@ -44,14 +45,14 @@ async fn ip1_coupon_redemption_bounded_and_idempotent() {
 
     // --- Idempotency: max_use=2, the SAME sale committed twice consumes exactly ONE use, and the
     // retry returns the same rule (not CouponExhausted, not a second burn).
-    let budgeted = coupon(&pool, company, "TWICE", rule_id, Some(2)).await;
+    let budgeted = coupon(&pool, "TWICE", rule_id, Some(2)).await;
     let sale = Uuid::new_v4();
     let r1 = svc
-        .commit_coupon_redemption(company, budgeted, "sales_order", sale, &sink)
+        .commit_coupon_redemption(budgeted, "sales_order", sale, &sink)
         .await
         .unwrap();
     let r2 = svc
-        .commit_coupon_redemption(company, budgeted, "sales_order", sale, &sink)
+        .commit_coupon_redemption(budgeted, "sales_order", sale, &sink)
         .await
         .unwrap();
     assert_eq!(r1, r2, "a retry of the same sale returns the same rule");
@@ -67,15 +68,14 @@ async fn ip1_coupon_redemption_bounded_and_idempotent() {
 #[tokio::test]
 async fn ip2_accrual_is_idempotent() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
     let sink = LoggingSink;
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = program(&pool, company, "0.01", "100", None).await; // 1 pt / 100 spent
+    let program_id = program(&pool, "0.01", "100", None).await; // 1 pt / 100 spent
     let source = Uuid::new_v4();
 
     let req = AccrualRequest {
-        company_id: company,
         loyalty_program_id: program_id,
         customer_id: customer,
         purchase_amount: dec("250000"),
@@ -91,23 +91,22 @@ async fn ip2_accrual_is_idempotent() {
     // Replay the exact same source → no new points.
     let b = svc.accrue(&req, &sink).await.unwrap();
     assert!(b.already);
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("2500"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("2500"));
 }
 
 /// IP-3 — redemption is balance-bounded and idempotent per source.
 #[tokio::test]
 async fn ip3_redemption_bounded_and_idempotent() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
     let sink = LoggingSink;
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = program(&pool, company, "0.01", "100", None).await;
+    let program_id = program(&pool, "0.01", "100", None).await;
 
     // Earn 2500 points.
     svc.accrue(
         &AccrualRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             purchase_amount: dec("250000"),
@@ -124,7 +123,6 @@ async fn ip3_redemption_bounded_and_idempotent() {
     let err = svc
         .redeem(
             &RedemptionRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 points: dec("3000"),
@@ -137,12 +135,11 @@ async fn ip3_redemption_bounded_and_idempotent() {
         .await
         .unwrap_err();
     assert!(matches!(err, PricingError::InsufficientPoints { .. }));
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("2500"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("2500"));
 
     // Redeem 1000 (worth 100000 IDR) → balance 1500.
     let redemption_src = Uuid::new_v4();
     let red = RedemptionRequest {
-        company_id: company,
         loyalty_program_id: program_id,
         customer_id: customer,
         points: dec("1000"),
@@ -153,30 +150,30 @@ async fn ip3_redemption_bounded_and_idempotent() {
     let r = svc.redeem(&red, &sink).await.unwrap();
     assert_eq!(r.discount_value, dec("100000.00")); // 1000 * 100
     assert!(!r.already);
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("1500"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("1500"));
 
     // Replay same redemption source → idempotent, balance stays 1500.
     let r2 = svc.redeem(&red, &sink).await.unwrap();
     assert!(r2.already);
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("1500"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("1500"));
 }
 
 /// IP-4 — resolve is side-effect-free: previewing a price with a coupon does NOT consume a use.
 #[tokio::test]
 async fn ip4_resolve_does_not_consume_coupon() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let (company, item) = (Uuid::new_v4(), Uuid::new_v4());
+    let item = Uuid::new_v4();
     let rule_id = rule(&pool, common::RuleSpec {
         coupon_required: true,
         discount_percentage: Some(dec("40")),
-        ..common::RuleSpec::for_item(company, item)
+        ..common::RuleSpec::for_item(item)
     })
     .await;
-    let coupon_id = coupon(&pool, company, "PREVIEW", rule_id, Some(1)).await;
+    let coupon_id = coupon(&pool, "PREVIEW", rule_id, Some(1)).await;
 
     let query = PriceQuery {
-        company_id: company,
         list_price: dec("100000"),
         quantity: Decimal::ONE,
         item_id: item,
@@ -212,18 +209,17 @@ async fn ip4_resolve_does_not_consume_coupon() {
 #[tokio::test]
 async fn ip5_balance_conservation_trigger() {
     let pool = pool().await;
-    let company = Uuid::new_v4();
+    let _wide = isolated_wide_tables(&pool).await;
     let customer = Uuid::new_v4();
-    let program_id = program(&pool, company, "0.01", "100", None).await;
+    let program_id = program(&pool, "0.01", "100", None).await;
 
     // 100 available (no expiry) — a −200 write is refused.
     sqlx::query(
         r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+             (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
               source_type, source_id, posting_date)
-           VALUES ($1,$2,$3,'earned',100,0,'seed',$4,$5)"#,
+           VALUES ($1,$2,'earned',100,0,'seed',$3,$4)"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(customer)
     .bind(Uuid::new_v4())
@@ -233,11 +229,10 @@ async fn ip5_balance_conservation_trigger() {
     .unwrap();
     let err: Result<_, sqlx::Error> = sqlx::query(
         r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+             (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
               source_type, source_id, posting_date)
-           VALUES ($1,$2,$3,'redeemed',-200,0,'probe',$4,$5)"#,
+           VALUES ($1,$2,'redeemed',-200,0,'probe',$3,$4)"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(customer)
     .bind(Uuid::new_v4())
@@ -252,11 +247,10 @@ async fn ip5_balance_conservation_trigger() {
     let customer2 = Uuid::new_v4();
     sqlx::query(
         r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+             (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
               source_type, source_id, posting_date, expiry_date)
-           VALUES ($1,$2,$3,'earned',100,0,'probe',$4,$5, now() - interval '1 hour')"#,
+           VALUES ($1,$2,'earned',100,0,'probe',$3,$4, now() - interval '1 hour')"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(customer2)
     .bind(Uuid::new_v4())
@@ -266,11 +260,10 @@ async fn ip5_balance_conservation_trigger() {
     .unwrap();
     let err2: Result<_, sqlx::Error> = sqlx::query(
         r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+             (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
               source_type, source_id, posting_date)
-           VALUES ($1,$2,$3,'redeemed',-50,0,'probe',$4,$5)"#,
+           VALUES ($1,$2,'redeemed',-50,0,'probe',$3,$4)"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(customer2)
     .bind(Uuid::new_v4())
@@ -285,13 +278,14 @@ async fn ip5_balance_conservation_trigger() {
 #[tokio::test]
 async fn ip6_coupon_used_count_bounded_at_table() {
     let pool = pool().await;
-    let (company, item) = (Uuid::new_v4(), Uuid::new_v4());
+    let _wide = isolated_wide_tables(&pool).await;
+    let item = Uuid::new_v4();
     let rule_id = rule(&pool, common::RuleSpec {
         discount_percentage: Some(dec("10")),
-        ..common::RuleSpec::for_item(company, item)
+        ..common::RuleSpec::for_item(item)
     })
     .await;
-    let coupon_id = coupon(&pool, company, "CAPX", rule_id, Some(3)).await;
+    let coupon_id = coupon(&pool, "CAPX", rule_id, Some(3)).await;
 
     let res = sqlx::query("UPDATE promo.coupon_codes SET used_count = 4 WHERE id = $1")
         .bind(coupon_id)
@@ -310,16 +304,15 @@ async fn ip6_coupon_used_count_bounded_at_table() {
 #[tokio::test]
 async fn ip7_inverted_windows_refused_everywhere() {
     let pool = pool().await;
-    let company = Uuid::new_v4();
+    let _wide = isolated_wide_tables(&pool).await;
     let item = Uuid::new_v4();
 
     let r1 = sqlx::query(
         r#"INSERT INTO promo.pricing_rules
-             (company_id, title, priority, apply_on, item_id, rate_or_discount,
+             (title, priority, apply_on, item_id, rate_or_discount,
               valid_from, valid_to, status)
-           VALUES ($1,'w',0,'item',$2,'discount_percentage', now(), now() - interval '1 hour', 'active')"#,
+           VALUES ('w',0,'item',$1,'discount_percentage', now(), now() - interval '1 hour', 'active')"#,
     )
-    .bind(company)
     .bind(item)
     .execute(&pool)
     .await;
@@ -327,36 +320,33 @@ async fn ip7_inverted_windows_refused_everywhere() {
 
     let r2 = sqlx::query(
         r#"INSERT INTO promo.loyalty_programs
-             (company_id, program_name, program_type, collection_factor, conversion_factor,
+             (program_name, program_type, collection_factor, conversion_factor,
               from_date, to_date, status)
-           VALUES ($1,'w','single_tier',0.01,100, now(), now() - interval '1 hour', 'active')"#,
+           VALUES ('w','single_tier',0.01,100, now(), now() - interval '1 hour', 'active')"#,
     )
-    .bind(company)
     .execute(&pool)
     .await;
     assert!(r2.is_err(), "loyalty program inverted window must be refused");
 
     let r3 = sqlx::query(
         r#"INSERT INTO promo.promo_bundles
-             (company_id, title, priority, match_type, reward, valid_from, valid_to, status)
-           VALUES ($1,'w',0,'all_of','discount_percentage', now(), now() - interval '1 hour', 'active')"#,
+             (title, priority, match_type, reward, valid_from, valid_to, status)
+           VALUES ('w',0,'all_of','discount_percentage', now(), now() - interval '1 hour', 'active')"#,
     )
-    .bind(company)
     .execute(&pool)
     .await;
     assert!(r3.is_err(), "bundle inverted window must be refused");
 
     let rule_id = rule(&pool, common::RuleSpec {
         discount_percentage: Some(dec("10")),
-        ..common::RuleSpec::for_item(company, item)
+        ..common::RuleSpec::for_item(item)
     })
     .await;
     let r4 = sqlx::query(
         r#"INSERT INTO promo.coupon_codes
-             (company_id, code, pricing_rule_id, valid_from, valid_to, status)
-           VALUES ($1,'WINV',$2, now(), now() - interval '1 hour', 'active')"#,
+             (code, pricing_rule_id, valid_from, valid_to, status)
+           VALUES ('WINV',$1, now(), now() - interval '1 hour', 'active')"#,
     )
-    .bind(company)
     .bind(rule_id)
     .execute(&pool)
     .await;
@@ -368,14 +358,13 @@ async fn ip7_inverted_windows_refused_everywhere() {
 #[tokio::test]
 async fn ip8_order_points_reversal_bounds() {
     let pool = pool().await;
-    let company = Uuid::new_v4();
-    let program_id = program(&pool, company, "0.1", "100", None).await;
+    let _wide = isolated_wide_tables(&pool).await;
+    let program_id = program(&pool, "0.1", "100", None).await;
     let svc = backbone_promo::application::service::promo_write_service::PromoWriteService::new(pool.clone());
     let customer = Uuid::new_v4();
     let order = Uuid::new_v4();
     svc.grant_order_points(
         &backbone_promo::application::service::promo_ports::OrderPointsGrantRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -408,10 +397,9 @@ async fn ip8_order_points_reversal_bounds() {
     // A row that records no movement at all is refused (both legs zero).
     let empty = sqlx::query(
         r#"INSERT INTO promo.loyalty_order_points
-             (company_id, loyalty_program_id, customer_id, order_ref_type, order_ref_id)
-           VALUES ($1,$2,$3,'probe',$4)"#,
+             (loyalty_program_id, customer_id, order_ref_type, order_ref_id)
+           VALUES ($1,$2,'probe',$3)"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(customer)
     .bind(Uuid::new_v4())
@@ -426,6 +414,7 @@ async fn ip8_order_points_reversal_bounds() {
 #[tokio::test]
 async fn ip9_backstops_installed_and_validated() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
 
     let checks: Vec<(String, bool)> = sqlx::query_as(
         r#"SELECT conname, convalidated FROM pg_constraint

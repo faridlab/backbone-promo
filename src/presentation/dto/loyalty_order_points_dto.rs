@@ -34,9 +34,6 @@ use crate::domain::entity::AuditMetadata;
 #[serde(rename_all = "camelCase")]
 pub struct CreateLoyaltyOrderPointsDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "loyalty_program_id")]
     pub loyalty_program_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -80,9 +77,6 @@ pub struct CreateLoyaltyOrderPointsDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateLoyaltyOrderPointsDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "loyalty_program_id")]
     pub loyalty_program_id: Uuid,
@@ -128,9 +122,6 @@ pub struct UpdateLoyaltyOrderPointsDto {
 #[serde(rename_all = "camelCase")]
 pub struct PatchLoyaltyOrderPointsDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "loyalty_program_id")]
     pub loyalty_program_id: Option<Uuid>,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -164,7 +155,7 @@ pub struct PatchLoyaltyOrderPointsDto {
 impl PatchLoyaltyOrderPointsDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.loyalty_program_id.is_some() || self.customer_id.is_some() || self.order_ref_type.is_some() || self.order_ref_id.is_some() || self.coupon_code_id.is_some() || self.grant_base_amount.is_some() || self.granted_points.is_some() || self.spent_points.is_some() || self.granted_reversed_points.is_some() || self.spent_reversed_points.is_some() || self.granted_at.is_some() || self.spent_at.is_some()
+        self.loyalty_program_id.is_some() || self.customer_id.is_some() || self.order_ref_type.is_some() || self.order_ref_id.is_some() || self.coupon_code_id.is_some() || self.grant_base_amount.is_some() || self.granted_points.is_some() || self.spent_points.is_some() || self.granted_reversed_points.is_some() || self.spent_reversed_points.is_some() || self.granted_at.is_some() || self.spent_at.is_some()
     }
 }
 
@@ -182,8 +173,6 @@ impl PatchLoyaltyOrderPointsDto {
 pub struct LoyaltyOrderPointsResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub loyalty_program_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -257,9 +246,9 @@ impl LoyaltyOrderPointsListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct LoyaltyOrderPointsSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
+    pub order_ref_type: String,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -271,7 +260,6 @@ impl From<LoyaltyOrderPoints> for LoyaltyOrderPointsResponseDto {
     fn from(entity: LoyaltyOrderPoints) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             loyalty_program_id: entity.loyalty_program_id,
             customer_id: entity.customer_id,
             order_ref_type: entity.order_ref_type,
@@ -294,9 +282,9 @@ impl From<LoyaltyOrderPoints> for LoyaltyOrderPointsSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             loyalty_program_id: entity.loyalty_program_id,
             customer_id: entity.customer_id,
+            order_ref_type: entity.order_ref_type,
             created_at,
         }
     }
@@ -306,7 +294,6 @@ impl From<CreateLoyaltyOrderPointsDto> for LoyaltyOrderPoints {
     fn from(dto: CreateLoyaltyOrderPointsDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             loyalty_program_id: dto.loyalty_program_id,
             customer_id: dto.customer_id,
             order_ref_type: dto.order_ref_type,
@@ -328,7 +315,6 @@ impl From<&LoyaltyOrderPoints> for LoyaltyOrderPointsResponseDto {
     fn from(entity: &LoyaltyOrderPoints) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             loyalty_program_id: entity.loyalty_program_id.clone(),
             customer_id: entity.customer_id.clone(),
             order_ref_type: entity.order_ref_type.clone(),
@@ -354,7 +340,6 @@ impl backbone_core::FromCreateDto<CreateLoyaltyOrderPointsDto> for LoyaltyOrderP
 
 impl backbone_core::ApplyUpdateDto<UpdateLoyaltyOrderPointsDto> for LoyaltyOrderPoints {
     fn apply_update(mut self, dto: UpdateLoyaltyOrderPointsDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.loyalty_program_id = dto.loyalty_program_id;
         self.customer_id = dto.customer_id;
         self.order_ref_type = dto.order_ref_type;

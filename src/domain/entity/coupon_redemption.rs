@@ -48,7 +48,6 @@ impl std::ops::Deref for CouponRedemptionId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct CouponRedemption {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub coupon_id: Uuid,
     pub pricing_rule_id: Uuid,
     pub source_type: String,
@@ -66,10 +65,9 @@ impl CouponRedemption {
     }
 
     /// Create a new CouponRedemption with required fields
-    pub fn new(company_id: Uuid, coupon_id: Uuid, pricing_rule_id: Uuid, source_type: String, source_id: Uuid, redeemed_at: DateTime<Utc>) -> Self {
+    pub fn new(coupon_id: Uuid, pricing_rule_id: Uuid, source_type: String, source_id: Uuid, redeemed_at: DateTime<Utc>) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             coupon_id,
             pricing_rule_id,
             source_type,
@@ -138,9 +136,6 @@ impl CouponRedemption {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "coupon_id" => {
                     if let Ok(v) = serde_json::from_value(value) { self.coupon_id = v; }
                 }
@@ -210,7 +205,6 @@ impl backbone_orm::EntityRepoMeta for CouponRedemption {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("coupon_id".to_string(), "uuid".to_string());
         m.insert("pricing_rule_id".to_string(), "uuid".to_string());
         m.insert("source_id".to_string(), "uuid".to_string());
@@ -218,9 +212,6 @@ impl backbone_orm::EntityRepoMeta for CouponRedemption {
     }
     fn search_fields() -> &'static [&'static str] {
         &["source_type"]
-    }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
     }
 }
 
@@ -230,7 +221,6 @@ impl backbone_orm::EntityRepoMeta for CouponRedemption {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct CouponRedemptionBuilder {
-    company_id: Option<Uuid>,
     coupon_id: Option<Uuid>,
     pricing_rule_id: Option<Uuid>,
     source_type: Option<String>,
@@ -239,12 +229,6 @@ pub struct CouponRedemptionBuilder {
 }
 
 impl CouponRedemptionBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the coupon_id field (required)
     pub fn coupon_id(mut self, value: Uuid) -> Self {
         self.coupon_id = Some(value);
@@ -279,7 +263,6 @@ impl CouponRedemptionBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<CouponRedemption, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let coupon_id = self.coupon_id.ok_or_else(|| "coupon_id is required".to_string())?;
         let pricing_rule_id = self.pricing_rule_id.ok_or_else(|| "pricing_rule_id is required".to_string())?;
         let source_type = self.source_type.ok_or_else(|| "source_type is required".to_string())?;
@@ -287,7 +270,6 @@ impl CouponRedemptionBuilder {
 
         Ok(CouponRedemption {
             id: Uuid::new_v4(),
-            company_id,
             coupon_id,
             pricing_rule_id,
             source_type,

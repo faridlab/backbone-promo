@@ -24,7 +24,6 @@ impl TestDataGenerator for PromoBundleComponentTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": Uuid::new_v4().to_string(),
-            "company_id": Uuid::new_v4().to_string(),
             "bundle_id": Uuid::new_v4().to_string(),
             "apply_on": "item",
             "item_id": null,
@@ -39,7 +38,6 @@ impl TestDataGenerator for PromoBundleComponentTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": id,
-            "company_id": Uuid::new_v4().to_string(),
             "bundle_id": Uuid::new_v4().to_string(),
             "apply_on": "item",
             "item_id": null,

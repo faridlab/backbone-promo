@@ -36,9 +36,6 @@ use crate::domain::entity::RateOrDiscount;
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePromoBundleDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "validation", validate(length(max = 140)))]
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
@@ -84,9 +81,6 @@ pub struct CreatePromoBundleDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePromoBundleDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "validation", validate(length(max = 140)))]
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
@@ -132,9 +126,6 @@ pub struct UpdatePromoBundleDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct PatchPromoBundleDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
     #[cfg_attr(feature = "validation", validate(length(max = 140)))]
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -176,7 +167,7 @@ pub struct PatchPromoBundleDto {
 impl PatchPromoBundleDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.match_type.is_some() || self.required_distinct.is_some() || self.reward.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.reward_item_id.is_some() || self.reward_qty.is_some() || self.currency.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.status.is_some()
+        self.title.is_some() || self.priority.is_some() || self.match_type.is_some() || self.required_distinct.is_some() || self.reward.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.reward_item_id.is_some() || self.reward_qty.is_some() || self.currency.is_some() || self.min_order_amount.is_some() || self.stackable.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.status.is_some()
     }
 }
 
@@ -194,8 +185,6 @@ impl PatchPromoBundleDto {
 pub struct PromoBundleResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
@@ -273,9 +262,9 @@ impl PromoBundleListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct PromoBundleSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub title: String,
     pub priority: i32,
+    pub match_type: BundleMatch,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -287,7 +276,6 @@ impl From<PromoBundle> for PromoBundleResponseDto {
     fn from(entity: PromoBundle) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             title: entity.title,
             priority: entity.priority,
             match_type: entity.match_type,
@@ -313,9 +301,9 @@ impl From<PromoBundle> for PromoBundleSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             title: entity.title,
             priority: entity.priority,
+            match_type: entity.match_type,
             created_at,
         }
     }
@@ -325,7 +313,6 @@ impl From<CreatePromoBundleDto> for PromoBundle {
     fn from(dto: CreatePromoBundleDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             title: dto.title,
             priority: dto.priority,
             match_type: dto.match_type,
@@ -350,7 +337,6 @@ impl From<&PromoBundle> for PromoBundleResponseDto {
     fn from(entity: &PromoBundle) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             title: entity.title.clone(),
             priority: entity.priority.clone(),
             match_type: entity.match_type.clone(),
@@ -379,7 +365,6 @@ impl backbone_core::FromCreateDto<CreatePromoBundleDto> for PromoBundle {
 
 impl backbone_core::ApplyUpdateDto<UpdatePromoBundleDto> for PromoBundle {
     fn apply_update(mut self, dto: UpdatePromoBundleDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.title = dto.title;
         self.priority = dto.priority;
         self.match_type = dto.match_type;

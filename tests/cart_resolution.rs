@@ -13,12 +13,11 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 /// A cart line with just the dimensions the resolver matches on.
-fn line(company: Uuid, item: Uuid, list: &str, qty: &str) -> CartLine {
+fn line(item: Uuid, list: &str, qty: &str) -> CartLine {
     CartLine {
         line_id: Uuid::new_v4(),
         tax_key: None,
         query: PriceQuery {
-            company_id: company,
             list_price: dec(list),
             quantity: dec(qty),
             item_id: item,
@@ -33,9 +32,8 @@ fn line(company: Uuid, item: Uuid, list: &str, qty: &str) -> CartLine {
     }
 }
 
-fn cart(company: Uuid, lines: Vec<CartLine>) -> CartQuery {
+fn cart(lines: Vec<CartLine>) -> CartQuery {
     CartQuery {
-        company_id: company,
         customer_id: None,
         customer_group_id: None,
         coupon_code: None,
@@ -68,15 +66,16 @@ fn assert_shares_tie_out(cart_result: &backbone_promo::application::service::pro
 #[tokio::test]
 async fn cart1_order_total_minimum_fires_and_allocates() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
     // Spend ≥ 250k → 10% off the whole order.
-    order_rule(&pool, company, 0, "250000", "discount_percentage", Some(dec("10")), None, false, None).await;
+    order_rule(&pool, 0, "250000", "discount_percentage", Some(dec("10")), None, false, None).await;
 
-    let c = cart(company, vec![
-        line(company, a, "100000", "1"),
-        line(company, b, "200000", "1"),
+    let c = cart(vec![
+        line(a, "100000", "1"),
+        line(b, "200000", "1"),
     ]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
@@ -96,12 +95,13 @@ async fn cart1_order_total_minimum_fires_and_allocates() {
 #[tokio::test]
 async fn cart2_order_total_minimum_not_met() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let a = Uuid::new_v4();
-    order_rule(&pool, company, 0, "250000", "discount_percentage", Some(dec("10")), None, false, None).await;
 
-    let c = cart(company, vec![line(company, a, "100000", "1")]); // subtotal 100k < 250k
+    let a = Uuid::new_v4();
+    order_rule(&pool, 0, "250000", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let c = cart(vec![line(a, "100000", "1")]); // subtotal 100k < 250k
     let r = svc.resolve_cart(&c).await.unwrap();
 
     assert_eq!(r.subtotal, dec("100000.00"));
@@ -114,16 +114,17 @@ async fn cart2_order_total_minimum_not_met() {
 #[tokio::test]
 async fn cart3_allocation_penny_reconciliation() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b, cc) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
     // 10000 fixed off the order, spread over three EQUAL lines → 3333.33 each, 0.01 remainder.
-    order_rule(&pool, company, 0, "0", "discount_amount", None, Some(dec("10000")), false, None).await;
+    order_rule(&pool, 0, "0", "discount_amount", None, Some(dec("10000")), false, None).await;
 
-    let c = cart(company, vec![
-        line(company, a, "100000", "1"),
-        line(company, b, "100000", "1"),
-        line(company, cc, "100000", "1"),
+    let c = cart(vec![
+        line(a, "100000", "1"),
+        line(b, "100000", "1"),
+        line(cc, "100000", "1"),
     ]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
@@ -140,16 +141,17 @@ async fn cart3_allocation_penny_reconciliation() {
 #[tokio::test]
 async fn cart4_bundle_all_of() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
-    let bid = bundle(&pool, company, 0, "all_of", None, "discount_percentage", Some(dec("10")), None, "0", false).await;
-    bundle_component(&pool, company, bid, a, "1").await;
-    bundle_component(&pool, company, bid, b, "1").await;
 
-    let c = cart(company, vec![
-        line(company, a, "100000", "1"),
-        line(company, b, "50000", "1"),
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+    let bid = bundle(&pool, 0, "all_of", None, "discount_percentage", Some(dec("10")), None, "0", false).await;
+    bundle_component(&pool, bid, a, "1").await;
+    bundle_component(&pool, bid, b, "1").await;
+
+    let c = cart(vec![
+        line(a, "100000", "1"),
+        line(b, "50000", "1"),
     ]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
@@ -165,15 +167,16 @@ async fn cart4_bundle_all_of() {
 #[tokio::test]
 async fn cart5_bundle_all_of_not_satisfied() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
-    let bid = bundle(&pool, company, 0, "all_of", None, "discount_percentage", Some(dec("10")), None, "0", false).await;
-    bundle_component(&pool, company, bid, a, "1").await;
-    bundle_component(&pool, company, bid, b, "1").await;
+    let bid = bundle(&pool, 0, "all_of", None, "discount_percentage", Some(dec("10")), None, "0", false).await;
+    bundle_component(&pool, bid, a, "1").await;
+    bundle_component(&pool, bid, b, "1").await;
 
     // Only A in the cart — B is absent.
-    let c = cart(company, vec![line(company, a, "100000", "1")]);
+    let c = cart(vec![line(a, "100000", "1")]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
     assert_eq!(r.order_discount_total, Decimal::ZERO);
@@ -184,19 +187,20 @@ async fn cart5_bundle_all_of_not_satisfied() {
 #[tokio::test]
 async fn cart6_bundle_any_n() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b, cc) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
     // Any 2 of {A,B,C} → 20000 off.
-    let bid = bundle(&pool, company, 0, "any_n", Some(2), "discount_amount", None, Some(dec("20000")), "0", false).await;
-    bundle_component(&pool, company, bid, a, "1").await;
-    bundle_component(&pool, company, bid, b, "1").await;
-    bundle_component(&pool, company, bid, cc, "1").await;
+    let bid = bundle(&pool, 0, "any_n", Some(2), "discount_amount", None, Some(dec("20000")), "0", false).await;
+    bundle_component(&pool, bid, a, "1").await;
+    bundle_component(&pool, bid, b, "1").await;
+    bundle_component(&pool, bid, cc, "1").await;
 
     // A and B present, C absent → 2 distinct → fires.
-    let c = cart(company, vec![
-        line(company, a, "100000", "1"),
-        line(company, b, "100000", "1"),
+    let c = cart(vec![
+        line(a, "100000", "1"),
+        line(b, "100000", "1"),
     ]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
@@ -209,12 +213,13 @@ async fn cart6_bundle_any_n() {
 #[tokio::test]
 async fn cart7_line_rule_still_applies_in_cart() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let a = Uuid::new_v4();
-    pct_rule(&pool, company, a, 0, "20").await; // 20% off item A (scope=line by default)
 
-    let c = cart(company, vec![line(company, a, "100000", "2")]);
+    let a = Uuid::new_v4();
+    pct_rule(&pool, a, 0, "20").await; // 20% off item A (scope=line by default)
+
+    let c = cart(vec![line(a, "100000", "2")]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
     assert_eq!(r.lines[0].unit_price, dec("80000.00")); // 20% off applied per line
@@ -228,14 +233,15 @@ async fn cart7_line_rule_still_applies_in_cart() {
 #[tokio::test]
 async fn cart8a_non_stackable_is_exclusive() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let a = Uuid::new_v4();
     // R1 priority 10 non-stackable 10%; R2 priority 5 stackable 5%.
-    order_rule(&pool, company, 10, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
-    order_rule(&pool, company, 5, "0", "discount_percentage", Some(dec("5")), None, true, None).await;
+    order_rule(&pool, 10, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+    order_rule(&pool, 5, "0", "discount_percentage", Some(dec("5")), None, true, None).await;
 
-    let c = cart(company, vec![line(company, a, "100000", "1")]);
+    let c = cart(vec![line(a, "100000", "1")]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
     // Only R1 (10%) applies; R2 cannot stack onto an exclusive winner.
@@ -248,13 +254,14 @@ async fn cart8a_non_stackable_is_exclusive() {
 #[tokio::test]
 async fn cart8b_stackable_rules_combine() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let a = Uuid::new_v4();
-    order_rule(&pool, company, 10, "0", "discount_percentage", Some(dec("10")), None, true, None).await;
-    order_rule(&pool, company, 5, "0", "discount_percentage", Some(dec("5")), None, true, None).await;
 
-    let c = cart(company, vec![line(company, a, "100000", "1")]);
+    let a = Uuid::new_v4();
+    order_rule(&pool, 10, "0", "discount_percentage", Some(dec("10")), None, true, None).await;
+    order_rule(&pool, 5, "0", "discount_percentage", Some(dec("5")), None, true, None).await;
+
+    let c = cart(vec![line(a, "100000", "1")]);
     let r = svc.resolve_cart(&c).await.unwrap();
 
     // 10% of 100k = 10k; then 5% of the remaining 90k = 4.5k → 14.5k total.
@@ -268,14 +275,15 @@ async fn cart8b_stackable_rules_combine() {
 #[tokio::test]
 async fn cart9_order_rule_customer_group_scoped() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let a = Uuid::new_v4();
     let vip = Uuid::new_v4();
-    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, Some(vip)).await;
+    order_rule(&pool, 0, "0", "discount_percentage", Some(dec("10")), None, false, Some(vip)).await;
 
     // Non-VIP cart: rule does not apply.
-    let mut c = cart(company, vec![line(company, a, "100000", "1")]);
+    let mut c = cart(vec![line(a, "100000", "1")]);
     let r = svc.resolve_cart(&c).await.unwrap();
     assert_eq!(r.order_discount_total, Decimal::ZERO);
 
@@ -289,14 +297,14 @@ async fn cart9_order_rule_customer_group_scoped() {
 #[tokio::test]
 async fn cart10_order_rule_absent_from_single_line_resolve() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let a = Uuid::new_v4();
-    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("50")), None, false, None).await;
+    order_rule(&pool, 0, "0", "discount_percentage", Some(dec("50")), None, false, None).await;
 
     // Single-line resolve must ignore scope=order rules → pass-through to list price.
     let q = PriceQuery {
-        company_id: company,
         list_price: dec("100000"),
         quantity: dec("1"),
         item_id: a,
@@ -321,20 +329,21 @@ async fn cart10_order_rule_absent_from_single_line_resolve() {
 #[tokio::test]
 async fn cart15_bundle_plus_stackable_order_rule_conserves() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
 
     // 100%-off stackable bundle on item A alone.
-    let bid = bundle(&pool, company, 10, "all_of", None, "discount_percentage", Some(dec("100")), None, "0", true).await;
-    bundle_component(&pool, company, bid, a, "1").await;
+    let bid = bundle(&pool, 10, "all_of", None, "discount_percentage", Some(dec("100")), None, "0", true).await;
+    bundle_component(&pool, bid, a, "1").await;
     // A stackable 50%-off order rule.
-    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("50")), None, true, None).await;
+    order_rule(&pool, 0, "0", "discount_percentage", Some(dec("50")), None, true, None).await;
 
-    let line_a = line(company, a, "100000", "1");
-    let line_b = line(company, b, "100000", "1");
+    let line_a = line(a, "100000", "1");
+    let line_b = line(b, "100000", "1");
     let (id_a, id_b) = (line_a.line_id, line_b.line_id);
-    let r = svc.resolve_cart(&cart(company, vec![line_a, line_b])).await.unwrap();
+    let r = svc.resolve_cart(&cart(vec![line_a, line_b])).await.unwrap();
 
     assert_eq!(r.subtotal, dec("200000.00"));
     assert_eq!(r.order_discount_total, dec("150000.00")); // 100k bundle + 50k order rule
@@ -346,21 +355,15 @@ async fn cart15_bundle_plus_stackable_order_rule_conserves() {
 }
 
 /// Seed a buy-X-get-Y bundle: satisfying its components grants `reward_qty × sets` free `reward_item`.
-async fn free_bundle(
-    pool: &sqlx::PgPool,
-    company: Uuid,
-    reward_item: Uuid,
-    reward_qty: &str,
-) -> Uuid {
+async fn free_bundle(pool: &sqlx::PgPool, reward_item: Uuid, reward_qty: &str) -> Uuid {
     sqlx::query_scalar::<_, Uuid>(
         r#"INSERT INTO promo.promo_bundles
-             (company_id, title, priority, match_type, reward, reward_item_id, reward_qty,
+             (title, priority, match_type, reward, reward_item_id, reward_qty,
               min_order_amount, stackable, valid_from, status)
-           VALUES ($1,'free-bundle',0,'all_of'::bundle_match,'discount_percentage'::rate_or_discount,
-                   $2,$3,'0',false,now() - interval '1 day', 'active')
+           VALUES ('free-bundle',0,'all_of'::bundle_match,'discount_percentage'::rate_or_discount,
+                   $1,$2,'0',false,now() - interval '1 day', 'active')
            RETURNING id"#,
     )
-    .bind(company)
     .bind(reward_item)
     .bind(dec(reward_qty))
     .fetch_one(pool)
@@ -373,13 +376,14 @@ async fn free_bundle(
 #[tokio::test]
 async fn cart16_buy_x_get_y_free_line() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let (item_a, free_b) = (Uuid::new_v4(), Uuid::new_v4());
-    let bid = free_bundle(&pool, company, free_b, "1").await;
-    bundle_component(&pool, company, bid, item_a, "1").await; // buy 1 A
 
-    let r = svc.resolve_cart(&cart(company, vec![line(company, item_a, "100000", "1")])).await.unwrap();
+    let (item_a, free_b) = (Uuid::new_v4(), Uuid::new_v4());
+    let bid = free_bundle(&pool, free_b, "1").await;
+    bundle_component(&pool, bid, item_a, "1").await; // buy 1 A
+
+    let r = svc.resolve_cart(&cart(vec![line(item_a, "100000", "1")])).await.unwrap();
 
     // A is charged in full; the bundle adds a free B, not a discount.
     assert_eq!(r.subtotal, dec("100000.00"));
@@ -397,22 +401,23 @@ async fn cart16_buy_x_get_y_free_line() {
 #[tokio::test]
 async fn cart17_order_min_qty_gate() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let item = Uuid::new_v4();
 
     // 10% off the cart, but only when the cart holds ≥ 5 units in total.
     order_rule_threshold(
-        &pool, company, 0, "0", Some(dec("5")),
+        &pool, 0, "0", Some(dec("5")),
         "discount_percentage", Some(dec("10")), None, None, false,
     )
     .await;
 
     // Below the floor: 2 lines × 2 units = 4 < 5 → rule does not fire.
     let under = svc
-        .resolve_cart(&cart(company, vec![
-            line(company, item, "100000", "2"),
-            line(company, item, "100000", "2"),
+        .resolve_cart(&cart(vec![
+            line(item, "100000", "2"),
+            line(item, "100000", "2"),
         ]))
         .await
         .unwrap();
@@ -422,9 +427,9 @@ async fn cart17_order_min_qty_gate() {
 
     // At/above the floor: 2 lines × 3 units = 6 ≥ 5 → rule fires, 10% off.
     let over = svc
-        .resolve_cart(&cart(company, vec![
-            line(company, item, "100000", "3"),
-            line(company, item, "100000", "3"),
+        .resolve_cart(&cart(vec![
+            line(item, "100000", "3"),
+            line(item, "100000", "3"),
         ]))
         .await
         .unwrap();
@@ -439,19 +444,20 @@ async fn cart17_order_min_qty_gate() {
 #[tokio::test]
 async fn cart18_order_discount_upto_cap() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let item = Uuid::new_v4();
 
     // 10% off the cart, capped at 50,000.
     order_rule_threshold(
-        &pool, company, 0, "0", None,
+        &pool, 0, "0", None,
         "discount_percentage", Some(dec("10")), None, Some(dec("50000")), false,
     )
     .await;
 
     let r = svc
-        .resolve_cart(&cart(company, vec![line(company, item, "1000000", "1")]))
+        .resolve_cart(&cart(vec![line(item, "1000000", "1")]))
         .await
         .unwrap();
     assert_eq!(r.subtotal, dec("1000000.00"));
@@ -467,18 +473,19 @@ async fn cart18_order_discount_upto_cap() {
 #[tokio::test]
 async fn cart19_multi_gift_bundle() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (item_a, gift_b, gift_c) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
 
     // Buy 1 A → get 1 free B and 2 free C (two distinct gifts on one bundle).
-    let bid = bundle(&pool, company, 0, "all_of", None, "discount_percentage", None, None, "0", false).await;
-    bundle_component(&pool, company, bid, item_a, "1").await;
-    gift(&pool, company, bid, gift_b, "1").await;
-    gift(&pool, company, bid, gift_c, "2").await;
+    let bid = bundle(&pool, 0, "all_of", None, "discount_percentage", None, None, "0", false).await;
+    bundle_component(&pool, bid, item_a, "1").await;
+    gift(&pool, bid, gift_b, "1").await;
+    gift(&pool, bid, gift_c, "2").await;
 
     let r = svc
-        .resolve_cart(&cart(company, vec![line(company, item_a, "100000", "1")]))
+        .resolve_cart(&cart(vec![line(item_a, "100000", "1")]))
         .await
         .unwrap();
 
@@ -502,12 +509,11 @@ async fn cart19_multi_gift_bundle() {
 // oracle (`assert_shares_tie_out`, which also checks the by-tax fold).
 
 /// A cart line carrying an explicit tax-group key (None = the caller has no tax split).
-fn line_tax(company: Uuid, item: Uuid, list: &str, qty: &str, tax_key: Option<&str>) -> CartLine {
+fn line_tax(item: Uuid, list: &str, qty: &str, tax_key: Option<&str>) -> CartLine {
     CartLine {
         line_id: Uuid::new_v4(),
         tax_key: tax_key.map(str::to_string),
         query: PriceQuery {
-            company_id: company,
             list_price: dec(list),
             quantity: dec(qty),
             item_id: item,
@@ -550,16 +556,17 @@ fn group_total(
 #[tokio::test]
 async fn tax1_two_group_split() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
-    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
 
-    let la = line_tax(company, a, "100000", "1", Some("PPN"));
-    let lb = line_tax(company, b, "50000", "1", Some("FREE"));
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+    order_rule(&pool, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let la = line_tax(a, "100000", "1", Some("PPN"));
+    let lb = line_tax(b, "50000", "1", Some("FREE"));
     let id_a = la.line_id;
     let id_b = lb.line_id;
-    let r = svc.resolve_cart(&cart(company, vec![la, lb])).await.unwrap();
+    let r = svc.resolve_cart(&cart(vec![la, lb])).await.unwrap();
 
     assert_eq!(r.subtotal, dec("150000.00"));
     assert_eq!(r.order_discount_total, dec("15000.00"));
@@ -580,17 +587,18 @@ async fn tax1_two_group_split() {
 #[tokio::test]
 async fn tax2_three_group_penny_fold() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b, cc) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
-    order_rule(&pool, company, 0, "0", "discount_amount", None, Some(dec("100")), false, None).await;
+    order_rule(&pool, 0, "0", "discount_amount", None, Some(dec("100")), false, None).await;
 
     let lines = vec![
-        line_tax(company, a, "100000", "1", Some("A")),
-        line_tax(company, b, "100000", "1", Some("B")),
-        line_tax(company, cc, "100000", "1", Some("C")),
+        line_tax(a, "100000", "1", Some("A")),
+        line_tax(b, "100000", "1", Some("B")),
+        line_tax(cc, "100000", "1", Some("C")),
     ];
-    let r = svc.resolve_cart(&cart(company, lines)).await.unwrap();
+    let r = svc.resolve_cart(&cart(lines)).await.unwrap();
     assert_eq!(r.order_discount_total, dec("100.00"));
     let mut shares: Vec<Decimal> =
         r.order_adjustments[0].allocated.iter().map(|s| s.share).collect();
@@ -608,24 +616,25 @@ async fn tax2_three_group_penny_fold() {
 #[tokio::test]
 async fn tax3_single_group_byte_identical() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b, cc) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
-    order_rule(&pool, company, 0, "0", "discount_amount", None, Some(dec("10000")), false, None).await;
+    order_rule(&pool, 0, "0", "discount_amount", None, Some(dec("10000")), false, None).await;
 
     let bare = svc
-        .resolve_cart(&cart(company, vec![
-            line(company, a, "100000", "1"),
-            line(company, b, "100000", "1"),
-            line(company, cc, "100000", "1"),
+        .resolve_cart(&cart(vec![
+            line(a, "100000", "1"),
+            line(b, "100000", "1"),
+            line(cc, "100000", "1"),
         ]))
         .await
         .unwrap();
     let keyed = svc
-        .resolve_cart(&cart(company, vec![
-            line_tax(company, a, "100000", "1", Some("PPN")),
-            line_tax(company, b, "100000", "1", Some("PPN")),
-            line_tax(company, cc, "100000", "1", Some("PPN")),
+        .resolve_cart(&cart(vec![
+            line_tax(a, "100000", "1", Some("PPN")),
+            line_tax(b, "100000", "1", Some("PPN")),
+            line_tax(cc, "100000", "1", Some("PPN")),
         ]))
         .await
         .unwrap();
@@ -648,15 +657,16 @@ async fn tax3_single_group_byte_identical() {
 #[tokio::test]
 async fn tax4_keyless_line_is_its_own_group() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
-    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
 
-    let la = line_tax(company, a, "100000", "1", Some("PPN"));
-    let lb = line_tax(company, b, "100000", "1", None);
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+    order_rule(&pool, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let la = line_tax(a, "100000", "1", Some("PPN"));
+    let lb = line_tax(b, "100000", "1", None);
     let id_b = lb.line_id;
-    let r = svc.resolve_cart(&cart(company, vec![la, lb])).await.unwrap();
+    let r = svc.resolve_cart(&cart(vec![la, lb])).await.unwrap();
 
     assert_eq!(group_total(&r, Some("PPN")), dec("10000.00"));
     assert_eq!(group_total(&r, None), dec("10000.00"));
@@ -669,15 +679,16 @@ async fn tax4_keyless_line_is_its_own_group() {
 #[tokio::test]
 async fn tax5_cart_level_key_wins_over_query_key() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let item = Uuid::new_v4();
-    order_rule(&pool, company, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
 
-    let mut l = line_tax(company, item, "100000", "1", Some("CART"));
+    let item = Uuid::new_v4();
+    order_rule(&pool, 0, "0", "discount_percentage", Some(dec("10")), None, false, None).await;
+
+    let mut l = line_tax(item, "100000", "1", Some("CART"));
     l.query.tax_key = Some("QUERY".into());
     let id = l.line_id;
-    let r = svc.resolve_cart(&cart(company, vec![l])).await.unwrap();
+    let r = svc.resolve_cart(&cart(vec![l])).await.unwrap();
 
     assert_eq!(share_of(&r, id), (Some("CART".into()), dec("10000.00")));
     assert_eq!(r.lines[0].tax_key.as_deref(), Some("CART"));
@@ -690,20 +701,21 @@ async fn tax5_cart_level_key_wins_over_query_key() {
 #[tokio::test]
 async fn tax6_exhausted_group_gets_no_share() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+
     let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
     // A 100%-off stackable bundle on A alone (exhausts A's capacity), plus a stackable fixed 5000
     // order rule that can only find capacity on B.
-    let bid = bundle(&pool, company, 0, "all_of", None, "discount_percentage", Some(dec("100")), None, "0", true).await;
-    bundle_component(&pool, company, bid, a, "1").await;
-    order_rule(&pool, company, 0, "0", "discount_amount", None, Some(dec("5000")), true, None).await;
+    let bid = bundle(&pool, 0, "all_of", None, "discount_percentage", Some(dec("100")), None, "0", true).await;
+    bundle_component(&pool, bid, a, "1").await;
+    order_rule(&pool, 0, "0", "discount_amount", None, Some(dec("5000")), true, None).await;
 
-    let la = line_tax(company, a, "10000", "1", Some("PPN"));
-    let lb = line_tax(company, b, "100000", "1", Some("FREE"));
+    let la = line_tax(a, "10000", "1", Some("PPN"));
+    let lb = line_tax(b, "100000", "1", Some("FREE"));
     let id_a = la.line_id;
     let id_b = lb.line_id;
-    let r = svc.resolve_cart(&cart(company, vec![la, lb])).await.unwrap();
+    let r = svc.resolve_cart(&cart(vec![la, lb])).await.unwrap();
 
     assert_eq!(r.order_discount_total, dec("15000.00")); // 10000 (bundle) + 5000 (rule)
     // The bundle took all of A; the order rule's 5000 could only land on B's group.
@@ -730,7 +742,6 @@ async fn tax6_exhausted_group_gets_no_share() {
 fn tax7_serde_back_compat() {
     // A pre-D4 PriceQuery (no tax_key field).
     let old_price_query = serde_json::json!({
-        "company_id": "00000000-0000-0000-0000-000000000001",
         "list_price": "100000",
         "quantity": "1",
         "item_id": "00000000-0000-0000-0000-000000000002",
@@ -748,7 +759,6 @@ fn tax7_serde_back_compat() {
     let old_cart_line = serde_json::json!({
         "line_id": "00000000-0000-0000-0000-000000000003",
         "query": {
-            "company_id": "00000000-0000-0000-0000-000000000001",
             "list_price": "100000",
             "quantity": "1",
             "item_id": "00000000-0000-0000-0000-000000000002",

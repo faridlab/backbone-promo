@@ -44,7 +44,6 @@ pub struct PricingRulePaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct PricingRuleFilter {
-    pub company_id: Option<Uuid>,
     pub title: Option<String>,
     pub scope: Option<RuleScope>,
     pub stackable: Option<bool>,
@@ -63,7 +62,7 @@ pub struct PricingRuleFilter {
 impl PricingRuleFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.scope.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.rate_or_discount.is_some() || self.currency.is_some() || self.coupon_required.is_some() || self.status.is_some()
+        self.title.is_some() || self.scope.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.rate_or_discount.is_some() || self.currency.is_some() || self.coupon_required.is_some() || self.status.is_some()
     }
 }
 

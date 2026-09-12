@@ -41,21 +41,21 @@ async fn order_subtotal(pool: &sqlx::PgPool, id: Uuid) -> Decimal {
 #[tokio::test]
 async fn prseam1_resolved_price_drives_selling_order() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let promo = Arc::new(PromoWriteService::new(pool.clone()));
     let selling = SellingWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
+    let suffix = Uuid::new_v4();
     let customer = Uuid::new_v4();
     let discounted_item = Uuid::new_v4();
     let plain_item = Uuid::new_v4();
 
     // A 20%-off rule on ONE item.
-    pct_rule(&pool, company, discounted_item, 0, "20").await;
+    pct_rule(&pool, discounted_item, 0, "20").await;
 
     // The caller depends only on the PORT (zero normal edge).
     let resolver: Arc<dyn PriceResolverPort> = Arc::new(PromoPriceResolver { service: promo.clone() });
 
     let query = |item: Uuid| PriceQuery {
-        company_id: company,
         list_price: dec("100000"),
         quantity: dec("2"),
         item_id: item,
@@ -79,7 +79,6 @@ async fn prseam1_resolved_price_drives_selling_order() {
         order_number: num.to_string(),
         quotation_id: None,
         delivery_carrier_id: None,
-        company_id: company,
         branch_id: None,
         customer_id: customer,
         order_date: now().date_naive(),
@@ -100,11 +99,11 @@ async fn prseam1_resolved_price_drives_selling_order() {
     };
 
     let disc_order = selling
-        .create_sales_order(mk(&format!("SO-D-{}", &company.to_string()[..8]), discounted_item, disc.unit_price))
+        .create_sales_order(mk(&format!("SO-D-{}", &suffix.to_string()[..8]), discounted_item, disc.unit_price))
         .await
         .unwrap();
     let plain_order = selling
-        .create_sales_order(mk(&format!("SO-P-{}", &company.to_string()[..8]), plain_item, plain.unit_price))
+        .create_sales_order(mk(&format!("SO-P-{}", &suffix.to_string()[..8]), plain_item, plain.unit_price))
         .await
         .unwrap();
 
@@ -122,23 +121,23 @@ async fn prseam1_resolved_price_drives_selling_order() {
 #[tokio::test]
 async fn prseam3_coupon_cap_binds_across_selling_commit() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let promo = PromoWriteService::new(pool.clone());
     let selling = SellingWriteService::new(pool.clone());
     let sink = LoggingSink;
-    let company = Uuid::new_v4();
+    let suffix = Uuid::new_v4();
     let item = Uuid::new_v4();
 
     // A single-use, coupon-gated 30%-off rule.
     let rule_id = rule(&pool, RuleSpec {
         coupon_required: true,
         discount_percentage: Some(dec("30")),
-        ..RuleSpec::for_item(company, item)
+        ..RuleSpec::for_item(item)
     })
     .await;
-    let coupon_id = coupon(&pool, company, "FLASH", rule_id, Some(1)).await;
+    let coupon_id = coupon(&pool, "FLASH", rule_id, Some(1)).await;
 
     let query = |cust: Uuid| PriceQuery {
-        company_id: company,
         list_price: dec("100000"),
         quantity: Decimal::ONE,
         item_id: item,
@@ -154,7 +153,6 @@ async fn prseam3_coupon_cap_binds_across_selling_commit() {
         order_number: num.to_string(),
         quotation_id: None,
         delivery_carrier_id: None,
-        company_id: company,
         branch_id: None,
         customer_id: cust,
         order_date: now().date_naive(),
@@ -173,7 +171,7 @@ async fn prseam3_coupon_cap_binds_across_selling_commit() {
             is_downpayment: None,
         }],
     };
-    let short = &company.to_string()[..8];
+    let short = &suffix.to_string()[..8];
 
     // Customer A: resolve offers the discount + the coupon handoff token.
     let a = Uuid::new_v4();
@@ -192,7 +190,7 @@ async fn prseam3_coupon_cap_binds_across_selling_commit() {
         .await
         .unwrap();
     let consumed_rule = promo
-        .commit_coupon_redemption(company, cid, "sales_order", order_a, &sink)
+        .commit_coupon_redemption(cid, "sales_order", order_a, &sink)
         .await
         .unwrap();
     assert_eq!(consumed_rule, rule_id);
@@ -208,16 +206,18 @@ async fn prseam3_coupon_cap_binds_across_selling_commit() {
 #[tokio::test]
 async fn prseam2_loyalty_accrues_from_pos_invoice_paid() {
     let pool = pool().await;
+    let _wide = isolated_wide_tables(&pool).await;
     let promo = PromoWriteService::new(pool.clone());
     let sink = LoggingSink;
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = program(&pool, company, "0.01", "100", Some(365)).await; // 1 pt / 100 spent
+    let program_id = program(&pool, "0.01", "100", Some(365)).await; // 1 pt / 100 spent
 
-    // The REAL event POS emits when a counter sale is recognised.
+    // The REAL event POS emits when a counter sale is recognised. Its `company_id` is the legacy
+    // tenant twin POS still stamps (the ambient org scope's echo; nil when undecorated) — post-strip
+    // promo keys no statement on it (ADR-0029).
     let paid = PosInvoicePaid {
         pos_invoice_id: Uuid::new_v4(),
-        company_id: company,
+        company_id: Uuid::nil(),
         grand_total: dec("250000"),
         rounded_total: dec("250000"),
         billing_invoice_id: Uuid::new_v4(),
@@ -226,7 +226,6 @@ async fn prseam2_loyalty_accrues_from_pos_invoice_paid() {
 
     // A POS→promo adapter maps the paid event to an accrual request.
     let to_accrual = |e: &PosInvoicePaid| AccrualRequest {
-        company_id: e.company_id,
         loyalty_program_id: program_id,
         customer_id: customer,
         purchase_amount: e.rounded_total,
@@ -242,5 +241,5 @@ async fn prseam2_loyalty_accrues_from_pos_invoice_paid() {
     // Redelivery of the same paid event earns nothing more.
     let b = promo.accrue(&to_accrual(&paid), &sink).await.unwrap();
     assert!(b.already);
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("2500"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("2500"));
 }

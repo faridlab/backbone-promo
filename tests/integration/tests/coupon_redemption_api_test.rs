@@ -24,7 +24,6 @@ impl TestDataGenerator for CouponRedemptionTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": Uuid::new_v4().to_string(),
-            "company_id": Uuid::new_v4().to_string(),
             "coupon_id": Uuid::new_v4().to_string(),
             "pricing_rule_id": Uuid::new_v4().to_string(),
             "source_type": format!("Test {}", Uuid::new_v4().to_string().split('-').next().unwrap()),
@@ -38,7 +37,6 @@ impl TestDataGenerator for CouponRedemptionTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": id,
-            "company_id": Uuid::new_v4().to_string(),
             "coupon_id": Uuid::new_v4().to_string(),
             "pricing_rule_id": Uuid::new_v4().to_string(),
             "source_type": format!("Test {}", Uuid::new_v4().to_string().split('-').next().unwrap()),

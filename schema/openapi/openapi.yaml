@@ -3331,7 +3331,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - code
         - pricing_rule_id
         - used_count
@@ -3340,9 +3339,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         code:
@@ -3390,7 +3386,6 @@ components:
     CreateCouponCodeRequest:
       type: object
       required:
-        - company_id
         - code
         - pricing_rule_id
         - used_count
@@ -3398,9 +3393,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         code:
           type: string
           maxLength: 40
@@ -3433,7 +3425,6 @@ components:
     UpdateCouponCodeRequest:
       type: object
       required:
-        - company_id
         - code
         - pricing_rule_id
         - used_count
@@ -3441,9 +3432,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         code:
           type: string
           maxLength: 40
@@ -3476,9 +3464,6 @@ components:
     PatchCouponCodeRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         code:
           type: string
           maxLength: 40
@@ -3522,7 +3507,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - coupon_id
         - pricing_rule_id
         - source_type
@@ -3531,9 +3515,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         coupon_id:
@@ -3570,7 +3551,6 @@ components:
     CreateCouponRedemptionRequest:
       type: object
       required:
-        - company_id
         - coupon_id
         - pricing_rule_id
         - source_type
@@ -3578,9 +3558,6 @@ components:
         - redeemed_at
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         coupon_id:
           type: string
           format: uuid
@@ -3602,7 +3579,6 @@ components:
     UpdateCouponRedemptionRequest:
       type: object
       required:
-        - company_id
         - coupon_id
         - pricing_rule_id
         - source_type
@@ -3610,9 +3586,6 @@ components:
         - redeemed_at
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         coupon_id:
           type: string
           format: uuid
@@ -3634,9 +3607,6 @@ components:
     PatchCouponRedemptionRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         coupon_id:
           type: string
           format: uuid
@@ -3669,7 +3639,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - loyalty_program_id
         - customer_id
         - order_ref_type
@@ -3682,9 +3651,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         loyalty_program_id:
@@ -3740,7 +3706,6 @@ components:
     CreateLoyaltyOrderPointsRequest:
       type: object
       required:
-        - company_id
         - loyalty_program_id
         - customer_id
         - order_ref_type
@@ -3752,9 +3717,6 @@ components:
         - spent_reversed_points
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         loyalty_program_id:
           type: string
           format: uuid
@@ -3795,7 +3757,6 @@ components:
     UpdateLoyaltyOrderPointsRequest:
       type: object
       required:
-        - company_id
         - loyalty_program_id
         - customer_id
         - order_ref_type
@@ -3807,9 +3768,6 @@ components:
         - spent_reversed_points
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         loyalty_program_id:
           type: string
           format: uuid
@@ -3850,9 +3808,6 @@ components:
     PatchLoyaltyOrderPointsRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         loyalty_program_id:
           type: string
           format: uuid
@@ -3904,7 +3859,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - program_name
         - program_type
         - collection_factor
@@ -3914,9 +3868,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         program_name:
@@ -3960,7 +3911,6 @@ components:
     CreateLoyaltyProgramRequest:
       type: object
       required:
-        - company_id
         - program_name
         - program_type
         - collection_factor
@@ -3969,9 +3919,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         program_name:
           type: string
           maxLength: 140
@@ -4000,7 +3947,6 @@ components:
     UpdateLoyaltyProgramRequest:
       type: object
       required:
-        - company_id
         - program_name
         - program_type
         - collection_factor
@@ -4009,9 +3955,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         program_name:
           type: string
           maxLength: 140
@@ -4040,9 +3983,6 @@ components:
     PatchLoyaltyProgramRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         program_name:
           type: string
           maxLength: 140
@@ -4082,7 +4022,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - loyalty_program_id
         - customer_id
         - entry_type
@@ -4094,9 +4033,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         loyalty_program_id:
@@ -4143,7 +4079,6 @@ components:
     CreateLoyaltyPointEntryRequest:
       type: object
       required:
-        - company_id
         - loyalty_program_id
         - customer_id
         - entry_type
@@ -4154,9 +4089,6 @@ components:
         - posting_date
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         loyalty_program_id:
           type: string
           format: uuid
@@ -4188,7 +4120,6 @@ components:
     UpdateLoyaltyPointEntryRequest:
       type: object
       required:
-        - company_id
         - loyalty_program_id
         - customer_id
         - entry_type
@@ -4199,9 +4130,6 @@ components:
         - posting_date
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         loyalty_program_id:
           type: string
           format: uuid
@@ -4233,9 +4161,6 @@ components:
     PatchLoyaltyPointEntryRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         loyalty_program_id:
           type: string
           format: uuid
@@ -4278,7 +4203,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - title
         - priority
         - scope
@@ -4295,9 +4219,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         title:
@@ -4390,7 +4311,6 @@ components:
     CreatePricingRuleRequest:
       type: object
       required:
-        - company_id
         - title
         - priority
         - scope
@@ -4406,9 +4326,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         title:
           type: string
           maxLength: 140
@@ -4486,7 +4403,6 @@ components:
     UpdatePricingRuleRequest:
       type: object
       required:
-        - company_id
         - title
         - priority
         - scope
@@ -4502,9 +4418,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         title:
           type: string
           maxLength: 140
@@ -4582,9 +4495,6 @@ components:
     PatchPricingRuleRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         title:
           type: string
           maxLength: 140
@@ -4673,7 +4583,6 @@ components:
       type: object
       required:
         - id
-        - company_id
         - title
         - priority
         - match_type
@@ -4686,9 +4595,6 @@ components:
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         title:
@@ -4752,7 +4658,6 @@ components:
     CreatePromoBundleRequest:
       type: object
       required:
-        - company_id
         - title
         - priority
         - match_type
@@ -4764,9 +4669,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         title:
           type: string
           maxLength: 140
@@ -4815,7 +4717,6 @@ components:
     UpdatePromoBundleRequest:
       type: object
       required:
-        - company_id
         - title
         - priority
         - match_type
@@ -4827,9 +4728,6 @@ components:
         - status
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         title:
           type: string
           maxLength: 140
@@ -4878,9 +4776,6 @@ components:
     PatchPromoBundleRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         title:
           type: string
           maxLength: 140
@@ -4940,16 +4835,12 @@ components:
       type: object
       required:
         - id
-        - company_id
         - bundle_id
         - apply_on
         - min_qty
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         bundle_id:
@@ -4990,15 +4881,11 @@ components:
     CreatePromoBundleComponentRequest:
       type: object
       required:
-        - company_id
         - bundle_id
         - apply_on
         - min_qty
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         bundle_id:
           type: string
           format: uuid
@@ -5024,15 +4911,11 @@ components:
     UpdatePromoBundleComponentRequest:
       type: object
       required:
-        - company_id
         - bundle_id
         - apply_on
         - min_qty
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         bundle_id:
           type: string
           format: uuid
@@ -5058,9 +4941,6 @@ components:
     PatchPromoBundleComponentRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         bundle_id:
           type: string
           format: uuid
@@ -5097,16 +4977,12 @@ components:
       type: object
       required:
         - id
-        - company_id
         - bundle_id
         - gift_item_id
         - gift_qty
         - metadata
       properties:
         id:
-          type: string
-          format: uuid
-        company_id:
           type: string
           format: uuid
         bundle_id:
@@ -5136,15 +5012,11 @@ components:
     CreatePromoBundleGiftRequest:
       type: object
       required:
-        - company_id
         - bundle_id
         - gift_item_id
         - gift_qty
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         bundle_id:
           type: string
           format: uuid
@@ -5159,15 +5031,11 @@ components:
     UpdatePromoBundleGiftRequest:
       type: object
       required:
-        - company_id
         - bundle_id
         - gift_item_id
         - gift_qty
         - metadata
       properties:
-        company_id:
-          type: string
-          format: uuid
         bundle_id:
           type: string
           format: uuid
@@ -5182,9 +5050,6 @@ components:
     PatchPromoBundleGiftRequest:
       type: object
       properties:
-        company_id:
-          type: string
-          format: uuid
         bundle_id:
           type: string
           format: uuid

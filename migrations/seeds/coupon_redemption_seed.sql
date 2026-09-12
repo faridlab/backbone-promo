@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.coupon_redemptions (
 --     id,
---     company_id,
 --     coupon_id,
 --     pricing_rule_id,
 --     source_type,

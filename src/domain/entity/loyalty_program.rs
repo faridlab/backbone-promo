@@ -52,7 +52,6 @@ impl std::ops::Deref for LoyaltyProgramId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct LoyaltyProgram {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub program_name: String,
     pub program_type: LoyaltyProgramType,
     pub collection_factor: Decimal,
@@ -73,10 +72,9 @@ impl LoyaltyProgram {
     }
 
     /// Create a new LoyaltyProgram with required fields
-    pub fn new(company_id: Uuid, program_name: String, program_type: LoyaltyProgramType, collection_factor: Decimal, conversion_factor: Decimal, from_date: DateTime<Utc>, status: LoyaltyProgramStatus) -> Self {
+    pub fn new(program_name: String, program_type: LoyaltyProgramType, collection_factor: Decimal, conversion_factor: Decimal, from_date: DateTime<Utc>, status: LoyaltyProgramStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             program_name,
             program_type,
             collection_factor,
@@ -169,9 +167,6 @@ impl LoyaltyProgram {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "program_name" => {
                     if let Ok(v) = serde_json::from_value(value) { self.program_name = v; }
                 }
@@ -250,16 +245,12 @@ impl backbone_orm::EntityRepoMeta for LoyaltyProgram {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("program_type".to_string(), "loyalty_program_type".to_string());
         m.insert("status".to_string(), "loyalty_program_status".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
         &["program_name"]
-    }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
     }
 }
 
@@ -269,7 +260,6 @@ impl backbone_orm::EntityRepoMeta for LoyaltyProgram {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct LoyaltyProgramBuilder {
-    company_id: Option<Uuid>,
     program_name: Option<String>,
     program_type: Option<LoyaltyProgramType>,
     collection_factor: Option<Decimal>,
@@ -281,12 +271,6 @@ pub struct LoyaltyProgramBuilder {
 }
 
 impl LoyaltyProgramBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the program_name field (required)
     pub fn program_name(mut self, value: String) -> Self {
         self.program_name = Some(value);
@@ -339,7 +323,6 @@ impl LoyaltyProgramBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<LoyaltyProgram, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let program_name = self.program_name.ok_or_else(|| "program_name is required".to_string())?;
         let collection_factor = self.collection_factor.ok_or_else(|| "collection_factor is required".to_string())?;
         let conversion_factor = self.conversion_factor.ok_or_else(|| "conversion_factor is required".to_string())?;
@@ -347,7 +330,6 @@ impl LoyaltyProgramBuilder {
 
         Ok(LoyaltyProgram {
             id: Uuid::new_v4(),
-            company_id,
             program_name,
             program_type: self.program_type.unwrap_or_default(),
             collection_factor,

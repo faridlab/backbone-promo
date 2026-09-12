@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.coupon_codes (
 --     id,
---     company_id,
 --     code,
 --     pricing_rule_id,
 --     description,

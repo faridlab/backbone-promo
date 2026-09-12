@@ -24,7 +24,6 @@ impl TestDataGenerator for LoyaltyProgramTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": Uuid::new_v4().to_string(),
-            "company_id": Uuid::new_v4().to_string(),
             "program_name": format!("Test {}", Uuid::new_v4().to_string().split('-').next().unwrap()),
             "program_type": "single_tier",
             "collection_factor": 0,
@@ -41,7 +40,6 @@ impl TestDataGenerator for LoyaltyProgramTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": id,
-            "company_id": Uuid::new_v4().to_string(),
             "program_name": format!("Test {}", Uuid::new_v4().to_string().split('-').next().unwrap()),
             "program_type": "single_tier",
             "collection_factor": 0,

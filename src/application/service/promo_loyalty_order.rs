@@ -21,7 +21,6 @@
 //! the member lock on `LoyaltyMemberAnchorRepository`, and the program reads on
 //! `LoyaltyProgramRepository`.
 
-use backbone_orm::company_scope;
 use rust_decimal::Decimal;
 
 use crate::infrastructure::persistence::{NewAccrualRow, NewRedemptionRow, NewReversalRow};
@@ -40,8 +39,9 @@ impl PromoWriteService {
     // ---- 5. per-order loyalty accounting -------------------------------------------------------
 
     /// Grant (earn) a member's points for one logical order, at order confirm. Re-drive safe: the
-    /// order row's partial-unique key and the ledger entry's `(company, source, entry_type)` key
-    /// together make a replayed confirm a no-op returning the same outcome. Points are DERIVED:
+    /// order row's partial-unique key and the ledger entry's one-entry-per-document unique (a
+    /// decorator-declared org-scoped key, ADR-0029) together make a replayed confirm a no-op
+    /// returning the same outcome. Points are DERIVED:
     /// `floor(grant_base_amount · collection_factor)` — a zero result writes nothing (matching
     /// `accrue`'s zero behavior). Cross-legacy defense: a host that also drove the bare `accrue`
     /// with the same source key dedupes on the entry partial-unique.
@@ -56,8 +56,9 @@ impl PromoWriteService {
         if req.order_ref_type.is_empty() || req.order_ref_type.len() > 40 {
             return Err(PricingError::Invalid("order_ref_type must be 1..=40 chars".into()));
         }
-        let (collection_factor, expiry_days) =
-            self.load_active_program(req.company_id, req.loyalty_program_id, req.at).await?;
+        let (collection_factor, expiry_days) = self
+            .load_active_program(req.loyalty_program_id, req.at)
+            .await?;
 
         let points = (req.grant_base_amount * collection_factor).floor();
         if points <= Decimal::ZERO {
@@ -71,13 +72,11 @@ impl PromoWriteService {
         let expiry = expiry_days.map(|d| req.at + chrono::Duration::days(d as i64));
 
         let mut tx = self.pool.begin().await?;
-        // RLS scope (ADR-0008): company on the request — bind it so the anchor mint, the ledger
-        // claim, and the order-row upsert all run inside this tenant's fence.
-        company_scope::bind_company_on(&mut tx, req.company_id).await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Member serialization: the anchor exists/was locked before any balance-affecting write.
         self.anchors
-            .ensure_and_lock(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id)
+            .ensure_and_lock(&mut tx, req.customer_id, req.loyalty_program_id)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::MemberBalance))?;
 
@@ -85,7 +84,6 @@ impl PromoWriteService {
         let inserted = self
             .order_points
             .insert_grant(&mut tx, &crate::infrastructure::persistence::NewOrderGrantRow {
-                company_id: req.company_id,
                 loyalty_program_id: req.loyalty_program_id,
                 customer_id: req.customer_id,
                 order_ref_type: &req.order_ref_type,
@@ -101,7 +99,6 @@ impl PromoWriteService {
         let entry_id = self
             .entries
             .claim_accrual_on(&mut tx, &NewAccrualRow {
-                company_id: req.company_id,
                 loyalty_program_id: req.loyalty_program_id,
                 customer_id: req.customer_id,
                 points,
@@ -125,7 +122,6 @@ impl PromoWriteService {
                     .order_points
                     .find_by_order_ref(
                         &mut tx,
-                        req.company_id,
                         req.loyalty_program_id,
                         &req.order_ref_type,
                         req.order_ref_id,
@@ -135,7 +131,6 @@ impl PromoWriteService {
                 self.order_points
                     .set_granted(
                         &mut tx,
-                        req.company_id,
                         req.loyalty_program_id,
                         &req.order_ref_type,
                         req.order_ref_id,
@@ -152,7 +147,6 @@ impl PromoWriteService {
                     .order_points
                     .find_by_order_ref(
                         &mut tx,
-                        req.company_id,
                         req.loyalty_program_id,
                         &req.order_ref_type,
                         req.order_ref_id,
@@ -168,7 +162,7 @@ impl PromoWriteService {
             sink.publish(&PromoEvent::LoyaltyOrderPointsGranted(LoyaltyOrderPointsGranted {
                 order_points_id,
                 loyalty_program_id: req.loyalty_program_id,
-                company_id: req.company_id,
+                company_id: legacy_twin(),
                 customer_id: req.customer_id,
                 order_ref_type: req.order_ref_type.clone(),
                 order_ref_id: req.order_ref_id,
@@ -203,32 +197,32 @@ impl PromoWriteService {
             return Err(PricingError::Invalid("order_ref_type must be 1..=40 chars".into()));
         }
         let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, req.company_id).await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock order: the program row pins conversion_factor against admin edits (fail-fast over
         // blocking); the anchor serializes every balance writer for this member.
         let conversion_factor = self
             .programs
-            .find_active_conversion(&mut tx, req.company_id, req.loyalty_program_id, req.at)
+            .find_active_conversion(&mut tx, req.loyalty_program_id, req.at)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::LoyaltyProgram))?
             .ok_or(PricingError::ProgramInvalid)?;
 
         self.anchors
-            .ensure_and_lock(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id)
+            .ensure_and_lock(&mut tx, req.customer_id, req.loyalty_program_id)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::MemberBalance))?;
 
         // Idempotent replay: this order already spent — return the stored spend.
         if let Some(prior) = self
             .entries
-            .find_redemption_by_source(&mut tx, req.company_id, &req.order_ref_type, req.order_ref_id)
+            .find_redemption_by_source(&mut tx, &req.order_ref_type, req.order_ref_id)
             .await?
         {
             let points = -prior.points;
             let available_after = self
                 .entries
-                .balances_at(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id, req.at)
+                .balances_at(&mut tx, req.customer_id, req.loyalty_program_id, req.at)
                 .await?
                 .0;
             tx.commit().await?;
@@ -244,7 +238,7 @@ impl PromoWriteService {
         // Expiry-aware balance, under the member lock.
         let (available, lapsed) = self
             .entries
-            .balances_at(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id, req.at)
+            .balances_at(&mut tx, req.customer_id, req.loyalty_program_id, req.at)
             .await?;
         if req.points > available {
             if available + lapsed >= req.points {
@@ -257,7 +251,6 @@ impl PromoWriteService {
         let entry_id = self
             .entries
             .insert_redemption(&mut tx, &NewRedemptionRow {
-                company_id: req.company_id,
                 loyalty_program_id: req.loyalty_program_id,
                 customer_id: req.customer_id,
                 points: -req.points,
@@ -272,7 +265,6 @@ impl PromoWriteService {
         let order_points_id = match self
             .order_points
             .insert_spend(&mut tx, &crate::infrastructure::persistence::NewOrderSpendRow {
-                company_id: req.company_id,
                 loyalty_program_id: req.loyalty_program_id,
                 customer_id: req.customer_id,
                 order_ref_type: &req.order_ref_type,
@@ -288,7 +280,6 @@ impl PromoWriteService {
                     .order_points
                     .find_by_order_ref(
                         &mut tx,
-                        req.company_id,
                         req.loyalty_program_id,
                         &req.order_ref_type,
                         req.order_ref_id,
@@ -298,7 +289,6 @@ impl PromoWriteService {
                 self.order_points
                     .set_spent(
                         &mut tx,
-                        req.company_id,
                         req.loyalty_program_id,
                         &req.order_ref_type,
                         req.order_ref_id,
@@ -312,7 +302,7 @@ impl PromoWriteService {
 
         let available_after = self
             .entries
-            .balances_at(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id, req.at)
+            .balances_at(&mut tx, req.customer_id, req.loyalty_program_id, req.at)
             .await?
             .0;
 
@@ -320,7 +310,7 @@ impl PromoWriteService {
         sink.publish(&PromoEvent::LoyaltyOrderPointsSpent(LoyaltyOrderPointsSpent {
             order_points_id,
             loyalty_program_id: req.loyalty_program_id,
-            company_id: req.company_id,
+            company_id: legacy_twin(),
             customer_id: req.customer_id,
             order_ref_type: req.order_ref_type.clone(),
             order_ref_id: req.order_ref_id,
@@ -370,33 +360,32 @@ impl PromoWriteService {
             return Err(PricingError::Invalid("reversal_ref_type must be 1..=40 chars".into()));
         }
         let mut tx = self.pool.begin().await?;
-        company_scope::bind_company_on(&mut tx, req.company_id).await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock order: program row → member anchor (same as spend). Deliberately NOT
         // window-checked — a return months later must still reverse under a retired program.
         let (collection_factor, _) = self
             .programs
-            .find_factors_locked(&mut tx, req.company_id, req.loyalty_program_id)
+            .find_factors_locked(&mut tx, req.loyalty_program_id)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::LoyaltyProgram))?
             .ok_or(PricingError::ProgramInvalid)?;
 
         self.anchors
-            .ensure_and_lock(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id)
+            .ensure_and_lock(&mut tx, req.customer_id, req.loyalty_program_id)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::MemberBalance))?;
 
         // Idempotent replay: this RETURN document already reversed — return its stored legs.
         if let Some(prior) = self
             .entries
-            .find_reversal_by_source(&mut tx, req.company_id, &req.reversal_ref_type, req.reversal_ref_id)
+            .find_reversal_by_source(&mut tx, &req.reversal_ref_type, req.reversal_ref_id)
             .await?
         {
             let row = self
                 .order_points
                 .find_by_order_ref(
                     &mut tx,
-                    req.company_id,
                     req.loyalty_program_id,
                     &req.order_ref_type,
                     req.order_ref_id,
@@ -416,7 +405,6 @@ impl PromoWriteService {
             .order_points
             .find_by_order_ref(
                 &mut tx,
-                req.company_id,
                 req.loyalty_program_id,
                 &req.order_ref_type,
                 req.order_ref_id,
@@ -429,7 +417,7 @@ impl PromoWriteService {
         let remaining_spent = row.spent_points - row.spent_reversed_points;
         let (available, _) = self
             .entries
-            .balances_at(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id, req.at)
+            .balances_at(&mut tx, req.customer_id, req.loyalty_program_id, req.at)
             .await?;
         let (grant_leg, spend_leg) = match req.return_amount {
             None => (remaining_granted.min(available), remaining_spent),
@@ -452,13 +440,12 @@ impl PromoWriteService {
         // never earned (documented edge).
         let earned_expiry = self
             .entries
-            .find_earned_expiry(&mut tx, req.company_id, &req.order_ref_type, req.order_ref_id)
+            .find_earned_expiry(&mut tx, &req.order_ref_type, req.order_ref_id)
             .await?;
         let mut wrote_any = false;
         if grant_leg > Decimal::ZERO {
             self.entries
                 .insert_reversal(&mut tx, &NewReversalRow {
-                    company_id: req.company_id,
                     loyalty_program_id: req.loyalty_program_id,
                     customer_id: req.customer_id,
                     entry_type: "grant_reversed",
@@ -474,7 +461,6 @@ impl PromoWriteService {
         if spend_leg > Decimal::ZERO {
             self.entries
                 .insert_reversal(&mut tx, &NewReversalRow {
-                    company_id: req.company_id,
                     loyalty_program_id: req.loyalty_program_id,
                     customer_id: req.customer_id,
                     entry_type: "spend_reversed",
@@ -493,7 +479,6 @@ impl PromoWriteService {
             self.order_points
                 .add_reversal_counters(
                     &mut tx,
-                    req.company_id,
                     req.loyalty_program_id,
                     &req.order_ref_type,
                     req.order_ref_id,
@@ -508,7 +493,7 @@ impl PromoWriteService {
             sink.publish(&PromoEvent::LoyaltyOrderPointsReversed(LoyaltyOrderPointsReversed {
                 order_points_id: row.id,
                 loyalty_program_id: req.loyalty_program_id,
-                company_id: req.company_id,
+                company_id: legacy_twin(),
                 customer_id: req.customer_id,
                 order_ref_type: req.order_ref_type.clone(),
                 order_ref_id: req.order_ref_id,
@@ -525,4 +510,13 @@ impl PromoWriteService {
             already: false,
         })
     }
+}
+
+/// The legacy tenancy twin the loyalty event payloads still carry (ADR-0029): under the composing
+/// service's org request scope it is the scope's legacy echo; nil when undecorated. The event
+/// field stays for still-fenced consumers; nothing in this module keys a statement on it.
+fn legacy_twin() -> uuid::Uuid {
+    backbone_orm::org_scope::current_org_scope()
+        .and_then(|s| s.legacy_company_id())
+        .unwrap_or(uuid::Uuid::nil())
 }

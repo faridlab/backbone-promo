@@ -44,7 +44,6 @@ pub struct CouponCodePaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct CouponCodeFilter {
-    pub company_id: Option<Uuid>,
     pub code: Option<String>,
     pub pricing_rule_id: Option<Uuid>,
     pub description: Option<String>,
@@ -54,7 +53,7 @@ pub struct CouponCodeFilter {
 impl CouponCodeFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.code.is_some() || self.pricing_rule_id.is_some() || self.description.is_some() || self.status.is_some()
+        self.code.is_some() || self.pricing_rule_id.is_some() || self.description.is_some() || self.status.is_some()
     }
 }
 

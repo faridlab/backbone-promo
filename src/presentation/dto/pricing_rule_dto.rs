@@ -37,9 +37,6 @@ use crate::domain::entity::RuleScope;
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePricingRuleDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "validation", validate(length(max = 140)))]
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
@@ -106,9 +103,6 @@ pub struct CreatePricingRuleDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePricingRuleDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "validation", validate(length(max = 140)))]
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
@@ -175,9 +169,6 @@ pub struct UpdatePricingRuleDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct PatchPricingRuleDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
     #[cfg_attr(feature = "validation", validate(length(max = 140)))]
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -240,7 +231,7 @@ pub struct PatchPricingRuleDto {
 impl PatchPricingRuleDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.title.is_some() || self.priority.is_some() || self.scope.is_some() || self.min_order_amount.is_some() || self.min_order_qty.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.discount_upto.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.status.is_some()
+        self.title.is_some() || self.priority.is_some() || self.scope.is_some() || self.min_order_amount.is_some() || self.min_order_qty.is_some() || self.stackable.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.customer_id.is_some() || self.customer_group_id.is_some() || self.min_qty.is_some() || self.max_qty.is_some() || self.min_amount.is_some() || self.rate_or_discount.is_some() || self.rate.is_some() || self.discount_percentage.is_some() || self.discount_amount.is_some() || self.discount_upto.is_some() || self.currency.is_some() || self.valid_from.is_some() || self.valid_to.is_some() || self.coupon_required.is_some() || self.status.is_some()
     }
 }
 
@@ -258,8 +249,6 @@ impl PatchPricingRuleDto {
 pub struct PricingRuleResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
@@ -348,9 +337,9 @@ impl PricingRuleListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct PricingRuleSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub title: String,
     pub priority: i32,
+    pub scope: RuleScope,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -362,7 +351,6 @@ impl From<PricingRule> for PricingRuleResponseDto {
     fn from(entity: PricingRule) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             title: entity.title,
             priority: entity.priority,
             scope: entity.scope,
@@ -398,9 +386,9 @@ impl From<PricingRule> for PricingRuleSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             title: entity.title,
             priority: entity.priority,
+            scope: entity.scope,
             created_at,
         }
     }
@@ -410,7 +398,6 @@ impl From<CreatePricingRuleDto> for PricingRule {
     fn from(dto: CreatePricingRuleDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             title: dto.title,
             priority: dto.priority,
             scope: dto.scope,
@@ -445,7 +432,6 @@ impl From<&PricingRule> for PricingRuleResponseDto {
     fn from(entity: &PricingRule) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             title: entity.title.clone(),
             priority: entity.priority.clone(),
             scope: entity.scope.clone(),
@@ -484,7 +470,6 @@ impl backbone_core::FromCreateDto<CreatePricingRuleDto> for PricingRule {
 
 impl backbone_core::ApplyUpdateDto<UpdatePricingRuleDto> for PricingRule {
     fn apply_update(mut self, dto: UpdatePricingRuleDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.title = dto.title;
         self.priority = dto.priority;
         self.scope = dto.scope;

@@ -108,6 +108,7 @@ impl EventStore for PostgresEventStore {
         }
 
         let mut tx = self.pool.begin().await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
         let mut last_sequence = 0i64;
 
         for event in events {

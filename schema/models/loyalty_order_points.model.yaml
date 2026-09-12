@@ -2,7 +2,7 @@
 # Domain: Promo
 # Entity: LoyaltyOrderPoints
 # Description: Per-order loyalty accounting — the grant/spend/reversal state of
-# one member's points on one logical order. One row per (company, program,
+# one member's points on one logical order. One row per (org unit, program,
 # order_ref_type, order_ref_id): the order-flow verbs (grant_order_points /
 # spend_order_points / reverse_order_points) keep it in step with the signed
 # entry ledger, and its counters make a partial return server-derivable from
@@ -22,10 +22,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique row id"
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Books owner # logical FK to organization.Company.id"
       loyalty_program_id:
         type: uuid
         attributes: ["@required", "@foreign_key(LoyaltyProgram.id)"]
@@ -85,10 +81,5 @@ models:
       # One row per order per program (a future second program on the same order
       # needs no re-migration). The reversal-counter CHECKs live in a hand
       # migration — the schema DSL cannot express cross-column constraints.
-      - type: unique
-        fields: [company_id, loyalty_program_id, order_ref_type, order_ref_id]
-        where: "deleted_at IS NULL"
-      - type: index
-        fields: [company_id, customer_id]
       - type: index
         fields: [loyalty_program_id]

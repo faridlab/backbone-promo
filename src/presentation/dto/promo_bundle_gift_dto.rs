@@ -34,9 +34,6 @@ use crate::domain::entity::AuditMetadata;
 #[serde(rename_all = "camelCase")]
 pub struct CreatePromoBundleGiftDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "bundle_id")]
     pub bundle_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -59,9 +56,6 @@ pub struct CreatePromoBundleGiftDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePromoBundleGiftDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "bundle_id")]
     pub bundle_id: Uuid,
@@ -86,9 +80,6 @@ pub struct UpdatePromoBundleGiftDto {
 #[serde(rename_all = "camelCase")]
 pub struct PatchPromoBundleGiftDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "bundle_id")]
     pub bundle_id: Option<Uuid>,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -101,7 +92,7 @@ pub struct PatchPromoBundleGiftDto {
 impl PatchPromoBundleGiftDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.bundle_id.is_some() || self.gift_item_id.is_some() || self.gift_qty.is_some()
+        self.bundle_id.is_some() || self.gift_item_id.is_some() || self.gift_qty.is_some()
     }
 }
 
@@ -119,8 +110,6 @@ impl PatchPromoBundleGiftDto {
 pub struct PromoBundleGiftResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub bundle_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -183,9 +172,9 @@ impl PromoBundleGiftListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct PromoBundleGiftSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub bundle_id: Uuid,
     pub gift_item_id: Uuid,
+    pub gift_qty: Decimal,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -197,7 +186,6 @@ impl From<PromoBundleGift> for PromoBundleGiftResponseDto {
     fn from(entity: PromoBundleGift) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             bundle_id: entity.bundle_id,
             gift_item_id: entity.gift_item_id,
             gift_qty: entity.gift_qty,
@@ -211,9 +199,9 @@ impl From<PromoBundleGift> for PromoBundleGiftSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             bundle_id: entity.bundle_id,
             gift_item_id: entity.gift_item_id,
+            gift_qty: entity.gift_qty,
             created_at,
         }
     }
@@ -223,7 +211,6 @@ impl From<CreatePromoBundleGiftDto> for PromoBundleGift {
     fn from(dto: CreatePromoBundleGiftDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             bundle_id: dto.bundle_id,
             gift_item_id: dto.gift_item_id,
             gift_qty: dto.gift_qty,
@@ -236,7 +223,6 @@ impl From<&PromoBundleGift> for PromoBundleGiftResponseDto {
     fn from(entity: &PromoBundleGift) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             bundle_id: entity.bundle_id.clone(),
             gift_item_id: entity.gift_item_id.clone(),
             gift_qty: entity.gift_qty.clone(),
@@ -253,7 +239,6 @@ impl backbone_core::FromCreateDto<CreatePromoBundleGiftDto> for PromoBundleGift 
 
 impl backbone_core::ApplyUpdateDto<UpdatePromoBundleGiftDto> for PromoBundleGift {
     fn apply_update(mut self, dto: UpdatePromoBundleGiftDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.bundle_id = dto.bundle_id;
         self.gift_item_id = dto.gift_item_id;
         self.gift_qty = dto.gift_qty;

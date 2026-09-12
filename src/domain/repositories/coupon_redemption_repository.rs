@@ -44,7 +44,6 @@ pub struct CouponRedemptionPaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct CouponRedemptionFilter {
-    pub company_id: Option<Uuid>,
     pub coupon_id: Option<Uuid>,
     pub pricing_rule_id: Option<Uuid>,
     pub source_type: Option<String>,
@@ -54,7 +53,7 @@ pub struct CouponRedemptionFilter {
 impl CouponRedemptionFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.coupon_id.is_some() || self.pricing_rule_id.is_some() || self.source_type.is_some() || self.source_id.is_some()
+        self.coupon_id.is_some() || self.pricing_rule_id.is_some() || self.source_type.is_some() || self.source_id.is_some()
     }
 }
 

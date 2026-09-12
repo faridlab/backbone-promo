@@ -1,352 +1,232 @@
-//! Loyalty RLS fence probes — the loyalty tables under a NON-BYPASSRLS session.
+//! The tenancy posture probe (ADR-0029) — the module ships NO tenancy of its own: no tenant
+//! column, no tenant predicate, and no RLS policy. What it ships instead is the HALF-FENCE the
+//! composing service's tenancy decorator completes: every promo base table carries ENABLE + FORCE
+//! ROW LEVEL SECURITY with zero policies. This probe pins that posture from below, the family
+//! pattern (proven on backbone-accounting, backbone-billing, backbone-selling, then backbone-pos).
 //!
-//! Row-Level Security only binds for a non-superuser, non-BYPASSRLS session (superusers always
-//! bypass it), so these probes run against the restricted `promo_fence_probe` role minted and
-//! granted by the admin pool — the same pattern backbone-selling's fence suite uses. Every probe
-//! scopes the session with a TRANSACTION-LOCAL `set_config('app.company_id', …, true)`, so nothing
-//! leaks across pooled connections.
+//! - the flags are armed on every base table and the policy set is empty (schema pin);
+//! - a plain NOSUPERUSER NOBYPASSRLS role is default-DENIED — zero rows, writes refused — no
+//!   matter what legacy variable is set (no policy reads `app.company_id` anymore; the
+//!   decorator's org-scoped policies will, once composed);
+//! - the scratch owner is a superuser and BYPASSES row-level security, so it still sees its own
+//!   seeded rows plainly: the denial is the missing policy, not an empty database.
 //!
-//! Tables probed: the entry ledger, the per-order points rows, and the member anchor lock table —
-//! the three tables the loyalty write path touches — plus read fencing on the programs/coupons
-//! masters. The deployment contract this enforces: the app must connect as a non-superuser role,
-//! and every loyalty statement then fences to one company no matter what its WHERE clause says.
+//! The pre-rewrite fence suite's cross-company isolation legs retire here: they pinned the
+//! module's own company policy, whose claim has moved to the composing service's tenancy
+//! decorator (ADR-0029).
+//!
+//! Requires DATABASE_URL (:5433/backbone_promo) reachable as a superuser (to mint and tear down
+//! the probe role).
 
 mod common;
 
-use common::pool;
-use sqlx::PgPool;
+use common::{dburl, pool};
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-const PROBE_ROLE: &str = "promo_fence_probe";
-const PROBE_PASSWORD: &str = "probe";
+const ROLE: &str = "promo_tenancy_probe";
+const PWD: &str = "probe";
 
-/// Rebuild DATABASE_URL aimed at the probe role, keeping its host/port/database.
-fn restricted_url(admin_url: &str) -> String {
-    let rest = admin_url
-        .trim_start_matches("postgresql://")
-        .trim_start_matches("postgres://");
-    let (authority, path) = rest.split_once('/').expect("DATABASE_URL must name a database");
-    let hostport = authority.rsplit_once('@').map(|(_, h)| h).unwrap_or(authority);
-    let db = path.split('?').next().unwrap_or("backbone_promo");
-    format!("postgresql://{PROBE_ROLE}:{PROBE_PASSWORD}@{hostport}/{db}")
+/// Role/catalog DDL serializes — two tests minting roles concurrently hit
+/// "tuple concurrently updated" in the system catalogs.
+static ROLE_DDL_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Shed the role's grants, then drop it. Leftover grants (from a run whose teardown never
+/// reached the drop, or whose drop was swallowed) make plain DROP ROLE fail with 2BP01 —
+/// DROP OWNED BY first keeps both bootstrap and teardown idempotent across runs.
+async fn drop_role(admin: &PgPool) {
+    let _ = sqlx::query(&format!("DROP OWNED BY {ROLE}"))
+        .execute(admin)
+        .await;
+    let _ = sqlx::query(&format!("DROP ROLE IF EXISTS {ROLE}"))
+        .execute(admin)
+        .await;
 }
 
-/// A pool connected as the restricted probe role, minted and granted by the admin pool.
-async fn restricted_pool(admin: &PgPool) -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5433/backbone_promo".to_string());
-    let db = url
+async fn bootstrap_role(admin: &PgPool, table: &str) {
+    drop_role(admin).await;
+    let db = dburl()
         .trim_start_matches("postgresql://")
         .trim_start_matches("postgres://")
         .split_once('/')
         .and_then(|(_, path)| path.split('?').next())
         .unwrap_or("backbone_promo")
         .to_string();
-
-    // Serialize mint + grants across parallel tests (shared-catalog DDL does not tolerate
-    // concurrent GRANTs), then tolerate losing the race — the winner made the same role.
-    sqlx::query("SELECT pg_advisory_lock(hashtext('promo_fence_probe'))")
-        .execute(admin)
-        .await
-        .expect("take probe mint lock");
-    let _ = sqlx::query(&format!(
-        "CREATE ROLE {PROBE_ROLE} LOGIN PASSWORD '{PROBE_PASSWORD}' \
-           NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE"
-    ))
-    .execute(admin)
-    .await;
-    // One statement per execute (a multi-command string is not a legal prepared statement). The
-    // grants cover exactly the loyalty tables the write path touches — no more.
-    for grant in [
-        format!(r#"GRANT CONNECT ON DATABASE "{db}" TO {PROBE_ROLE}"#),
-        format!("GRANT USAGE ON SCHEMA promo TO {PROBE_ROLE}"),
-        format!("GRANT SELECT, INSERT, UPDATE ON TABLE promo.loyalty_point_entries TO {PROBE_ROLE}"),
-        format!("GRANT SELECT, INSERT, UPDATE ON TABLE promo.loyalty_order_points TO {PROBE_ROLE}"),
-        format!("GRANT SELECT, INSERT, UPDATE ON TABLE promo.loyalty_member_anchors TO {PROBE_ROLE}"),
-        format!("GRANT SELECT ON TABLE promo.loyalty_programs TO {PROBE_ROLE}"),
-        format!("GRANT SELECT, INSERT, UPDATE ON TABLE promo.coupon_codes TO {PROBE_ROLE}"),
-        format!("GRANT SELECT, INSERT, UPDATE ON TABLE promo.coupon_redemptions TO {PROBE_ROLE}"),
+    for stmt in [
+        format!("CREATE ROLE {ROLE} LOGIN PASSWORD '{PWD}' NOSUPERUSER NOBYPASSRLS"),
+        format!(r#"GRANT CONNECT ON DATABASE "{db}" TO {ROLE}"#),
+        format!("GRANT USAGE ON SCHEMA promo TO {ROLE}"),
+        format!("GRANT SELECT, INSERT, UPDATE ON TABLE promo.{table} TO {ROLE}"),
     ] {
-        sqlx::query(&grant).execute(admin).await.expect("grant probe role");
+        sqlx::query(&stmt).execute(admin).await.unwrap();
     }
-    sqlx::query("SELECT pg_advisory_unlock(hashtext('promo_fence_probe'))")
-        .execute(admin)
-        .await
-        .expect("release probe mint lock");
-
-    PgPool::connect(&restricted_url(&url)).await.expect("connect as restricted probe")
 }
 
-/// Scope a fresh transaction on `pool` to `company`, transaction-local.
-async fn scoped_tx(pool: &PgPool, company: Uuid) -> sqlx::Transaction<'_, sqlx::Postgres> {
-    let mut tx = pool.begin().await.expect("begin scoped tx");
-    sqlx::query("SELECT set_config('app.company_id', $1, true)")
-        .bind(company.to_string())
-        .execute(&mut *tx)
+/// A pool connected as the plain probe role, aimed at the same host/port/database as the admin
+/// URL (the role was minted by [`bootstrap_role`] on the admin pool).
+async fn restricted_pool() -> PgPool {
+    let url = dburl();
+    let rest = url
+        .trim_start_matches("postgresql://")
+        .trim_start_matches("postgres://");
+    let (authority, path) = rest.split_once('/').expect("DATABASE_URL must name a database");
+    let hostport = authority.rsplit_once('@').map(|(_, h)| h).unwrap_or(authority);
+    let db = path.split('?').next().unwrap_or("backbone_promo");
+    PgPool::connect(&format!("postgresql://{ROLE}:{PWD}@{hostport}/{db}"))
         .await
-        .expect("scope tx");
-    tx
+        .expect("connect probe role")
 }
 
-/// LFP-1 — the entry ledger is read-fenced: a victim's entries are invisible to a foreign tenant's
-/// scope even when the query names the victim's company explicitly.
+// ── The schema pin: armed flags, empty policy set ─────────────────────────────
+
+/// The promo base tables the strip migration freed of their company axis — every one must stay
+/// behind the armed half-fence.
+const BASE_TABLES: [&str; 11] = [
+    "coupon_claims",
+    "coupon_codes",
+    "coupon_redemptions",
+    "loyalty_member_anchors",
+    "loyalty_order_points",
+    "loyalty_point_entries",
+    "loyalty_programs",
+    "pricing_rules",
+    "promo_bundle_components",
+    "promo_bundle_gifts",
+    "promo_bundles",
+];
+
+/// Every promo base table carries ENABLE + FORCE ROW LEVEL SECURITY and the module ships ZERO
+/// policies — the decorator's half-fence. If a strip or regen ever drops the flags, an
+/// undecorated deployment would silently become readable by any role the host grants; if a
+/// policy ever reappears module-side, the decorator's org-scoped policies would fight it.
 #[tokio::test]
-async fn lfp1_entry_ledger_reads_are_fenced() {
-    let admin = pool().await;
-    let restricted = restricted_pool(&admin).await;
-    let victim = Uuid::new_v4();
-    let attacker = Uuid::new_v4();
+async fn tables_carry_rls_flags_and_the_module_ships_no_policy() {
+    let owner = pool().await;
 
-    // The victim's ledger, seeded through the admin (superuser) pool.
-    sqlx::query(
-        r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
-              source_type, source_id, posting_date)
-           VALUES ($1,$2,$3,'earned',100,0,'seed',$4, now())"#,
+    let armed: Vec<String> = sqlx::query(
+        "SELECT c.relname FROM pg_class c \
+         JOIN pg_namespace n ON n.oid = c.relnamespace \
+         WHERE n.nspname = 'promo' AND c.relkind = 'r' \
+           AND c.relrowsecurity AND c.relforcerowsecurity \
+         ORDER BY c.relname",
     )
-    .bind(victim)
+    .fetch_all(&owner)
+    .await
+    .unwrap()
+    .iter()
+    .map(|r| r.get::<String, _>("relname"))
+    .collect();
+    for table in BASE_TABLES {
+        assert!(
+            armed.iter().any(|t| t == table),
+            "{table} must carry ENABLE + FORCE ROW LEVEL SECURITY"
+        );
+    }
+
+    let policies: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM pg_policy WHERE polrelid::regnamespace::text = 'promo'",
+    )
+    .fetch_one(&owner)
+    .await
+    .unwrap();
+    assert_eq!(
+        policies, 0,
+        "the module ships no RLS policy — isolation belongs to the composing service's decorator"
+    );
+}
+
+// ── Default-deny until composed: the plain probe role ─────────────────────────
+
+/// A plain non-superuser, NOBYPASSRLS role with bare grants sees NOTHING and cannot
+/// write — with or without the legacy company variable set. No policy admits it (there
+/// are none), and none reads `app.company_id` anymore. The owner pool still sees its
+/// seeded row: the denial is the missing policy, not an empty database.
+#[tokio::test]
+async fn plain_role_is_default_denied_until_the_decorator_composes() {
+    let _ddl = ROLE_DDL_LOCK.lock().await;
+    let owner = pool().await;
+    bootstrap_role(&owner, "loyalty_point_entries").await;
+    let restricted = restricted_pool().await;
+
+    // The owner seeds a ledger row as the superuser (whom RLS can never bind). No tenant column
+    // exists to set — a ledger entry is just a row (ADR-0029).
+    let customer = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO promo.loyalty_point_entries \
+           (loyalty_program_id, customer_id, entry_type, points, purchase_amount, \
+            source_type, source_id, posting_date) \
+         VALUES ($1, $2, 'earned', 100, 0, 'probe', $3, now())",
+    )
     .bind(Uuid::new_v4())
+    .bind(customer)
     .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .execute(&admin)
+    .execute(&owner)
     .await
     .unwrap();
 
-    let mut tx = scoped_tx(&restricted, attacker).await;
-    let visible: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM promo.loyalty_point_entries WHERE company_id = $1",
+    // Bare read: zero rows — default-deny with no policy admitting the role.
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM promo.loyalty_point_entries WHERE customer_id=$1",
     )
-    .bind(victim)
+    .bind(customer)
+    .fetch_one(&restricted)
+    .await
+    .unwrap();
+    assert_eq!(n, 0, "a role no policy admits sees zero rows");
+
+    // The legacy company variable resurrects nothing: no policy reads it anymore
+    // (the decorator's org-scoped policies will, once composed). Transaction-local, so
+    // nothing leaks across pooled connections.
+    let mut tx = restricted.begin().await.unwrap();
+    sqlx::query("SELECT set_config('app.company_id', $1, true)")
+        .bind(Uuid::new_v4().to_string())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM promo.loyalty_point_entries WHERE customer_id=$1",
+    )
+    .bind(customer)
     .fetch_one(&mut *tx)
     .await
     .unwrap();
-    tx.commit().await.unwrap();
-    assert_eq!(visible, 0, "a foreign scope must not see the victim's ledger");
-
-    // The victim's own scope sees exactly its row.
-    let mut own = scoped_tx(&restricted, victim).await;
-    let own_visible: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM promo.loyalty_point_entries WHERE company_id = $1",
-    )
-    .bind(victim)
-    .fetch_one(&mut *own)
-    .await
-    .unwrap();
-    own.commit().await.unwrap();
-    assert_eq!(own_visible, 1);
-}
-
-/// LFP-2 — the entry ledger is write-fenced: writing another company's id into the ledger under a
-/// foreign scope is refused by the policy's WITH CHECK, and writing under one's OWN scope passes it.
-#[tokio::test]
-async fn lfp2_entry_ledger_writes_are_fenced() {
-    let admin = pool().await;
-    let restricted = restricted_pool(&admin).await;
-    let victim = Uuid::new_v4();
-    let attacker = Uuid::new_v4();
-
-    // Attacker tries to mint points ON THE VICTIM'S COMPANY under its own scope.
-    let mut tx = scoped_tx(&restricted, attacker).await;
-    let refused = sqlx::query(
-        r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
-              source_type, source_id, posting_date)
-           VALUES ($1,$2,$3,'earned',100,0,'probe',$4, now())"#,
-    )
-    .bind(victim)
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .execute(&mut *tx)
-    .await;
-    let msg = refused.err().map(|e| e.to_string()).unwrap_or_default();
+    assert_eq!(n, 0, "the legacy variable must not bypass the absent policy set");
     tx.rollback().await.unwrap();
+
+    // A write is refused outright (no WITH CHECK policy admits the new row).
+    let err = sqlx::query(
+        "INSERT INTO promo.loyalty_point_entries \
+           (loyalty_program_id, customer_id, entry_type, points, purchase_amount, \
+            source_type, source_id, posting_date) \
+         VALUES ($1, $2, 'earned', 1, 0, 'probe write', $3, now())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(Uuid::new_v4())
+    .bind(Uuid::new_v4())
+    .execute(&restricted)
+    .await
+    .expect_err("a write with no admitting policy must be refused");
+    let code = err
+        .as_database_error()
+        .and_then(|db| db.code())
+        .map(|c| c.to_string())
+        .unwrap_or_default();
+    assert_eq!(code, "42501", "the default-denied write hits row-level security, got {err}");
     assert!(
-        msg.contains("row-level security"),
-        "cross-tenant ledger write must be refused by RLS, got: {msg}"
+        err.to_string().to_lowercase().contains("row-level security"),
+        "the refusal names row-level security, got {err}"
     );
 
-    // Positive control: the same shape under the writer's OWN scope passes the WITH CHECK.
-    let mut own = scoped_tx(&restricted, attacker).await;
-    sqlx::query(
-        r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
-              source_type, source_id, posting_date)
-           VALUES ($1,$2,$3,'earned',50,0,'probe',$4, now())"#,
+    // The owner pool still sees its row.
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM promo.loyalty_point_entries WHERE customer_id=$1",
     )
-    .bind(attacker)
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .execute(&mut *own)
-    .await
-    .expect("own-company ledger write passes the fence");
-    own.commit().await.unwrap();
-}
-
-/// LFP-3 — the per-order points rows are fenced both ways: invisible across tenants, unwritable
-/// with a foreign company_id.
-#[tokio::test]
-async fn lfp3_order_points_rows_are_fenced() {
-    let admin = pool().await;
-    let restricted = restricted_pool(&admin).await;
-    let victim = Uuid::new_v4();
-    let attacker = Uuid::new_v4();
-
-    // Seed a victim row through the admin pool.
-    sqlx::query(
-        r#"INSERT INTO promo.loyalty_order_points
-             (company_id, loyalty_program_id, customer_id, order_ref_type, order_ref_id,
-              grant_base_amount, granted_points)
-           VALUES ($1,$2,$3,'pos_order',$4,10000,1000)"#,
-    )
-    .bind(victim)
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .execute(&admin)
+    .bind(customer)
+    .fetch_one(&owner)
     .await
     .unwrap();
+    assert_eq!(n, 1, "the owner pool must still see the seeded row");
 
-    let mut tx = scoped_tx(&restricted, attacker).await;
-    let visible: i64 =
-        sqlx::query_scalar("SELECT count(*) FROM promo.loyalty_order_points WHERE company_id = $1")
-            .bind(victim)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
-    assert_eq!(visible, 0, "a foreign scope must not see the victim's order rows");
-    let refused = sqlx::query(
-        r#"INSERT INTO promo.loyalty_order_points
-             (company_id, loyalty_program_id, customer_id, order_ref_type, order_ref_id,
-              grant_base_amount, granted_points)
-           VALUES ($1,$2,$3,'pos_order',$4,1,1)"#,
-    )
-    .bind(victim)
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .execute(&mut *tx)
-    .await;
-    let msg = refused.err().map(|e| e.to_string()).unwrap_or_default();
-    tx.rollback().await.unwrap();
-    assert!(
-        msg.contains("row-level security"),
-        "cross-tenant order-points write must be refused by RLS, got: {msg}"
-    );
-}
-
-/// LFP-4 — the member anchor lock table is fenced: a foreign scope cannot mint an anchor on the
-/// victim's company (the lock a write would take is itself tenant-bound).
-#[tokio::test]
-async fn lfp4_member_anchor_table_is_fenced() {
-    let admin = pool().await;
-    let restricted = restricted_pool(&admin).await;
-    let victim = Uuid::new_v4();
-    let attacker = Uuid::new_v4();
-
-    // Attacker mints an anchor FOR THE VICTIM's member under the attacker's scope.
-    let mut tx = scoped_tx(&restricted, attacker).await;
-    let refused = sqlx::query(
-        r#"INSERT INTO promo.loyalty_member_anchors (company_id, customer_id, loyalty_program_id)
-           VALUES ($1,$2,$3)"#,
-    )
-    .bind(victim)
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .execute(&mut *tx)
-    .await;
-    let msg = refused.err().map(|e| e.to_string()).unwrap_or_default();
-    tx.rollback().await.unwrap();
-    assert!(
-        msg.contains("row-level security"),
-        "minting a foreign member's anchor must be refused by RLS, got: {msg}"
-    );
-
-    // Positive control: minting one's own anchor works, and the NOWAIT lock the write path takes
-    // succeeds under the owner's scope.
-    let mut own = scoped_tx(&restricted, attacker).await;
-    sqlx::query(
-        r#"INSERT INTO promo.loyalty_member_anchors (company_id, customer_id, loyalty_program_id)
-           VALUES ($1,$2,$3)"#,
-    )
-    .bind(attacker)
-    .bind(Uuid::new_v4())
-    .bind(Uuid::new_v4())
-    .execute(&mut *own)
-    .await
-    .expect("own anchor mint passes the fence");
-    let locked: Option<Uuid> = sqlx::query_scalar(
-        r#"SELECT id FROM promo.loyalty_member_anchors
-           WHERE company_id = $1 FOR UPDATE NOWAIT"#,
-    )
-    .bind(attacker)
-    .fetch_optional(&mut *own)
-    .await
-    .unwrap();
-    assert!(locked.is_some(), "the owner can take its own anchor lock");
-    own.commit().await.unwrap();
-}
-
-/// LFP-5 — the read-side masters (loyalty programs, coupon codes) are read-fenced: program factors
-/// and coupon state never leak across tenants even to a session that names them by id.
-#[tokio::test]
-async fn lfp5_masters_reads_are_fenced() {
-    let admin = pool().await;
-    let restricted = restricted_pool(&admin).await;
-    let victim = Uuid::new_v4();
-    let attacker = Uuid::new_v4();
-
-    // A victim program and a victim coupon (admin-seeded).
-    let program_id: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO promo.loyalty_programs
-             (company_id, program_name, program_type, collection_factor, conversion_factor,
-              from_date, status)
-           VALUES ($1,'fence','single_tier',0.1,100, now() - interval '1 day', 'active')
-           RETURNING id"#,
-    )
-    .bind(victim)
-    .fetch_one(&admin)
-    .await
-    .unwrap();
-    let item = Uuid::new_v4();
-    let rule_id: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO promo.pricing_rules
-             (company_id, title, priority, apply_on, item_id, rate_or_discount, valid_from, status)
-           VALUES ($1,'fence',0,'item',$2,'discount_percentage', now() - interval '1 day', 'active')
-           RETURNING id"#,
-    )
-    .bind(victim)
-    .bind(item)
-    .fetch_one(&admin)
-    .await
-    .unwrap();
-    let coupon_id: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO promo.coupon_codes
-             (company_id, code, pricing_rule_id, valid_from, status)
-           VALUES ($1,'FENCE',$2, now() - interval '1 day', 'active') RETURNING id"#,
-    )
-    .bind(victim)
-    .bind(rule_id)
-    .fetch_one(&admin)
-    .await
-    .unwrap();
-
-    let mut tx = scoped_tx(&restricted, attacker).await;
-    let program: Option<Uuid> = sqlx::query_scalar(
-        "SELECT id FROM promo.loyalty_programs WHERE id = $1",
-    )
-    .bind(program_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .unwrap();
-    let coupon: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM promo.coupon_codes WHERE id = $1")
-            .bind(coupon_id)
-            .fetch_optional(&mut *tx)
-            .await
-            .unwrap();
-    tx.commit().await.unwrap();
-    assert!(program.is_none(), "a foreign scope must not read the victim's program factors");
-    assert!(coupon.is_none(), "a foreign scope must not read the victim's coupon state");
+    drop(restricted);
+    drop_role(&owner).await;
 }

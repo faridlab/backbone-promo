@@ -24,7 +24,6 @@ impl TestDataGenerator for LoyaltyPointEntryTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": Uuid::new_v4().to_string(),
-            "company_id": Uuid::new_v4().to_string(),
             "loyalty_program_id": Uuid::new_v4().to_string(),
             "customer_id": Uuid::new_v4().to_string(),
             "entry_type": "earned",
@@ -42,7 +41,6 @@ impl TestDataGenerator for LoyaltyPointEntryTestData {
         let now = Utc::now().to_rfc3339();
         json!({
             "id": id,
-            "company_id": Uuid::new_v4().to_string(),
             "loyalty_program_id": Uuid::new_v4().to_string(),
             "customer_id": Uuid::new_v4().to_string(),
             "entry_type": "earned",

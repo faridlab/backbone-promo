@@ -12,7 +12,11 @@ use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
+// The typed multi-row read twins live only in the legacy `company_scope` module. Their
+// connection discipline is what this repository needs — request-dedicated connection when
+// the composing service bound one, plain pool otherwise. The helper's legacy task-local
+// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
+use backbone_orm::company_scope::fetch_all_rows_scoped;
 
 use crate::domain::entity::PromoBundle;
 
@@ -62,17 +66,15 @@ impl PromoBundleRepository {
     /// Active, in-window bundles whose `min_order_amount` floor the subtotal clears, ordered
     /// priority DESC → newest → id.
     ///
-    /// RLS scope (ADR-0008): company on the cart — the caller wraps this in
-    /// `with_company_scope(Some(company_id))`. The explicit `company_id = $1` stays as
-    /// defense-in-depth.
+    /// Tenant-agnostic (ADR-0029): the module ships no row fence — row scoping is the composing
+    /// service's tenancy decorator.
     pub async fn find_active(
         &self,
         pool: &PgPool,
-        company_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
         subtotal: Decimal,
     ) -> Result<Vec<BundleRow>, sqlx::Error> {
-        let rows = company_scope::fetch_all_rows_scoped(
+        let rows = fetch_all_rows_scoped(
             pool,
             sqlx::query(
                 r#"
@@ -80,16 +82,14 @@ impl PromoBundleRepository {
                        reward::text AS reward, discount_percentage, discount_amount,
                        reward_item_id, reward_qty, stackable, valid_from
                 FROM promo.promo_bundles
-                WHERE company_id = $1
-                  AND status = 'active'
+                WHERE status = 'active'
                   AND (metadata->>'deleted_at') IS NULL
-                  AND valid_from <= $2
-                  AND (valid_to IS NULL OR valid_to >= $2)
-                  AND min_order_amount <= $3
+                  AND valid_from <= $1
+                  AND (valid_to IS NULL OR valid_to >= $1)
+                  AND min_order_amount <= $2
                 ORDER BY priority DESC, valid_from DESC, id ASC
                 "#,
             )
-            .bind(company_id)
             .bind(at)
             .bind(subtotal),
         )

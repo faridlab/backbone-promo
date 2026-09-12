@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.loyalty_point_entries (
 --     id,
---     company_id,
 --     loyalty_program_id,
 --     customer_id,
 --     entry_type,

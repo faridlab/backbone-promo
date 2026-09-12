@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.promo_bundle_gifts (
 --     id,
---     company_id,
 --     bundle_id,
 --     gift_item_id,
 --     gift_qty,

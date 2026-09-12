@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.pricing_rules (
 --     id,
---     company_id,
 --     title,
 --     priority,
 --     scope,

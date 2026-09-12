@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.loyalty_programs (
 --     id,
---     company_id,
 --     program_name,
 --     program_type,
 --     collection_factor,

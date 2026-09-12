@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.loyalty_order_points (
 --     id,
---     company_id,
 --     loyalty_program_id,
 --     customer_id,
 --     order_ref_type,

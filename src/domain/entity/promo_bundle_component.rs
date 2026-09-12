@@ -51,7 +51,6 @@ impl std::ops::Deref for PromoBundleComponentId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PromoBundleComponent {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub bundle_id: Uuid,
     pub apply_on: ApplyOn,
     pub item_id: Option<Uuid>,
@@ -70,10 +69,9 @@ impl PromoBundleComponent {
     }
 
     /// Create a new PromoBundleComponent with required fields
-    pub fn new(company_id: Uuid, bundle_id: Uuid, apply_on: ApplyOn, min_qty: Decimal) -> Self {
+    pub fn new(bundle_id: Uuid, apply_on: ApplyOn, min_qty: Decimal) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             bundle_id,
             apply_on,
             item_id: None,
@@ -165,9 +163,6 @@ impl PromoBundleComponent {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "bundle_id" => {
                     if let Ok(v) = serde_json::from_value(value) { self.bundle_id = v; }
                 }
@@ -240,7 +235,6 @@ impl backbone_orm::EntityRepoMeta for PromoBundleComponent {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("bundle_id".to_string(), "uuid".to_string());
         m.insert("item_id".to_string(), "uuid".to_string());
         m.insert("item_group_id".to_string(), "uuid".to_string());
@@ -251,9 +245,6 @@ impl backbone_orm::EntityRepoMeta for PromoBundleComponent {
     fn search_fields() -> &'static [&'static str] {
         &[]
     }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
-    }
 }
 
 /// Builder for PromoBundleComponent entity
@@ -262,7 +253,6 @@ impl backbone_orm::EntityRepoMeta for PromoBundleComponent {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct PromoBundleComponentBuilder {
-    company_id: Option<Uuid>,
     bundle_id: Option<Uuid>,
     apply_on: Option<ApplyOn>,
     item_id: Option<Uuid>,
@@ -272,12 +262,6 @@ pub struct PromoBundleComponentBuilder {
 }
 
 impl PromoBundleComponentBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the bundle_id field (required)
     pub fn bundle_id(mut self, value: Uuid) -> Self {
         self.bundle_id = Some(value);
@@ -318,12 +302,10 @@ impl PromoBundleComponentBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<PromoBundleComponent, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let bundle_id = self.bundle_id.ok_or_else(|| "bundle_id is required".to_string())?;
 
         Ok(PromoBundleComponent {
             id: Uuid::new_v4(),
-            company_id,
             bundle_id,
             apply_on: self.apply_on.unwrap_or_default(),
             item_id: self.item_id,

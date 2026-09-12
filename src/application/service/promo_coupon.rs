@@ -5,21 +5,31 @@
 //!
 //!   * **bounded** — the guarded increment makes `used_count` impossible to advance past `max_use`,
 //!     even under concurrent redemptions (→ `CouponExhausted`).
-//!   * **idempotent** — a `coupon_redemptions` ledger row keyed by `(company, coupon, source)`
-//!     records WHICH document consumed the use. A retry of the same sale (a dropped ack, an
-//!     at-least-once event) finds the existing row and returns the same result WITHOUT a second
-//!     burn — the same partial-unique pattern the loyalty accrual leg uses.
+//!   * **idempotent** — a `coupon_redemptions` ledger row keyed per `(coupon, source)` under the
+//!     composing service's org-scoped unique (ADR-0029) records WHICH document consumed the use.
+//!     A retry of the same sale (a dropped ack, an at-least-once event) finds the existing row and
+//!     returns the same result WITHOUT a second burn — the same partial-unique pattern the loyalty
+//!     accrual leg uses.
 //!
 //! Per the module's 4-layer rule this file holds no SQL — the ledger claim and the guarded counter
 //! bump live on `CouponRedemptionRepository` / `CouponCodeRepository`, and both repo methods take
 //! THIS service's transaction so the claim and the burn commit together.
 
-use backbone_orm::company_scope;
 use uuid::Uuid;
 
 use super::promo_events::{CouponRedeemed, PromoEvent, PromoEventSink};
 use super::promo_ports::{LockResource, PricingError};
 use super::promo_write_service::PromoWriteService;
+
+/// The legacy tenancy twin echo (ADR-0029): the `CouponRedeemed` event keeps a `company_id` field
+/// for still-fenced consumers, so the publish site sources it from the ambient org scope's legacy
+/// company id when the composing service bound one, nil otherwise. Nothing in this module keys a
+/// statement on it, and an undecorated deployment is unfenced by design.
+fn legacy_twin() -> Uuid {
+    backbone_orm::org_scope::current_org_scope()
+        .and_then(|s| s.legacy_company_id())
+        .unwrap_or(Uuid::nil())
+}
 
 impl PromoWriteService {
     // ---- 2. coupon redemption (bounded write) -------------------------------------------------
@@ -27,10 +37,11 @@ impl PromoWriteService {
     /// Consume one use of a coupon when a sale commits. Atomic, bounded, AND idempotent per source:
     ///   * **bounded** — the guarded increment makes `used_count` impossible to advance past
     ///     `max_use`, even under concurrent redemptions (→ `CouponExhausted`).
-    ///   * **idempotent** — a `coupon_redemptions` ledger row keyed by `(company, coupon, source)`
-    ///     records WHICH document consumed the use. A retry of the same sale (a dropped ack, an
-    ///     at-least-once event) finds the existing row and returns the same result WITHOUT a second
-    ///     burn — the same partial-unique pattern the loyalty accrual leg uses.
+    ///   * **idempotent** — a `coupon_redemptions` ledger row keyed per `(coupon, source)` under
+    ///     the composing service's org-scoped unique (ADR-0029) records WHICH document consumed
+    ///     the use. A retry of the same sale (a dropped ack, an at-least-once event) finds the
+    ///     existing row and returns the same result WITHOUT a second burn — the same
+    ///     partial-unique pattern the loyalty accrual leg uses.
     ///
     /// The coupon row is locked `FOR UPDATE NOWAIT` FIRST — before any write — so two sales burning
     /// the same coupon serialize on the row instead of racing the guarded bump (a lost lock maps to
@@ -43,29 +54,26 @@ impl PromoWriteService {
     /// replayed source we short-circuit before touching the counter. Returns the pricing_rule_id.
     pub async fn commit_coupon_redemption(
         &self,
-        company_id: Uuid,
         coupon_id: Uuid,
         source_type: &str,
         source_id: Uuid,
         sink: &dyn PromoEventSink,
     ) -> Result<Uuid, PricingError> {
         let mut tx = self.pool.begin().await?;
-        // RLS scope (ADR-0008): company is an explicit argument — bind it onto our own transaction so the
-        // row lock, the ledger claim, and the guarded counter bump all pass the `app.company_id` fence.
-        company_scope::bind_company_on(&mut tx, company_id).await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock the coupon row first (NOWAIT). Ok(false) = no active row → fall through to the claim,
         // which refuses unknown coupons and lets the bump refuse exhausted ones — the typed
         // CouponInvalid / CouponExhausted semantics are unchanged.
         self.coupons
-            .lock_for_burn(&mut tx, coupon_id, company_id)
+            .lock_for_burn(&mut tx, coupon_id)
             .await
             .map_err(|e| super::promo_write_service::lock_busy_or_db(e, LockResource::CouponCode))?;
 
         // Idempotency gate: claim this (coupon, source) exactly once. ON CONFLICT → already redeemed.
         let claimed = self
             .redemptions
-            .claim(&mut tx, company_id, coupon_id, source_type, source_id)
+            .claim(&mut tx, coupon_id, source_type, source_id)
             .await?;
 
         // Settle the cart-stage claim minted under THIS document ref (the claim-and-burn-under-
@@ -76,13 +84,13 @@ impl PromoWriteService {
         // discards this settle with everything else. `settled_at` is the database clock: the
         // burn verb takes no caller instant, and the commit instant IS the settle instant.
         self.claims
-            .settle_redeemed(&mut tx, company_id, coupon_id, source_type, source_id)
+            .settle_redeemed(&mut tx, coupon_id, source_type, source_id)
             .await?;
 
         let rule_id: Uuid = match claimed {
             // Fresh source: advance the counter, bounded. Exhausted → roll back the ledger claim.
             Some(rule_id) => {
-                let bumped = self.coupons.bump_used_count(&mut tx, coupon_id, company_id).await?;
+                let bumped = self.coupons.bump_used_count(&mut tx, coupon_id).await?;
                 if bumped.is_none() {
                     // No use remained (or the coupon is inactive) — undo the ledger claim.
                     return Err(PricingError::CouponExhausted);
@@ -91,7 +99,7 @@ impl PromoWriteService {
                 sink.publish(&PromoEvent::CouponRedeemed(CouponRedeemed {
                     coupon_id,
                     pricing_rule_id: rule_id,
-                    company_id,
+                    company_id: legacy_twin(),
                     source_type: source_type.to_string(),
                     source_id,
                 }));
@@ -101,7 +109,7 @@ impl PromoWriteService {
             None => {
                 let existing = self
                     .redemptions
-                    .find_existing(&mut tx, company_id, coupon_id, source_type, source_id)
+                    .find_existing(&mut tx, coupon_id, source_type, source_id)
                     .await?;
                 tx.commit().await?;
                 existing

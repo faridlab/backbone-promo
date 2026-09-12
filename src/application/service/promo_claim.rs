@@ -38,7 +38,6 @@
 //! claim insert, the settle, the release, and the history read live on
 //! [`crate::infrastructure::persistence::CouponClaimRepository`].
 
-use backbone_orm::company_scope;
 use uuid::Uuid;
 
 use super::promo_events::{PromoCodeClaimed, PromoCodeClaimReleased, PromoEvent, PromoEventSink};
@@ -84,9 +83,7 @@ impl PromoWriteService {
         }
 
         let mut tx = self.pool.begin().await?;
-        // RLS scope (ADR-0008): company on the request — bind it so the locked adjudication
-        // read and the claim insert both run inside this tenant's fence.
-        company_scope::bind_company_on(&mut tx, req.company_id).await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Resolve + lock in ONE statement: the coupon row an active, in-window,
         // not-exhausted-at-rest claim can rest on, with its counters read UNDER the lock.
@@ -94,7 +91,7 @@ impl PromoWriteService {
         // uniform variant, no distinguishing detail.
         let coupon = self
             .claims
-            .lock_claimable(&mut tx, req.company_id, &code, req.at)
+            .lock_claimable(&mut tx, &code, req.at)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::CouponCode))?
             .ok_or(PricingError::ClaimRefused)?;
@@ -109,7 +106,7 @@ impl PromoWriteService {
         //                  race backstop.
         match self
             .claims
-            .find_active_for_cart(&mut tx, req.company_id, &req.cart_ref_type, req.cart_ref_id)
+            .find_active_for_cart(&mut tx, &req.cart_ref_type, req.cart_ref_id)
             .await?
         {
             Some(active) if active.coupon_id == coupon.coupon_id => {
@@ -133,7 +130,7 @@ impl PromoWriteService {
                 if let Some(max_use) = coupon.max_use {
                     let reserved = self
                         .claims
-                        .count_active_for_coupon(&mut tx, req.company_id, coupon.coupon_id)
+                        .count_active_for_coupon(&mut tx, coupon.coupon_id)
                         .await?;
                     if i64::from(coupon.used_count) + reserved + 1 > i64::from(max_use) {
                         return Err(PricingError::ClaimRefused);
@@ -143,7 +140,6 @@ impl PromoWriteService {
                     .claims
                     .insert_claim(
                         &mut tx,
-                        req.company_id,
                         &req.cart_ref_type,
                         req.cart_ref_id,
                         &coupon,
@@ -162,7 +158,7 @@ impl PromoWriteService {
                 tx.commit().await?;
                 sink.publish(&PromoEvent::PromoCodeClaimed(PromoCodeClaimed {
                     claim_id,
-                    company_id: req.company_id,
+                    company_id: legacy_twin(),
                     coupon_id: coupon.coupon_id,
                     pricing_rule_id: coupon.pricing_rule_id,
                     cart_ref_type: req.cart_ref_type.clone(),
@@ -186,36 +182,24 @@ impl PromoWriteService {
     /// delayed sweep. Idempotent: `Ok(None)` when the cart holds nothing active.
     pub async fn release_promo_claim(
         &self,
-        company_id: Uuid,
         cart_ref_type: &str,
         cart_ref_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
         sink: &dyn PromoEventSink,
     ) -> Result<Option<Uuid>, PricingError> {
         let mut tx = self.pool.begin().await?;
-        // RLS scope (ADR-0008): company on the parameter — bind it so the transition runs
-        // inside this tenant's fence.
-        company_scope::bind_company_on(&mut tx, company_id).await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
         let released = self
             .claims
-            .release_for_cart(&mut tx, company_id, cart_ref_type, cart_ref_id, at)
+            .release_for_cart(&mut tx, cart_ref_type, cart_ref_id, at)
             .await?;
         tx.commit().await?;
         if let Some(claim_id) = released {
             // The coupon id rides the event so consumers can recompute headroom without a join.
-            // The read runs inside a company scope: the claims table is RLS-fenced, the pool
-            // carries no company binding on the public cart path, and the scoped-execute
-            // helper only fences when a scope is present — without this wrap the lookup runs
-            // raw, sees zero rows, and the release surfaces as a refusal.
-            let coupon_id = company_scope::with_company_scope(
-                Some(company_id),
-                self.claims
-                    .coupon_of_claim(&self.pool, company_id, claim_id),
-            )
-            .await?;
+            let coupon_id = self.claims.coupon_of_claim(&self.pool, claim_id).await?;
             sink.publish(&PromoEvent::PromoCodeClaimReleased(PromoCodeClaimReleased {
                 claim_id,
-                company_id,
+                company_id: legacy_twin(),
                 coupon_id,
                 cart_ref_type: cart_ref_type.to_string(),
                 cart_ref_id,
@@ -225,18 +209,17 @@ impl PromoWriteService {
     }
 
     /// The cart's claim history, every status, oldest first — the inspectable claim state.
-    /// A pure read: `with_company_scope` fences it, the verbs stay the only writers.
+    /// A pure read: the module ships no row fence (row scoping is the composing service's
+    /// tenancy decorator, ADR-0029), and the verbs stay the only writers.
     pub async fn claims_for_cart(
         &self,
-        company_id: Uuid,
         cart_ref_type: &str,
         cart_ref_id: Uuid,
     ) -> Result<Vec<CodeClaimView>, PricingError> {
-        let rows = company_scope::with_company_scope(
-            Some(company_id),
-            self.claims.list_for_cart(&self.pool, company_id, cart_ref_type, cart_ref_id),
-        )
-        .await?;
+        let rows = self
+            .claims
+            .list_for_cart(&self.pool, cart_ref_type, cart_ref_id)
+            .await?;
         Ok(rows
             .into_iter()
             .map(|r| CodeClaimView {
@@ -266,4 +249,13 @@ fn unique_violation_or(err: sqlx::Error, fallback: PricingError) -> PricingError
         }
     }
     PricingError::Db(err)
+}
+
+/// The legacy tenancy twin the claim event payloads still carry (ADR-0029): under the composing
+/// service's org request scope it is the scope's legacy echo; nil when undecorated. The event
+/// field stays for still-fenced consumers; nothing in this module keys a statement on it.
+fn legacy_twin() -> Uuid {
+    backbone_orm::org_scope::current_org_scope()
+        .and_then(|s| s.legacy_company_id())
+        .unwrap_or(Uuid::nil())
 }

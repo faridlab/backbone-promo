@@ -13,7 +13,6 @@ use uuid::Uuid;
 /// One line the caller wants priced, plus the dimensions the resolver matches rules against.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PriceQuery {
-    pub company_id: Uuid,
     /// The list/base unit price before any promo (what selling/POS would otherwise charge).
     pub list_price: Decimal,
     pub quantity: Decimal,
@@ -86,7 +85,6 @@ pub struct CartLine {
 /// The whole basket to price in one call. Customer, coupon and instant are cart-wide.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CartQuery {
-    pub company_id: Uuid,
     pub customer_id: Option<Uuid>,
     pub customer_group_id: Option<Uuid>,
     /// A coupon code the customer presented (unlocks `coupon_required` line rules). Case-insensitive.
@@ -194,7 +192,6 @@ pub trait PriceResolverPort: Send + Sync {
 /// A request to accrue loyalty points for a settled purchase (the earn leg).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AccrualRequest {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     /// The spend that earns points (net of tax; caller's choice of base).
@@ -208,7 +205,6 @@ pub struct AccrualRequest {
 /// A request to redeem points against a purchase (the burn leg).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RedemptionRequest {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub points: Decimal,
@@ -236,7 +232,6 @@ pub struct RedemptionRequest {
 /// other client-computed claim fact.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PromoCodeClaimRequest {
-    pub company_id: Uuid,
     /// The claiming document's kind, e.g. `storefront_cart` — the claim grain. Claim and burn
     /// under the SAME ref: the burn settles the claim automatically.
     pub cart_ref_type: String,
@@ -307,12 +302,12 @@ pub struct CodeClaimView {
 
 /// Grant (earn) a member's points for one logical order. The earning base is the caller's
 /// net-of-tax order amount; the points are DERIVED server-side from the program's
-/// `collection_factor`. Idempotent per order: both the order row (unique per
-/// company/program/order-ref) and the ledger entry (unique per company/source-type/source-id/entry
-/// type) make a re-driven confirm a no-op returning the same outcome.
+/// `collection_factor`. Idempotent per order: both the order row (unique per program/order-ref)
+/// and the ledger entry (unique per source-type/source-id/entry type), each partitioned by the
+/// composing service's org scope (ADR-0029), make a re-driven confirm a no-op returning the same
+/// outcome.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OrderPointsGrantRequest {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     /// The logical order kind, e.g. `pos_order` / `sales_order` — half of the idempotency key.
@@ -344,7 +339,6 @@ pub struct OrderPointsGrantOutcome {
 /// derives the money value from the program's `conversion_factor`. Idempotent per order.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OrderPointsSpendRequest {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: String,
@@ -372,7 +366,6 @@ pub struct OrderPointsSpendOutcome {
 /// spent). Idempotent per return document.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OrderPointsReversalRequest {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: String,

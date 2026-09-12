@@ -12,7 +12,11 @@ use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
+// The typed multi-row read twins live only in the legacy `company_scope` module. Their
+// connection discipline is what this repository needs — request-dedicated connection when
+// the composing service bound one, plain pool otherwise. The helper's legacy task-local
+// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
+use backbone_orm::company_scope::fetch_optional_row_scoped;
 
 use crate::domain::entity::LoyaltyProgram;
 
@@ -48,26 +52,23 @@ impl LoyaltyProgramRepository {
 impl LoyaltyProgramRepository {
     /// An active, in-window program's `(collection_factor, expiry_duration_days)` — what accrual needs.
     ///
-    /// RLS scope (ADR-0008): company on the parameter — the caller wraps this in
-    /// `with_company_scope(Some(company_id))`. The explicit `company_id = $2` stays as
-    /// defense-in-depth.
+    /// Tenant-agnostic (ADR-0029): the module ships no row fence — row scoping is the composing
+    /// service's tenancy decorator.
     pub async fn find_active_collection(
         &self,
         pool: &PgPool,
-        company_id: Uuid,
         program_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<(Decimal, Option<i32>)>, sqlx::Error> {
-        let row = company_scope::fetch_optional_row_scoped(
+        let row = fetch_optional_row_scoped(
             pool,
             sqlx::query(
                 r#"SELECT collection_factor, expiry_duration_days FROM promo.loyalty_programs
-                   WHERE id = $1 AND company_id = $2 AND status = 'active'
+                   WHERE id = $1 AND status = 'active'
                      AND (metadata->>'deleted_at') IS NULL
-                     AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)"#,
+                     AND from_date <= $2 AND (to_date IS NULL OR to_date >= $2)"#,
             )
             .bind(program_id)
-            .bind(company_id)
             .bind(at),
         )
         .await?;
@@ -86,24 +87,21 @@ impl LoyaltyProgramRepository {
     /// patch with no shape change.
     ///
     /// Takes the CALLER'S connection: it is read INSIDE the redemption tx, so the factor that prices a
-    /// burn is the one the serialized balance check saw. The caller has already bound the company on it
-    /// (`bind_company_on`) — don't re-bind here.
+    /// burn is the one the serialized balance check saw.
     pub async fn find_active_conversion(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         program_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<Option<Decimal>, sqlx::Error> {
         sqlx::query_scalar(
             r#"SELECT conversion_factor FROM promo.loyalty_programs
-               WHERE id = $1 AND company_id = $2 AND status = 'active'
+               WHERE id = $1 AND status = 'active'
                  AND (metadata->>'deleted_at') IS NULL
-                 AND from_date <= $3 AND (to_date IS NULL OR to_date >= $3)
+                 AND from_date <= $2 AND (to_date IS NULL OR to_date >= $2)
                FOR UPDATE NOWAIT"#,
         )
         .bind(program_id)
-        .bind(company_id)
         .bind(at)
         .fetch_optional(conn)
         .await
@@ -116,16 +114,14 @@ impl LoyaltyProgramRepository {
     pub async fn find_factors_locked(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         program_id: Uuid,
     ) -> Result<Option<(Decimal, Decimal)>, sqlx::Error> {
         let row = sqlx::query(
             r#"SELECT collection_factor, conversion_factor FROM promo.loyalty_programs
-               WHERE id = $1 AND company_id = $2 AND (metadata->>'deleted_at') IS NULL
+               WHERE id = $1 AND (metadata->>'deleted_at') IS NULL
                FOR UPDATE NOWAIT"#,
         )
         .bind(program_id)
-        .bind(company_id)
         .fetch_optional(conn)
         .await?;
         Ok(row.map(|r| (r.get("collection_factor"), r.get("conversion_factor"))))

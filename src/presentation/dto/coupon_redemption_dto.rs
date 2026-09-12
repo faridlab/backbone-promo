@@ -33,9 +33,6 @@ use crate::domain::entity::AuditMetadata;
 #[serde(rename_all = "camelCase")]
 pub struct CreateCouponRedemptionDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "coupon_id")]
     pub coupon_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -66,9 +63,6 @@ pub struct CreateCouponRedemptionDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCouponRedemptionDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "coupon_id")]
     pub coupon_id: Uuid,
@@ -101,9 +95,6 @@ pub struct UpdateCouponRedemptionDto {
 #[serde(rename_all = "camelCase")]
 pub struct PatchCouponRedemptionDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "coupon_id")]
     pub coupon_id: Option<Uuid>,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -124,7 +115,7 @@ pub struct PatchCouponRedemptionDto {
 impl PatchCouponRedemptionDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.coupon_id.is_some() || self.pricing_rule_id.is_some() || self.source_type.is_some() || self.source_id.is_some() || self.redeemed_at.is_some()
+        self.coupon_id.is_some() || self.pricing_rule_id.is_some() || self.source_type.is_some() || self.source_id.is_some() || self.redeemed_at.is_some()
     }
 }
 
@@ -142,8 +133,6 @@ impl PatchCouponRedemptionDto {
 pub struct CouponRedemptionResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub coupon_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -211,9 +200,9 @@ impl CouponRedemptionListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct CouponRedemptionSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub coupon_id: Uuid,
     pub pricing_rule_id: Uuid,
+    pub source_type: String,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -225,7 +214,6 @@ impl From<CouponRedemption> for CouponRedemptionResponseDto {
     fn from(entity: CouponRedemption) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             coupon_id: entity.coupon_id,
             pricing_rule_id: entity.pricing_rule_id,
             source_type: entity.source_type,
@@ -241,9 +229,9 @@ impl From<CouponRedemption> for CouponRedemptionSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             coupon_id: entity.coupon_id,
             pricing_rule_id: entity.pricing_rule_id,
+            source_type: entity.source_type,
             created_at,
         }
     }
@@ -253,7 +241,6 @@ impl From<CreateCouponRedemptionDto> for CouponRedemption {
     fn from(dto: CreateCouponRedemptionDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             coupon_id: dto.coupon_id,
             pricing_rule_id: dto.pricing_rule_id,
             source_type: dto.source_type,
@@ -268,7 +255,6 @@ impl From<&CouponRedemption> for CouponRedemptionResponseDto {
     fn from(entity: &CouponRedemption) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             coupon_id: entity.coupon_id.clone(),
             pricing_rule_id: entity.pricing_rule_id.clone(),
             source_type: entity.source_type.clone(),
@@ -287,7 +273,6 @@ impl backbone_core::FromCreateDto<CreateCouponRedemptionDto> for CouponRedemptio
 
 impl backbone_core::ApplyUpdateDto<UpdateCouponRedemptionDto> for CouponRedemption {
     fn apply_update(mut self, dto: UpdateCouponRedemptionDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.coupon_id = dto.coupon_id;
         self.pricing_rule_id = dto.pricing_rule_id;
         self.source_type = dto.source_type;

@@ -6,7 +6,7 @@
 # (conversion_factor: currency value per point on redemption). Each
 # LoyaltyPointEntry is one signed movement (earned +, redeemed −, expired −) tied
 # to a source document. Accrual is IDEMPOTENT per source: a unique
-# (company_id, source_type, source_id, entry_type) key means one paid invoice
+# (org_unit_id, source_type, source_id, entry_type) key means one paid invoice
 # earns points at most once, however many times the event is replayed. Points are
 # NOT money and post NO GL — the entry is a loyalty subledger, not an accounting one.
 # =============================================================================
@@ -21,10 +21,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique program id"
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Books owner # logical FK to organization.Company.id"
       program_name:
         type: string
         attributes: ["@required", "@max(140)"]
@@ -65,9 +61,9 @@ models:
         attributes: ["@audit_metadata"]
         description: "Audit metadata"
 
-    indexes:
-      - type: index
-        fields: [company_id, status]
+    indexes: []      # every company-leading index here moved org-scoped: the
+                         # composing tenancy decorator re-declares them on
+                         # org_unit_id at composition (ADR-0029)
 
   - name: LoyaltyPointEntry
     collection: loyalty_point_entries
@@ -78,10 +74,6 @@ models:
         type: uuid
         attributes: ["@id", "@default(uuid)"]
         description: "Unique entry id"
-      company_id:
-        type: uuid
-        attributes: ["@required", "@exclude_from_foreign_key_check"]
-        description: "Books owner # logical FK to organization.Company.id"
       loyalty_program_id:
         type: uuid
         attributes: ["@required", "@foreign_key(LoyaltyProgram.id)"]
@@ -128,11 +120,6 @@ models:
 
     indexes:
       # Idempotency: one source doc earns/redeems at most once per entry_type.
-      - type: unique
-        fields: [company_id, source_type, source_id, entry_type]
-        where: "deleted_at IS NULL"
-      - type: index
-        fields: [company_id, customer_id, loyalty_program_id]
       - type: index
         fields: [customer_id, entry_type]
 

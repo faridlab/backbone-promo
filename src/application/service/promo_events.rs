@@ -3,6 +3,11 @@
 //! Promo posts NO GL and owns no money of record. It resolves prices (a pure read the selling/POS
 //! write paths consume) and runs the loyalty points ledger. These events are the hooks a downstream
 //! consumer (analytics, notifications, a claw-back on returns) subscribes to. Points are NOT money.
+//!
+//! The module is tenant-agnostic (ADR-0029): nothing in promo keys a statement on `company_id`. The
+//! event payloads keep the field as a documented legacy twin for still-fenced consumers — publish
+//! sites source it from the ambient org scope's legacy company id when the composing service bound
+//! one, nil otherwise.
 
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -13,6 +18,7 @@ use uuid::Uuid;
 pub struct CouponRedeemed {
     pub coupon_id: Uuid,
     pub pricing_rule_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub source_type: String,
     pub source_id: Uuid,
@@ -23,6 +29,7 @@ pub struct CouponRedeemed {
 pub struct LoyaltyPointsEarned {
     pub entry_id: Uuid,
     pub loyalty_program_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub customer_id: Uuid,
     pub points: Decimal,
@@ -36,6 +43,7 @@ pub struct LoyaltyPointsEarned {
 pub struct LoyaltyPointsRedeemed {
     pub entry_id: Uuid,
     pub loyalty_program_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub customer_id: Uuid,
     pub points: Decimal,
@@ -50,6 +58,7 @@ pub struct LoyaltyPointsRedeemed {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PromoCodeClaimed {
     pub claim_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub coupon_id: Uuid,
     pub pricing_rule_id: Uuid,
@@ -64,6 +73,7 @@ pub struct PromoCodeClaimed {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PromoCodeClaimReleased {
     pub claim_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub coupon_id: Uuid,
     pub cart_ref_type: String,
@@ -75,6 +85,7 @@ pub struct PromoCodeClaimReleased {
 pub struct LoyaltyOrderPointsGranted {
     pub order_points_id: Uuid,
     pub loyalty_program_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: String,
@@ -88,6 +99,7 @@ pub struct LoyaltyOrderPointsGranted {
 pub struct LoyaltyOrderPointsSpent {
     pub order_points_id: Uuid,
     pub loyalty_program_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: String,
@@ -101,6 +113,7 @@ pub struct LoyaltyOrderPointsSpent {
 pub struct LoyaltyOrderPointsReversed {
     pub order_points_id: Uuid,
     pub loyalty_program_id: Uuid,
+    /// Documented legacy twin (ADR-0029) — carried for still-fenced consumers; nil when undecorated.
     pub company_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: String,

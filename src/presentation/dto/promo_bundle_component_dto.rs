@@ -35,9 +35,6 @@ use crate::domain::entity::ApplyOn;
 #[serde(rename_all = "camelCase")]
 pub struct CreatePromoBundleComponentDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "bundle_id")]
     pub bundle_id: Uuid,
     #[serde(alias = "apply_on")]
@@ -65,9 +62,6 @@ pub struct CreatePromoBundleComponentDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePromoBundleComponentDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "bundle_id")]
     pub bundle_id: Uuid,
@@ -97,9 +91,6 @@ pub struct UpdatePromoBundleComponentDto {
 #[serde(rename_all = "camelCase")]
 pub struct PatchPromoBundleComponentDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "bundle_id")]
     pub bundle_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "apply_on")]
@@ -117,7 +108,7 @@ pub struct PatchPromoBundleComponentDto {
 impl PatchPromoBundleComponentDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.bundle_id.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.min_qty.is_some()
+        self.bundle_id.is_some() || self.apply_on.is_some() || self.item_id.is_some() || self.item_group_id.is_some() || self.brand_id.is_some() || self.min_qty.is_some()
     }
 }
 
@@ -135,8 +126,6 @@ impl PatchPromoBundleComponentDto {
 pub struct PromoBundleComponentResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub bundle_id: Uuid,
     pub apply_on: ApplyOn,
@@ -201,9 +190,9 @@ impl PromoBundleComponentListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct PromoBundleComponentSummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub bundle_id: Uuid,
     pub apply_on: ApplyOn,
+    pub item_id: Option<Uuid>,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -215,7 +204,6 @@ impl From<PromoBundleComponent> for PromoBundleComponentResponseDto {
     fn from(entity: PromoBundleComponent) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             bundle_id: entity.bundle_id,
             apply_on: entity.apply_on,
             item_id: entity.item_id,
@@ -232,9 +220,9 @@ impl From<PromoBundleComponent> for PromoBundleComponentSummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             bundle_id: entity.bundle_id,
             apply_on: entity.apply_on,
+            item_id: entity.item_id,
             created_at,
         }
     }
@@ -244,7 +232,6 @@ impl From<CreatePromoBundleComponentDto> for PromoBundleComponent {
     fn from(dto: CreatePromoBundleComponentDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             bundle_id: dto.bundle_id,
             apply_on: dto.apply_on,
             item_id: dto.item_id,
@@ -260,7 +247,6 @@ impl From<&PromoBundleComponent> for PromoBundleComponentResponseDto {
     fn from(entity: &PromoBundleComponent) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             bundle_id: entity.bundle_id.clone(),
             apply_on: entity.apply_on.clone(),
             item_id: entity.item_id.clone(),
@@ -280,7 +266,6 @@ impl backbone_core::FromCreateDto<CreatePromoBundleComponentDto> for PromoBundle
 
 impl backbone_core::ApplyUpdateDto<UpdatePromoBundleComponentDto> for PromoBundleComponent {
     fn apply_update(mut self, dto: UpdatePromoBundleComponentDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.bundle_id = dto.bundle_id;
         self.apply_on = dto.apply_on;
         self.item_id = dto.item_id;

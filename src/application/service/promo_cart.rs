@@ -9,7 +9,6 @@
 //! Per the module's 4-layer rule this file holds no SQL — the bundle/component/order-rule searches
 //! live on `PromoBundleRepository` / `PromoBundleComponentRepository` / `PricingRuleRepository`.
 
-use backbone_orm::company_scope;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -396,7 +395,7 @@ impl PromoWriteService {
         // A coupon-gated order rule / (future) bundle unlocks only when the cart's coupon maps to it.
         let unlocked_rule: Option<Uuid> = match &cart.coupon_code {
             Some(code) => self
-                .lookup_valid_coupon(cart.company_id, code, cart.at)
+                .lookup_valid_coupon(code, cart.at)
                 .await?
                 .map(|(_, rule_id)| rule_id),
             None => None,
@@ -407,7 +406,6 @@ impl PromoWriteService {
         for cl in &cart.lines {
             // Cart-wide customer/coupon/instant win over anything on the line's own query.
             let q = PriceQuery {
-                company_id: cart.company_id,
                 customer_id: cart.customer_id,
                 customer_group_id: cart.customer_group_id,
                 coupon_code: cart.coupon_code.clone(),
@@ -550,20 +548,17 @@ impl PromoWriteService {
         total_qty: Decimal,
         unlocked_rule: Option<Uuid>,
     ) -> Result<Vec<OrderRuleCand>, PricingError> {
-        // RLS scope (ADR-0008): company on the cart — scope the read.
-        let rows = company_scope::with_company_scope(
-            Some(cart.company_id),
-            self.rules.find_order_candidates(
+        let rows = self
+            .rules
+            .find_order_candidates(
                 &self.pool,
-                cart.company_id,
                 cart.at,
                 cart.customer_id,
                 cart.customer_group_id,
                 subtotal,
                 total_qty,
-            ),
-        )
-        .await?;
+            )
+            .await?;
 
         let mut cands: Vec<OrderRuleCand> = rows
             .into_iter()
@@ -599,28 +594,24 @@ impl PromoWriteService {
         cart: &CartQuery,
         subtotal: Decimal,
     ) -> Result<Vec<BundleCand>, PricingError> {
-        // RLS scope (ADR-0008): company on the cart — scope both the bundle and component reads.
-        let brows = company_scope::with_company_scope(
-            Some(cart.company_id),
-            self.bundles.find_active(&self.pool, cart.company_id, cart.at, subtotal),
-        )
-        .await?;
+        let brows = self
+            .bundles
+            .find_active(&self.pool, cart.at, subtotal)
+            .await?;
         if brows.is_empty() {
             return Ok(Vec::new());
         }
 
         let bundle_ids: Vec<Uuid> = brows.iter().map(|r| r.id).collect();
-        let crows = company_scope::with_company_scope(
-            Some(cart.company_id),
-            self.bundle_components.find_for_bundles(&self.pool, cart.company_id, &bundle_ids),
-        )
-        .await?;
+        let crows = self
+            .bundle_components
+            .find_for_bundles(&self.pool, &bundle_ids)
+            .await?;
 
-        let grows = company_scope::with_company_scope(
-            Some(cart.company_id),
-            self.bundle_gifts.find_for_bundles(&self.pool, cart.company_id, &bundle_ids),
-        )
-        .await?;
+        let grows = self
+            .bundle_gifts
+            .find_for_bundles(&self.pool, &bundle_ids)
+            .await?;
 
         let mut bundles: Vec<BundleCand> = brows
             .into_iter()

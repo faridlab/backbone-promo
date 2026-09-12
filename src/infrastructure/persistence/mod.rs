@@ -56,4 +56,15 @@ pub use backbone_orm::repository::{
 
 // Re-export custom persistence types
 // <<< CUSTOM
+// Re-bind the caller's ambient org scope onto a transaction opened on the plain pool — the
+// scope is task-local and a fresh pool transaction carries none of it. With no ambient scope
+// (standalone deployment, jobs) the transaction stays plain: the module is tenant-agnostic and
+// the composing service's tenancy decorator owns isolation (ADR-0029). Same convention as the
+// backbone-pos and backbone-livechat write paths.
+pub(crate) async fn relay_ambient_scope(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
+    if let Some(scope) = backbone_orm::org_scope::current_org_scope() {
+        backbone_orm::org_scope::bind_org_scope_on(conn, &scope).await?;
+    }
+    Ok(())
+}
 // END CUSTOM

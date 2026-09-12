@@ -44,7 +44,6 @@ pub struct LoyaltyOrderPointsPaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct LoyaltyOrderPointsFilter {
-    pub company_id: Option<Uuid>,
     pub loyalty_program_id: Option<Uuid>,
     pub customer_id: Option<Uuid>,
     pub order_ref_type: Option<String>,
@@ -55,7 +54,7 @@ pub struct LoyaltyOrderPointsFilter {
 impl LoyaltyOrderPointsFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.loyalty_program_id.is_some() || self.customer_id.is_some() || self.order_ref_type.is_some() || self.order_ref_id.is_some() || self.coupon_code_id.is_some()
+        self.loyalty_program_id.is_some() || self.customer_id.is_some() || self.order_ref_type.is_some() || self.order_ref_id.is_some() || self.coupon_code_id.is_some()
     }
 }
 

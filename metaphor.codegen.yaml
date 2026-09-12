@@ -91,6 +91,14 @@ user_owned:
   - "migrations/20260904100000_create_coupon_claims.down.sql"
   - "migrations/20260904100100_coupon_code_case_folded_unique.up.sql"
   - "migrations/20260904100100_coupon_code_case_folded_unique.down.sql"
+  # Hand-written tenancy strip (ADR-0029): drops every company-fence artifact from the
+  # promo tables — the company-leading uniques and indexes (their org-scoped re-declarations
+  # live in the composing service's tenancy decorator), the member-anchor mutex constraint,
+  # the company isolation policies, and the company_id columns — behind a decorator-first
+  # ordering guard. RLS enable flags stay armed with zero policies: the decorator's
+  # half-fence.
+  - "migrations/20260912140000_strip_tenancy.up.sql"
+  - "migrations/20260912140000_strip_tenancy.down.sql"
   # Claim-serialization probes (adjudication, uniform refusal, exactly-one-wins concurrency,
   # release/settle lifecycle, DB-backed uniqueness, NOWAIT lock proof, RLS fence).
   - "tests/claim_serialization_probes.rs"
@@ -106,6 +114,9 @@ user_owned:
   # used by every suite; not a generator-emitted path.
   - "tests/common/**"
   - "scripts/**"
+  # Hand-written event-store sink (aggregate/sequence ledger, optimistic-concurrency
+  # append); not a generator-emitted path.
+  - "src/infrastructure/event_store/**"
 
   # Behavior tests (the golden cases / oracle) + BDD features.
   - "tests/features/**"

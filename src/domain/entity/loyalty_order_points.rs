@@ -49,7 +49,6 @@ impl std::ops::Deref for LoyaltyOrderPointsId {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct LoyaltyOrderPoints {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub order_ref_type: String,
@@ -74,10 +73,9 @@ impl LoyaltyOrderPoints {
     }
 
     /// Create a new LoyaltyOrderPoints with required fields
-    pub fn new(company_id: Uuid, loyalty_program_id: Uuid, customer_id: Uuid, order_ref_type: String, order_ref_id: Uuid, grant_base_amount: Decimal, granted_points: Decimal, spent_points: Decimal, granted_reversed_points: Decimal, spent_reversed_points: Decimal) -> Self {
+    pub fn new(loyalty_program_id: Uuid, customer_id: Uuid, order_ref_type: String, order_ref_id: Uuid, grant_base_amount: Decimal, granted_points: Decimal, spent_points: Decimal, granted_reversed_points: Decimal, spent_reversed_points: Decimal) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id,
             loyalty_program_id,
             customer_id,
             order_ref_type,
@@ -175,9 +173,6 @@ impl LoyaltyOrderPoints {
     pub fn apply_patch(&mut self, fields: std::collections::HashMap<String, serde_json::Value>) {
         for (key, value) in fields {
             match key.as_str() {
-                "company_id" => {
-                    if let Ok(v) = serde_json::from_value(value) { self.company_id = v; }
-                }
                 "loyalty_program_id" => {
                     if let Ok(v) = serde_json::from_value(value) { self.loyalty_program_id = v; }
                 }
@@ -268,7 +263,6 @@ impl backbone_orm::EntityRepoMeta for LoyaltyOrderPoints {
     fn column_types() -> std::collections::HashMap<String, String> {
         let mut m = std::collections::HashMap::new();
         m.insert("id".to_string(), "uuid".to_string());
-        m.insert("company_id".to_string(), "uuid".to_string());
         m.insert("loyalty_program_id".to_string(), "uuid".to_string());
         m.insert("customer_id".to_string(), "uuid".to_string());
         m.insert("order_ref_id".to_string(), "uuid".to_string());
@@ -278,9 +272,6 @@ impl backbone_orm::EntityRepoMeta for LoyaltyOrderPoints {
     fn search_fields() -> &'static [&'static str] {
         &["order_ref_type"]
     }
-    fn company_field() -> Option<&'static str> {
-        Some("company_id")
-    }
 }
 
 /// Builder for LoyaltyOrderPoints entity
@@ -289,7 +280,6 @@ impl backbone_orm::EntityRepoMeta for LoyaltyOrderPoints {
 /// System fields (id, metadata, timestamps) are auto-initialized.
 #[derive(Debug, Clone, Default)]
 pub struct LoyaltyOrderPointsBuilder {
-    company_id: Option<Uuid>,
     loyalty_program_id: Option<Uuid>,
     customer_id: Option<Uuid>,
     order_ref_type: Option<String>,
@@ -305,12 +295,6 @@ pub struct LoyaltyOrderPointsBuilder {
 }
 
 impl LoyaltyOrderPointsBuilder {
-    /// Set the company_id field (required)
-    pub fn company_id(mut self, value: Uuid) -> Self {
-        self.company_id = Some(value);
-        self
-    }
-
     /// Set the loyalty_program_id field (required)
     pub fn loyalty_program_id(mut self, value: Uuid) -> Self {
         self.loyalty_program_id = Some(value);
@@ -387,7 +371,6 @@ impl LoyaltyOrderPointsBuilder {
     ///
     /// Returns Err if any required field without a default is missing.
     pub fn build(self) -> Result<LoyaltyOrderPoints, String> {
-        let company_id = self.company_id.ok_or_else(|| "company_id is required".to_string())?;
         let loyalty_program_id = self.loyalty_program_id.ok_or_else(|| "loyalty_program_id is required".to_string())?;
         let customer_id = self.customer_id.ok_or_else(|| "customer_id is required".to_string())?;
         let order_ref_type = self.order_ref_type.ok_or_else(|| "order_ref_type is required".to_string())?;
@@ -395,7 +378,6 @@ impl LoyaltyOrderPointsBuilder {
 
         Ok(LoyaltyOrderPoints {
             id: Uuid::new_v4(),
-            company_id,
             loyalty_program_id,
             customer_id,
             order_ref_type,

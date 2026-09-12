@@ -16,10 +16,10 @@
 //! Per the module's 4-layer rule this file holds no SQL — the accrual claim, the member anchor
 //! lock, the expiry-aware balance read, and the redemption insert live on
 //! `LoyaltyPointEntryRepository`, the member-anchor mint on `LoyaltyMemberAnchorRepository`, and
-//! the program/collection/conversion reads on `LoyaltyProgramRepository`. Every tx-taking repo
-//! method rides the bind this service makes.
+//! the program/collection/conversion reads on `LoyaltyProgramRepository`. The module ships no row
+//! fence: row scoping is the composing service's tenancy decorator (ADR-0029), and the tx-taking
+//! repo methods ride the caller's transaction unchanged.
 
-use backbone_orm::company_scope;
 use rust_decimal::Decimal;
 
 use crate::infrastructure::persistence::{NewAccrualRow, NewRedemptionRow};
@@ -31,9 +31,10 @@ use super::promo_write_service::{lock_busy_or_db, money, AccrualOutcome, PromoWr
 impl PromoWriteService {
     // ---- 3. loyalty ledger --------------------------------------------------------------------
 
-    /// Accrue points for a settled purchase. Idempotent per source: the partial unique key
-    /// `(company, source_type, source_id, earned)` means one document earns at most once, however
-    /// many times the paid event is replayed. `points = floor(purchase_amount · collection_factor)`.
+    /// Accrue points for a settled purchase. Idempotent per source: the one-earn-per-document
+    /// partial unique (a decorator-declared org-scoped key, ADR-0029) means one document earns at
+    /// most once, however many times the paid event is replayed.
+    /// `points = floor(purchase_amount · collection_factor)`.
     pub async fn accrue(
         &self,
         req: &AccrualRequest,
@@ -42,7 +43,9 @@ impl PromoWriteService {
         if req.purchase_amount < Decimal::ZERO {
             return Err(PricingError::Invalid("purchase_amount must be non-negative".into()));
         }
-        let program = self.load_active_program(req.company_id, req.loyalty_program_id, req.at).await?;
+        let program = self
+            .load_active_program(req.loyalty_program_id, req.at)
+            .await?;
         let (collection_factor, expiry_days): (Decimal, Option<i32>) = program;
 
         let points = (req.purchase_amount * collection_factor).floor();
@@ -51,12 +54,9 @@ impl PromoWriteService {
         }
         let expiry = expiry_days.map(|d| req.at + chrono::Duration::days(d as i64));
 
-        // RLS scope (ADR-0008): company on the accrual request — scope the insert so it passes the
-        // WITH CHECK fence (accrue is event-driven and has no ambient scope of its own).
-        let row = company_scope::with_company_scope(
-            Some(req.company_id),
-            self.entries.claim_accrual(&self.pool, &NewAccrualRow {
-                company_id: req.company_id,
+        let row = self
+            .entries
+            .claim_accrual(&self.pool, &NewAccrualRow {
                 loyalty_program_id: req.loyalty_program_id,
                 customer_id: req.customer_id,
                 points,
@@ -65,16 +65,15 @@ impl PromoWriteService {
                 source_id: req.source_id,
                 at: req.at,
                 expiry,
-            }),
-        )
-        .await?;
+            })
+            .await?;
 
         match row {
             Some(entry_id) => {
                 sink.publish(&PromoEvent::LoyaltyPointsEarned(LoyaltyPointsEarned {
                     entry_id,
                     loyalty_program_id: req.loyalty_program_id,
-                    company_id: req.company_id,
+                    company_id: legacy_twin(),
                     customer_id: req.customer_id,
                     points,
                     purchase_amount: money(req.purchase_amount),
@@ -104,9 +103,7 @@ impl PromoWriteService {
             return Err(PricingError::Invalid("points to redeem must be positive".into()));
         }
         let mut tx = self.pool.begin().await?;
-        // RLS scope (ADR-0008): company on the redemption request — bind it so the anchor lock, the
-        // balance read, and the redeemed-entry insert all run inside this tenant's fence.
-        company_scope::bind_company_on(&mut tx, req.company_id).await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock 1 — program row (NOWAIT): the factor that prices this burn is the one the serialized
         // balance check sees, pinned for the length of the transaction.
@@ -115,17 +112,17 @@ impl PromoWriteService {
             .await?;
 
         // Lock 2 — member anchor (NOWAIT): serialize all balance-changing ops for this
-        // (company, customer, program). The anchor row is minted on first touch, so even a member
+        // (customer, program). The anchor row is minted on first touch, so even a member
         // with no ledger history yet gets a lock target.
         self.anchors
-            .ensure_and_lock(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id)
+            .ensure_and_lock(&mut tx, req.customer_id, req.loyalty_program_id)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::MemberBalance))?;
 
         // Idempotent replay: a prior redemption for this exact source returns the same result.
         if let Some(r) = self
             .entries
-            .find_redemption_by_source(&mut tx, req.company_id, &req.source_type, req.source_id)
+            .find_redemption_by_source(&mut tx, &req.source_type, req.source_id)
             .await?
         {
             let prior_points = r.points;
@@ -142,7 +139,7 @@ impl PromoWriteService {
         // of entries whose expiry has passed. Read under the member lock, so it cannot be raced.
         let (available, lapsed) = self
             .entries
-            .balances_at(&mut tx, req.company_id, req.customer_id, req.loyalty_program_id, req.at)
+            .balances_at(&mut tx, req.customer_id, req.loyalty_program_id, req.at)
             .await?;
 
         if req.points > available {
@@ -155,7 +152,6 @@ impl PromoWriteService {
 
         let discount_value = money(req.points * conversion_factor);
         let entry_id = self.entries.insert_redemption(&mut tx, &NewRedemptionRow {
-            company_id: req.company_id,
             loyalty_program_id: req.loyalty_program_id,
             customer_id: req.customer_id,
             points: -req.points,
@@ -169,7 +165,7 @@ impl PromoWriteService {
         sink.publish(&PromoEvent::LoyaltyPointsRedeemed(LoyaltyPointsRedeemed {
             entry_id,
             loyalty_program_id: req.loyalty_program_id,
-            company_id: req.company_id,
+            company_id: legacy_twin(),
             customer_id: req.customer_id,
             points: req.points,
             discount_value,
@@ -183,17 +179,13 @@ impl PromoWriteService {
     /// loyalty chunks (the per-order grant verb rides the same read).
     pub(super) async fn load_active_program(
         &self,
-        company_id: uuid::Uuid,
         program_id: uuid::Uuid,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<(Decimal, Option<i32>), PricingError> {
-        // RLS scope (ADR-0008): company on the parameter — scope the read.
-        company_scope::with_company_scope(
-            Some(company_id),
-            self.programs.find_active_collection(&self.pool, company_id, program_id, at),
-        )
-        .await?
-        .ok_or(PricingError::ProgramInvalid)
+        self.programs
+            .find_active_collection(&self.pool, program_id, at)
+            .await?
+            .ok_or(PricingError::ProgramInvalid)
     }
 
     /// The program's conversion_factor (currency per point), locked `FOR UPDATE NOWAIT` inside the
@@ -205,9 +197,18 @@ impl PromoWriteService {
         req: &RedemptionRequest,
     ) -> Result<Decimal, PricingError> {
         self.programs
-            .find_active_conversion(tx, req.company_id, req.loyalty_program_id, req.at)
+            .find_active_conversion(tx, req.loyalty_program_id, req.at)
             .await
             .map_err(|e| lock_busy_or_db(e, LockResource::LoyaltyProgram))?
             .ok_or(PricingError::ProgramInvalid)
     }
+}
+
+/// The legacy tenancy twin the loyalty event payloads still carry (ADR-0029): under the composing
+/// service's org request scope it is the scope's legacy echo; nil when undecorated. The event
+/// field stays for still-fenced consumers; nothing in this module keys a statement on it.
+fn legacy_twin() -> uuid::Uuid {
+    backbone_orm::org_scope::current_org_scope()
+        .and_then(|s| s.legacy_company_id())
+        .unwrap_or(uuid::Uuid::nil())
 }

@@ -1,9 +1,11 @@
 //! Per-order loyalty accounting tests — the order-flow verbs (grant / spend / reverse) and the
 //! NOWAIT serialization contract.
 //!
-//! Every test uses a fresh random company (and member) so parallel tests never collide. Program
-//! factors are fixed for readability: collection 0.1 pts per currency unit, conversion 100
-//! currency per point — a 10,000 base grants 1,000 pts worth 100,000 on burn.
+//! Every test seeds freshly generated ids (program, member, order) so parallel tests never
+//! collide. Program factors are fixed for readability: collection 0.1 pts per currency unit,
+//! conversion 100 currency per point — a 10,000 base grants 1,000 pts worth 100,000 on burn.
+//! The module is tenant-agnostic (ADR-0029): no statement here names a tenant column — row
+//! scoping is the composing service's tenancy decorator.
 
 mod common;
 
@@ -37,17 +39,16 @@ impl RecSink {
 }
 
 /// Seed a program with the standard test factors (0.1 pts/unit, 100/pt).
-async fn std_program(pool: &sqlx::PgPool, company: Uuid, expiry_days: Option<i32>) -> Uuid {
-    program(pool, company, "0.1", "100", expiry_days).await
+async fn std_program(pool: &sqlx::PgPool, expiry_days: Option<i32>) -> Uuid {
+    program(pool, "0.1", "100", expiry_days).await
 }
 
 /// Seed the member's anchor row WITHOUT going through a verb (concurrency tests lock it directly).
-async fn seed_anchor(pool: &sqlx::PgPool, company: Uuid, customer: Uuid, program_id: Uuid) {
+async fn seed_anchor(pool: &sqlx::PgPool, customer: Uuid, program_id: Uuid) {
     sqlx::query(
-        "INSERT INTO promo.loyalty_member_anchors (company_id, customer_id, loyalty_program_id)
-         VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
+        "INSERT INTO promo.loyalty_member_anchors (customer_id, loyalty_program_id)
+         VALUES ($1,$2) ON CONFLICT DO NOTHING",
     )
-    .bind(company)
     .bind(customer)
     .bind(program_id)
     .execute(pool)
@@ -58,20 +59,18 @@ async fn seed_anchor(pool: &sqlx::PgPool, company: Uuid, customer: Uuid, program
 /// The member's expiry-aware position at `at`: (available, lapsed).
 async fn balances_at(
     pool: &sqlx::PgPool,
-    company: Uuid,
     customer: Uuid,
     program_id: Uuid,
     at: chrono::DateTime<chrono::Utc>,
 ) -> (Decimal, Decimal) {
     let row = sqlx::query(
         r#"SELECT
-               COALESCE(SUM(points) FILTER (WHERE expiry_date IS NULL OR expiry_date > $4), 0) AS available,
-               COALESCE(SUM(points) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date <= $4), 0) AS lapsed
+               COALESCE(SUM(points) FILTER (WHERE expiry_date IS NULL OR expiry_date > $3), 0) AS available,
+               COALESCE(SUM(points) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date <= $3), 0) AS lapsed
            FROM promo.loyalty_point_entries
-           WHERE company_id=$1 AND customer_id=$2 AND loyalty_program_id=$3
+           WHERE customer_id=$1 AND loyalty_program_id=$2
              AND (metadata->>'deleted_at') IS NULL"#,
     )
-    .bind(company)
     .bind(customer)
     .bind(program_id)
     .bind(at)
@@ -89,16 +88,14 @@ async fn balances_at(
 async fn grant_derives_points_and_writes_row() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     let out = svc
         .grant_order_points(
             &OrderPointsGrantRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -116,14 +113,13 @@ async fn grant_derives_points_and_writes_row() {
     assert!(!out.already);
     assert!(out.order_points_id.is_some());
     assert!(out.entry_id.is_some());
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("1000"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("1000"));
 
     // The order row carries the grant leg.
     let row = sqlx::query_as::<_, (Decimal, Decimal, Option<chrono::DateTime<chrono::Utc>>)>(
         r#"SELECT granted_points, grant_base_amount, granted_at FROM promo.loyalty_order_points
-           WHERE company_id=$1 AND loyalty_program_id=$2 AND order_ref_type='pos_order' AND order_ref_id=$3"#,
+           WHERE loyalty_program_id=$1 AND order_ref_type='pos_order' AND order_ref_id=$2"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(order)
     .fetch_one(&pool)
@@ -141,13 +137,11 @@ async fn grant_derives_points_and_writes_row() {
 async fn grant_replay_is_idempotent() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
     let req = OrderPointsGrantRequest {
-        company_id: company,
         loyalty_program_id: program_id,
         customer_id: customer,
         order_ref_type: "pos_order".into(),
@@ -165,11 +159,10 @@ async fn grant_replay_is_idempotent() {
     assert_eq!(second.points, first.points);
     assert_eq!(second.order_points_id, first.order_points_id);
     assert_eq!(second.entry_id, None); // nothing new claimed
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("1000"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("1000"));
     let rows: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM promo.loyalty_order_points WHERE company_id=$1 AND order_ref_id=$2",
+        "SELECT count(*) FROM promo.loyalty_order_points WHERE order_ref_id=$1",
     )
-    .bind(company)
     .bind(order)
     .fetch_one(&pool)
     .await
@@ -184,16 +177,14 @@ async fn grant_replay_is_idempotent() {
 async fn grant_below_factor_floor_writes_nothing() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     let out = svc
         .grant_order_points(
             &OrderPointsGrantRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -209,12 +200,11 @@ async fn grant_below_factor_floor_writes_nothing() {
     assert_eq!(out.points, Decimal::ZERO);
     assert!(out.order_points_id.is_none());
     assert!(out.entry_id.is_none());
-    assert_eq!(balance(&pool, company, customer, program_id).await, Decimal::ZERO);
+    assert_eq!(balance(&pool, customer, program_id).await, Decimal::ZERO);
 
     let err = svc
         .grant_order_points(
             &OrderPointsGrantRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -236,9 +226,8 @@ async fn grant_below_factor_floor_writes_nothing() {
 async fn spend_happy_path_derives_discount() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let settle = Uuid::new_v4();
     let order = Uuid::new_v4();
     let sink = RecSink::default();
@@ -246,7 +235,6 @@ async fn spend_happy_path_derives_discount() {
     // Earn 1000 pts on an unrelated settlement document.
     svc.accrue(
         &AccrualRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             purchase_amount: dec("10000"),
@@ -262,7 +250,6 @@ async fn spend_happy_path_derives_discount() {
     let out = svc
         .spend_order_points(
             &OrderPointsSpendRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -279,14 +266,13 @@ async fn spend_happy_path_derives_discount() {
     assert_eq!(out.points, dec("400"));
     assert_eq!(out.discount_value, dec("40000")); // 400 × 100, derived
     assert_eq!(out.available_after, dec("600"));
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("600"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("600"));
 
     // The order row exists with only its spend leg.
     let row = sqlx::query_as::<_, (Decimal, Decimal)>(
         r#"SELECT spent_points, granted_points FROM promo.loyalty_order_points
-           WHERE company_id=$1 AND loyalty_program_id=$2 AND order_ref_type='pos_order' AND order_ref_id=$3"#,
+           WHERE loyalty_program_id=$1 AND order_ref_type='pos_order' AND order_ref_id=$2"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(order)
     .fetch_one(&pool)
@@ -302,15 +288,13 @@ async fn spend_happy_path_derives_discount() {
 async fn spend_replay_returns_stored() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     svc.accrue(
         &AccrualRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             purchase_amount: dec("10000"),
@@ -324,7 +308,6 @@ async fn spend_replay_returns_stored() {
     .unwrap();
 
     let req = OrderPointsSpendRequest {
-        company_id: company,
         loyalty_program_id: program_id,
         customer_id: customer,
         order_ref_type: "pos_order".into(),
@@ -339,7 +322,7 @@ async fn spend_replay_returns_stored() {
     assert_eq!(second.entry_id, first.entry_id);
     assert_eq!(second.points, first.points);
     assert_eq!(second.discount_value, first.discount_value);
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("600"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("600"));
     assert_eq!(sink.count_matching(|e| matches!(e, PromoEvent::LoyaltyOrderPointsSpent(_))), 1);
 }
 
@@ -349,19 +332,17 @@ async fn spend_replay_returns_stored() {
 async fn spend_refuses_with_points_expired() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
 
     // 500 pts earned with an expiry that has already passed.
     sqlx::query(
         r#"INSERT INTO promo.loyalty_point_entries
-             (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+             (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
               source_type, source_id, posting_date, expiry_date)
-           VALUES ($1,$2,$3,'earned',500,0,'seed',$4,$5,$6)"#,
+           VALUES ($1,$2,'earned',500,0,'seed',$3,$4,$5)"#,
     )
-    .bind(company)
     .bind(program_id)
     .bind(customer)
     .bind(Uuid::new_v4())
@@ -374,7 +355,6 @@ async fn spend_refuses_with_points_expired() {
     let err = svc
         .spend_order_points(
             &OrderPointsSpendRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -393,7 +373,7 @@ async fn spend_refuses_with_points_expired() {
         }
         other => panic!("expected PointsExpired, got {other:?}"),
     }
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("500")); // untouched
+    assert_eq!(balance(&pool, customer, program_id).await, dec("500")); // untouched
 }
 
 /// A spend neither available nor lapsed points cover refuses as InsufficientPoints.
@@ -401,14 +381,12 @@ async fn spend_refuses_with_points_expired() {
 async fn spend_refuses_insufficient() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
 
     let err = svc
         .spend_order_points(
             &OrderPointsSpendRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -436,9 +414,8 @@ async fn spend_refuses_insufficient() {
 async fn full_reversal_grant_only_then_nothing_left() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let ret1 = Uuid::new_v4();
     let ret2 = Uuid::new_v4();
@@ -446,7 +423,6 @@ async fn full_reversal_grant_only_then_nothing_left() {
 
     svc.grant_order_points(
         &OrderPointsGrantRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -461,7 +437,6 @@ async fn full_reversal_grant_only_then_nothing_left() {
     .unwrap();
 
     let mk = |ret: Uuid| OrderPointsReversalRequest {
-        company_id: company,
         loyalty_program_id: program_id,
         customer_id: customer,
         order_ref_type: "pos_order".into(),
@@ -476,7 +451,7 @@ async fn full_reversal_grant_only_then_nothing_left() {
     assert!(!first.already);
     assert_eq!(first.grant_reversed, dec("1000"));
     assert_eq!(first.spend_restored, Decimal::ZERO);
-    assert_eq!(balance(&pool, company, customer, program_id).await, Decimal::ZERO);
+    assert_eq!(balance(&pool, customer, program_id).await, Decimal::ZERO);
 
     // Replaying the SAME return returns the stored legs.
     let replay = svc.reverse_order_points(&mk(ret1), &sink).await.unwrap();
@@ -488,7 +463,7 @@ async fn full_reversal_grant_only_then_nothing_left() {
     assert!(!second.already);
     assert_eq!(second.grant_reversed, Decimal::ZERO);
     assert_eq!(second.spend_restored, Decimal::ZERO);
-    assert_eq!(balance(&pool, company, customer, program_id).await, Decimal::ZERO);
+    assert_eq!(balance(&pool, customer, program_id).await, Decimal::ZERO);
     assert_eq!(sink.count_matching(|e| matches!(e, PromoEvent::LoyaltyOrderPointsReversed(_))), 1);
 }
 
@@ -498,15 +473,13 @@ async fn full_reversal_grant_only_then_nothing_left() {
 async fn partial_reversal_proportional() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     svc.grant_order_points(
         &OrderPointsGrantRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -523,7 +496,6 @@ async fn partial_reversal_proportional() {
     let out = svc
         .reverse_order_points(
             &OrderPointsReversalRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -538,7 +510,7 @@ async fn partial_reversal_proportional() {
         .await
         .unwrap();
     assert_eq!(out.grant_reversed, dec("250"));
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("750"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("750"));
 
     let counters = sqlx::query_as::<_, (Decimal, Decimal)>(
         "SELECT granted_reversed_points, spent_reversed_points FROM promo.loyalty_order_points WHERE order_ref_id=$1",
@@ -557,16 +529,14 @@ async fn partial_reversal_proportional() {
 async fn full_reversal_after_spend_bounded_by_available() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     // Grant 1000 and spend 400 on the SAME order.
     svc.grant_order_points(
         &OrderPointsGrantRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -581,7 +551,6 @@ async fn full_reversal_after_spend_bounded_by_available() {
     .unwrap();
     svc.spend_order_points(
         &OrderPointsSpendRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -593,12 +562,11 @@ async fn full_reversal_after_spend_bounded_by_available() {
     )
     .await
     .unwrap();
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("600"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("600"));
 
     let out = svc
         .reverse_order_points(
             &OrderPointsReversalRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -616,7 +584,7 @@ async fn full_reversal_after_spend_bounded_by_available() {
     assert_eq!(out.grant_reversed, dec("600"));
     assert_eq!(out.spend_restored, dec("400"));
     // 1000 − 400 − 600 + 400 = 400 stays with the member.
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("400"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("400"));
 }
 
 /// An order that SPENT before it granted (points earned elsewhere, confirm arriving late): the
@@ -625,16 +593,14 @@ async fn full_reversal_after_spend_bounded_by_available() {
 async fn spend_then_late_grant_sets_grant_leg() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     // Earn 2000 elsewhere, spend 400 on this order first.
     svc.accrue(
         &AccrualRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             purchase_amount: dec("20000"),
@@ -648,7 +614,6 @@ async fn spend_then_late_grant_sets_grant_leg() {
     .unwrap();
     svc.spend_order_points(
         &OrderPointsSpendRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -665,7 +630,6 @@ async fn spend_then_late_grant_sets_grant_leg() {
     let out = svc
         .grant_order_points(
             &OrderPointsGrantRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -692,7 +656,7 @@ async fn spend_then_late_grant_sets_grant_leg() {
     assert_eq!(row.0, dec("500"));
     assert_eq!(row.1, dec("400"));
     // 2000 − 400 + 500 = 2100.
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("2100"));
+    assert_eq!(balance(&pool, customer, program_id).await, dec("2100"));
 }
 
 /// Cross-legacy dedupe: a bare `accrue` that already used this order's source key means the order
@@ -701,16 +665,14 @@ async fn spend_then_late_grant_sets_grant_leg() {
 async fn legacy_accrue_dedupes_grant() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     // The legacy event-driven path already earned for this exact source.
     svc.accrue(
         &AccrualRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             purchase_amount: dec("10000"),
@@ -726,7 +688,6 @@ async fn legacy_accrue_dedupes_grant() {
     let out = svc
         .grant_order_points(
             &OrderPointsGrantRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -742,7 +703,7 @@ async fn legacy_accrue_dedupes_grant() {
     assert!(out.already);
     assert_eq!(out.entry_id, None); // no second earn
     assert_eq!(out.points, dec("1000"));
-    assert_eq!(balance(&pool, company, customer, program_id).await, dec("1000")); // not doubled
+    assert_eq!(balance(&pool, customer, program_id).await, dec("1000")); // not doubled
     assert_eq!(sink.count_matching(|e| matches!(e, PromoEvent::LoyaltyOrderPointsGranted(_))), 0);
 }
 
@@ -751,13 +712,11 @@ async fn legacy_accrue_dedupes_grant() {
 async fn reversal_unknown_order_refused() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
 
     let err = svc
         .reverse_order_points(
             &OrderPointsReversalRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: Uuid::new_v4(),
                 order_ref_type: "pos_order".into(),
@@ -780,15 +739,13 @@ async fn reversal_unknown_order_refused() {
 async fn spend_restoration_copies_earned_expiry() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, Some(30)).await;
+    let program_id = std_program(&pool, Some(30)).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     svc.grant_order_points(
         &OrderPointsGrantRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -803,7 +760,6 @@ async fn spend_restoration_copies_earned_expiry() {
     .unwrap();
     svc.spend_order_points(
         &OrderPointsSpendRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -820,7 +776,6 @@ async fn spend_restoration_copies_earned_expiry() {
     let out = svc
         .reverse_order_points(
             &OrderPointsReversalRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -841,10 +796,9 @@ async fn spend_restoration_copies_earned_expiry() {
     // count as available until then.
     let restored_expiry: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
         r#"SELECT expiry_date FROM promo.loyalty_point_entries
-           WHERE company_id=$1 AND source_type='pos_return' AND source_id=$2
+           WHERE source_type='pos_return' AND source_id=$1
              AND entry_type='spend_reversed'"#,
     )
-    .bind(company)
     .bind(ret)
     .fetch_one(&pool)
     .await
@@ -852,7 +806,7 @@ async fn spend_restoration_copies_earned_expiry() {
     let exp = restored_expiry.expect("restored leg must carry the earned expiry");
     assert!(exp > now() + chrono::Duration::days(29));
 
-    let (available, _) = balances_at(&pool, company, customer, program_id, now()).await;
+    let (available, _) = balances_at(&pool, customer, program_id, now()).await;
     assert_eq!(available, dec("100")); // 1000 − 100 − 900 + 100, all unexpired
 }
 
@@ -864,15 +818,13 @@ async fn spend_restoration_copies_earned_expiry() {
 async fn grant_reversal_copies_earned_expiry() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, Some(30)).await;
+    let program_id = std_program(&pool, Some(30)).await;
     let order = Uuid::new_v4();
     let sink = RecSink::default();
 
     svc.grant_order_points(
         &OrderPointsGrantRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -889,7 +841,6 @@ async fn grant_reversal_copies_earned_expiry() {
     let out = svc
         .reverse_order_points(
             &OrderPointsReversalRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -909,10 +860,9 @@ async fn grant_reversal_copies_earned_expiry() {
     // The negation leg carries the earned entry's expiry — not NULL.
     let reversal_expiry: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
         r#"SELECT expiry_date FROM promo.loyalty_point_entries
-           WHERE company_id=$1 AND source_type='pos_return' AND source_id=$2
+           WHERE source_type='pos_return' AND source_id=$1
              AND entry_type='grant_reversed'"#,
     )
-    .bind(company)
     .bind(ret)
     .fetch_one(&pool)
     .await
@@ -922,7 +872,7 @@ async fn grant_reversal_copies_earned_expiry() {
 
     // Past the expiry the member nets to exactly zero — available never goes negative.
     let past = now() + chrono::Duration::days(31);
-    let (available, lapsed) = balances_at(&pool, company, customer, program_id, past).await;
+    let (available, lapsed) = balances_at(&pool, customer, program_id, past).await;
     assert_eq!(available, dec("0"));
     assert_eq!(lapsed, dec("0"));
 
@@ -930,7 +880,6 @@ async fn grant_reversal_copies_earned_expiry() {
     let order2 = Uuid::new_v4();
     svc.grant_order_points(
         &OrderPointsGrantRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -945,7 +894,6 @@ async fn grant_reversal_copies_earned_expiry() {
     .unwrap();
     svc.spend_order_points(
         &OrderPointsSpendRequest {
-            company_id: company,
             loyalty_program_id: program_id,
             customer_id: customer,
             order_ref_type: "pos_order".into(),
@@ -969,17 +917,15 @@ async fn grant_reversal_copies_earned_expiry() {
 async fn nowait_held_anchor_refuses_spend() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
-    seed_anchor(&pool, company, customer, program_id).await;
+    let program_id = std_program(&pool, None).await;
+    seed_anchor(&pool, customer, program_id).await;
 
     let mut holder = pool.begin().await.unwrap();
     sqlx::query(
         "SELECT id FROM promo.loyalty_member_anchors
-         WHERE company_id=$1 AND customer_id=$2 AND loyalty_program_id=$3 FOR UPDATE",
+         WHERE customer_id=$1 AND loyalty_program_id=$2 FOR UPDATE",
     )
-    .bind(company)
     .bind(customer)
     .bind(program_id)
     .execute(&mut *holder)
@@ -989,7 +935,6 @@ async fn nowait_held_anchor_refuses_spend() {
     let err = svc
         .spend_order_points(
             &OrderPointsSpendRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -1014,9 +959,8 @@ async fn nowait_held_anchor_refuses_spend() {
 async fn nowait_held_program_row_refuses_spend() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
+    let program_id = std_program(&pool, None).await;
 
     let mut holder = pool.begin().await.unwrap();
     sqlx::query("SELECT id FROM promo.loyalty_programs WHERE id=$1 FOR UPDATE")
@@ -1028,7 +972,6 @@ async fn nowait_held_program_row_refuses_spend() {
     let err = svc
         .spend_order_points(
             &OrderPointsSpendRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -1052,17 +995,15 @@ async fn nowait_held_program_row_refuses_spend() {
 async fn nowait_held_anchor_refuses_grant() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let customer = Uuid::new_v4();
-    let program_id = std_program(&pool, company, None).await;
-    seed_anchor(&pool, company, customer, program_id).await;
+    let program_id = std_program(&pool, None).await;
+    seed_anchor(&pool, customer, program_id).await;
 
     let mut holder = pool.begin().await.unwrap();
     sqlx::query(
         "SELECT id FROM promo.loyalty_member_anchors
-         WHERE company_id=$1 AND customer_id=$2 AND loyalty_program_id=$3 FOR UPDATE",
+         WHERE customer_id=$1 AND loyalty_program_id=$2 FOR UPDATE",
     )
-    .bind(company)
     .bind(customer)
     .bind(program_id)
     .execute(&mut *holder)
@@ -1072,7 +1013,6 @@ async fn nowait_held_anchor_refuses_grant() {
     let err = svc
         .grant_order_points(
             &OrderPointsGrantRequest {
-                company_id: company,
                 loyalty_program_id: program_id,
                 customer_id: customer,
                 order_ref_type: "pos_order".into(),
@@ -1097,10 +1037,9 @@ async fn nowait_held_anchor_refuses_grant() {
 async fn nowait_held_coupon_refuses_burn() {
     let pool = pool().await;
     let svc = PromoWriteService::new(pool.clone());
-    let company = Uuid::new_v4();
     let item = Uuid::new_v4();
-    let rule_id = pct_rule(&pool, company, item, 0, "10").await;
-    let coupon_id = coupon(&pool, company, "LOCKED", rule_id, Some(5)).await;
+    let rule_id = pct_rule(&pool, item, 0, "10").await;
+    let coupon_id = coupon(&pool, "LOCKED", rule_id, Some(5)).await;
 
     let mut holder = pool.begin().await.unwrap();
     sqlx::query("SELECT id FROM promo.coupon_codes WHERE id=$1 FOR UPDATE")
@@ -1110,7 +1049,7 @@ async fn nowait_held_coupon_refuses_burn() {
         .unwrap();
 
     let err = svc
-        .commit_coupon_redemption(company, coupon_id, "sale", Uuid::new_v4(), &LoggingSink)
+        .commit_coupon_redemption(coupon_id, "sale", Uuid::new_v4(), &LoggingSink)
         .await
         .unwrap_err();
     assert!(matches!(
@@ -1126,10 +1065,9 @@ async fn nowait_held_coupon_refuses_burn() {
 #[tokio::test]
 async fn coupon_retry_storm_never_over_burns() {
     let pool = pool().await;
-    let company = Uuid::new_v4();
     let item = Uuid::new_v4();
-    let rule_id = pct_rule(&pool, company, item, 0, "10").await;
-    let coupon_id = coupon(&pool, company, "STORM", rule_id, Some(4)).await;
+    let rule_id = pct_rule(&pool, item, 0, "10").await;
+    let coupon_id = coupon(&pool, "STORM", rule_id, Some(4)).await;
 
     let svc = std::sync::Arc::new(PromoWriteService::new(pool.clone()));
     // The sink is not Sync, so the verb futures are !Send — run the storm on a LocalSet (the tasks
@@ -1148,7 +1086,7 @@ async fn coupon_retry_storm_never_over_burns() {
             // every wake; a terminal answer is returned as-is.
             for attempt in 1..=10u64 {
                 match svc
-                    .commit_coupon_redemption(company, coupon_id, "sale", source, &LoggingSink)
+                    .commit_coupon_redemption(coupon_id, "sale", source, &LoggingSink)
                     .await
                 {
                     Ok(rule) => return Ok(rule),

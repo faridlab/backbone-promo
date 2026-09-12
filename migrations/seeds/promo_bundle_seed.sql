@@ -6,7 +6,6 @@
 
 -- INSERT INTO promo.promo_bundles (
 --     id,
---     company_id,
 --     title,
 --     priority,
 --     match_type,

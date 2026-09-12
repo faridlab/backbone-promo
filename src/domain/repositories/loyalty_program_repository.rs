@@ -7,7 +7,6 @@
 
 use async_trait::async_trait;
 use anyhow::Result;
-use uuid::Uuid;
 
 use crate::domain::entity::{LoyaltyProgram, LoyaltyProgramStatus, LoyaltyProgramType};
 
@@ -44,7 +43,6 @@ pub struct LoyaltyProgramPaginatedResult {
 /// Filter parameters for list queries
 #[derive(Debug, Clone, Default)]
 pub struct LoyaltyProgramFilter {
-    pub company_id: Option<Uuid>,
     pub program_name: Option<String>,
     pub program_type: Option<LoyaltyProgramType>,
     pub status: Option<LoyaltyProgramStatus>,
@@ -53,7 +51,7 @@ pub struct LoyaltyProgramFilter {
 impl LoyaltyProgramFilter {
     /// Check if any filter is set
     pub fn has_filters(&self) -> bool {
-        self.company_id.is_some() || self.program_name.is_some() || self.program_type.is_some() || self.status.is_some()
+        self.program_name.is_some() || self.program_type.is_some() || self.status.is_some()
     }
 }
 

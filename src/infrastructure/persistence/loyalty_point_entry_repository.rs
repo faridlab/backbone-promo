@@ -4,15 +4,21 @@
 //! `user_owned` in `metaphor.codegen.yaml`, so the generator skips it wholesale. The custom methods
 //! below hold the hand-written LoyaltyPointEntry SQL (4-layer rule: services orchestrate, repos hold SQL).
 //!
-//! Thin newtype over `backbone_orm::GenericCrudRepository<LoyaltyPointEntry, backbone_orm::SoftDelete>`.
-//! All standard CRUD methods are available via `Deref`.
+//! RLS LAW: every statement here is tenant-agnostic (ADR-0029) — the module ships no row fence.
+//! Row isolation is installed by the COMPOSING service's tenancy decorator: these tables leave the
+//! module with RLS enabled and zero policies (default-deny), and the decorator composes the org-unit
+//! policy set. Reads that need a request-dedicated connection ride the `*_scoped` helpers below.
 
 use anyhow::Result;
 use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
+// The typed multi-row read twins live only in the legacy `company_scope` module. Their
+// connection discipline is what this repository needs — request-dedicated connection when
+// the composing service bound one, plain pool otherwise. The helper's legacy task-local
+// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
+use backbone_orm::company_scope::fetch_optional_row_scoped;
 
 use crate::domain::entity::LoyaltyPointEntry;
 
@@ -43,7 +49,6 @@ impl LoyaltyPointEntryRepository {
 /// entity; `entry_type` is the literal `'earned'` in the SQL. `points` is whole (floored by the
 /// caller) and is NOT money; `purchase_amount` is expected already money-rounded.
 pub struct NewAccrualRow<'a> {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub points: Decimal,
@@ -57,7 +62,6 @@ pub struct NewAccrualRow<'a> {
 /// The exact row a redemption writes. `points` is stored NEGATIVE (the ledger is signed, so the
 /// balance is a plain SUM) and `purchase_amount` is the literal `0` in the SQL.
 pub struct NewRedemptionRow<'a> {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     /// Already negated by the caller.
@@ -73,7 +77,6 @@ pub struct NewRedemptionRow<'a> {
 /// for a spend restoration (a restored point lapses when the point it restores would have) and is
 /// NULL for a clawback.
 pub struct NewReversalRow<'a> {
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
     pub entry_type: &'a str,
@@ -102,33 +105,35 @@ pub struct PriorReversalRow {
 /// Hand-written LoyaltyPointEntry SQL. Lives here (not in the write service) per the module's 4-layer
 /// rule: services orchestrate and own the unit of work, repositories hold the SQL.
 impl LoyaltyPointEntryRepository {
-    /// Claim the `(company, source_type, source_id, earned)` accrual slot. `Ok(None)` = this document
+    /// Claim the `(source_type, source_id, 'earned')` accrual slot. `Ok(None)` = this document
     /// already earned (a replayed paid event) — one document earns at most once, however many times the
     /// event is redelivered.
     ///
-    /// RLS scope (ADR-0008): company on the accrual request — the caller wraps this in
-    /// `with_company_scope(Some(company_id))` so the INSERT passes the WITH CHECK fence (accrual is
-    /// event-driven and has no ambient scope of its own).
+    /// Arbitration is SELECT-first: the one-entry-per-document unique is decorator-declared
+    /// `(org_unit_id, source_type, source_id, entry_type)` (ADR-0029), so an insert-conflict cannot
+    /// gate an undecorated database — the caller holds the member-anchor lock, the read decides
+    /// replay vs fresh, and the insert's untargeted DO NOTHING stays as the decorated-database
+    /// belt (the decorator's unique is unnamed-able by the module — no conflict target).
     pub async fn claim_accrual(
         &self,
         pool: &PgPool,
         a: &NewAccrualRow<'_>,
     ) -> Result<Option<Uuid>, sqlx::Error> {
-        let row = company_scope::fetch_optional_row_scoped(
+        if self.earned_exists(pool, a.source_type, a.source_id).await? {
+            return Ok(None);
+        }
+        let row = fetch_optional_row_scoped(
             pool,
             sqlx::query(
                 r#"
                 INSERT INTO promo.loyalty_point_entries
-                    (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+                    (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
                      source_type, source_id, posting_date, expiry_date)
-                VALUES ($1, $2, $3, 'earned', $4, $5, $6, $7, $8, $9)
-                ON CONFLICT (company_id, source_type, source_id, entry_type)
-                    WHERE (metadata->>'deleted_at') IS NULL
-                DO NOTHING
+                VALUES ($1, $2, 'earned', $3, $4, $5, $6, $7, $8)
+                ON CONFLICT DO NOTHING
                 RETURNING id
                 "#,
             )
-            .bind(a.company_id)
             .bind(a.loyalty_program_id)
             .bind(a.customer_id)
             .bind(a.points)
@@ -143,27 +148,37 @@ impl LoyaltyPointEntryRepository {
     }
 
     /// Claim the accrual slot on the CALLER'S transaction — same idempotency contract as
-    /// [`Self::claim_accrual`], for callers whose transaction already carries the company bind
-    /// (`bind_company_on`), so no scope wrapper is needed: the insert rides the ambient
-    /// `app.company_id` and commits (or rolls back) with the caller's unit of work.
+    /// [`Self::claim_accrual`], for callers whose transaction already carries the unit of work; the
+    /// insert rides the caller's ambient org scope (re-bound by the caller per ADR-0029) and commits
+    /// (or rolls back) with it. Same SELECT-first arbitration (the caller holds the member-anchor
+    /// lock).
     pub async fn claim_accrual_on(
         &self,
         conn: &mut sqlx::PgConnection,
         a: &NewAccrualRow<'_>,
     ) -> Result<Option<Uuid>, sqlx::Error> {
+        let exists = sqlx::query_scalar::<_, i64>(
+            r#"SELECT count(*) FROM promo.loyalty_point_entries
+               WHERE source_type = $1 AND source_id = $2 AND entry_type = 'earned'
+                 AND (metadata->>'deleted_at') IS NULL"#,
+        )
+        .bind(a.source_type)
+        .bind(a.source_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if exists > 0 {
+            return Ok(None);
+        }
         let row = sqlx::query(
             r#"
             INSERT INTO promo.loyalty_point_entries
-                (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+                (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
                  source_type, source_id, posting_date, expiry_date)
-            VALUES ($1, $2, $3, 'earned', $4, $5, $6, $7, $8, $9)
-            ON CONFLICT (company_id, source_type, source_id, entry_type)
-                WHERE (metadata->>'deleted_at') IS NULL
-            DO NOTHING
+            VALUES ($1, $2, 'earned', $3, $4, $5, $6, $7, $8)
+            ON CONFLICT DO NOTHING
             RETURNING id
             "#,
         )
-        .bind(a.company_id)
         .bind(a.loyalty_program_id)
         .bind(a.customer_id)
         .bind(a.points)
@@ -177,22 +192,39 @@ impl LoyaltyPointEntryRepository {
         Ok(row.map(|r| r.get("id")))
     }
 
+    /// Whether this document already carries an `earned` entry — the pool-side twin of the
+    /// SELECT-first arbitration read in [`Self::claim_accrual_on`].
+    async fn earned_exists(
+        &self,
+        pool: &PgPool,
+        source_type: &str,
+        source_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let n = sqlx::query_scalar::<_, i64>(
+            r#"SELECT count(*) FROM promo.loyalty_point_entries
+               WHERE source_type = $1 AND source_id = $2 AND entry_type = 'earned'
+                 AND (metadata->>'deleted_at') IS NULL"#,
+        )
+        .bind(source_type)
+        .bind(source_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(n > 0)
+    }
+
     /// A prior `redeemed` entry for this exact source, if any — the idempotent-replay short-circuit.
-    /// Same caller-owned-tx contract as the balance read: the caller has already bound the company
-    /// (`bind_company_on`) — don't re-bind here.
+    /// Same caller-owned-tx contract as the balance read: the caller owns the unit of work.
     pub async fn find_redemption_by_source(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         source_type: &str,
         source_id: Uuid,
     ) -> Result<Option<PriorRedemptionRow>, sqlx::Error> {
         let row = sqlx::query(
             r#"SELECT id, points FROM promo.loyalty_point_entries
-               WHERE company_id = $1 AND source_type = $2 AND source_id = $3 AND entry_type = 'redeemed'
+               WHERE source_type = $1 AND source_id = $2 AND entry_type = 'redeemed'
                  AND (metadata->>'deleted_at') IS NULL"#,
         )
-        .bind(company_id)
         .bind(source_type)
         .bind(source_id)
         .fetch_optional(conn)
@@ -201,27 +233,25 @@ impl LoyaltyPointEntryRepository {
     }
 
     /// The member's position at an instant, expiry-aware: `(available, lapsed)` over the same
-    /// company/customer/program partition the raw SUM always used. `available` counts only entries
-    /// whose `expiry_date` is NULL or still in the future at `$4`; `lapsed` counts the rest — the
+    /// customer/program partition the raw SUM always used. `available` counts only entries
+    /// whose `expiry_date` is NULL or still in the future at `$3`; `lapsed` counts the rest — the
     /// caller uses it to tell "your points expired" apart from "you never had them". Read under the
     /// member anchor lock, so it cannot be raced.
     pub async fn balances_at(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         customer_id: Uuid,
         loyalty_program_id: Uuid,
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<(Decimal, Decimal), sqlx::Error> {
         let row = sqlx::query(
             r#"SELECT
-                   COALESCE(SUM(points) FILTER (WHERE expiry_date IS NULL OR expiry_date > $4), 0) AS available,
-                   COALESCE(SUM(points) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date <= $4), 0) AS lapsed
+                   COALESCE(SUM(points) FILTER (WHERE expiry_date IS NULL OR expiry_date > $3), 0) AS available,
+                   COALESCE(SUM(points) FILTER (WHERE expiry_date IS NOT NULL AND expiry_date <= $3), 0) AS lapsed
                FROM promo.loyalty_point_entries
-               WHERE company_id = $1 AND customer_id = $2 AND loyalty_program_id = $3
+               WHERE customer_id = $1 AND loyalty_program_id = $2
                  AND (metadata->>'deleted_at') IS NULL"#,
         )
-        .bind(company_id)
         .bind(customer_id)
         .bind(loyalty_program_id)
         .bind(at)
@@ -236,16 +266,14 @@ impl LoyaltyPointEntryRepository {
     pub async fn find_earned_expiry(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         source_type: &str,
         source_id: Uuid,
     ) -> Result<Option<chrono::DateTime<chrono::Utc>>, sqlx::Error> {
         sqlx::query_scalar(
             r#"SELECT expiry_date FROM promo.loyalty_point_entries
-               WHERE company_id = $1 AND source_type = $2 AND source_id = $3 AND entry_type = 'earned'
+               WHERE source_type = $1 AND source_id = $2 AND entry_type = 'earned'
                  AND (metadata->>'deleted_at') IS NULL"#,
         )
-        .bind(company_id)
         .bind(source_type)
         .bind(source_id)
         .fetch_optional(conn)
@@ -259,18 +287,16 @@ impl LoyaltyPointEntryRepository {
     pub async fn find_reversal_by_source(
         &self,
         conn: &mut sqlx::PgConnection,
-        company_id: Uuid,
         source_type: &str,
         source_id: Uuid,
     ) -> Result<Option<PriorReversalRow>, sqlx::Error> {
         let rows = sqlx::query(
             // ::text — the enum column decodes as its text label (bind/decode cast rule)
             r#"SELECT entry_type::text AS entry_type, points FROM promo.loyalty_point_entries
-               WHERE company_id = $1 AND source_type = $2 AND source_id = $3
+               WHERE source_type = $1 AND source_id = $2
                  AND entry_type IN ('grant_reversed', 'spend_reversed')
                  AND (metadata->>'deleted_at') IS NULL"#,
         )
-        .bind(company_id)
         .bind(source_type)
         .bind(source_id)
         .fetch_all(conn)
@@ -293,9 +319,10 @@ impl LoyaltyPointEntryRepository {
         Ok(Some(prior))
     }
 
-    /// Claim a reversal leg for one RETURN document: the entry partial-unique key
-    /// `(company, source_type, source_id, entry_type)` makes a re-driven return a no-op.
-    /// `Ok(None)` = this return already wrote this leg. Same caller-owned-tx contract.
+    /// Claim a reversal leg for one RETURN document: the decorator-declared one-entry-per-document
+    /// unique makes a re-driven return a no-op (untargeted `ON CONFLICT DO NOTHING` — the module
+    /// cannot name the decorator's constraint). `Ok(None)` = this return already wrote this leg.
+    /// Same caller-owned-tx contract.
     pub async fn insert_reversal(
         &self,
         conn: &mut sqlx::PgConnection,
@@ -305,16 +332,13 @@ impl LoyaltyPointEntryRepository {
         let row = sqlx::query(
             r#"
             INSERT INTO promo.loyalty_point_entries
-                (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+                (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
                  source_type, source_id, posting_date, expiry_date)
-            VALUES ($1, $2, $3, $4::loyalty_entry_type, $5, 0, $6, $7, $8, $9)
-            ON CONFLICT (company_id, source_type, source_id, entry_type)
-                WHERE (metadata->>'deleted_at') IS NULL
-            DO NOTHING
+            VALUES ($1, $2, $3::loyalty_entry_type, $4, 0, $5, $6, $7, $8)
+            ON CONFLICT DO NOTHING
             RETURNING id
             "#,
         )
-        .bind(r.company_id)
         .bind(r.loyalty_program_id)
         .bind(r.customer_id)
         .bind(entry_type)
@@ -329,7 +353,7 @@ impl LoyaltyPointEntryRepository {
     }
 
     /// Write the redemption entry. The caller has already checked it against the balance under the
-    /// lock. Same caller-owned-tx contract as [`Self::lock_member_balance`].
+    /// lock. Same caller-owned-tx contract as [`Self::balances_at`].
     pub async fn insert_redemption(
         &self,
         conn: &mut sqlx::PgConnection,
@@ -338,13 +362,12 @@ impl LoyaltyPointEntryRepository {
         sqlx::query_scalar(
             r#"
             INSERT INTO promo.loyalty_point_entries
-                (company_id, loyalty_program_id, customer_id, entry_type, points, purchase_amount,
+                (loyalty_program_id, customer_id, entry_type, points, purchase_amount,
                  source_type, source_id, posting_date)
-            VALUES ($1, $2, $3, 'redeemed', $4, 0, $5, $6, $7)
+            VALUES ($1, $2, 'redeemed', $3, 0, $4, $5, $6)
             RETURNING id
             "#,
         )
-        .bind(r.company_id)
         .bind(r.loyalty_program_id)
         .bind(r.customer_id)
         .bind(r.points)

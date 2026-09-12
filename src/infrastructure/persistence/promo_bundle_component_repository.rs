@@ -12,7 +12,11 @@ use rust_decimal::Decimal;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use backbone_orm::company_scope;
+// The typed multi-row read twins live only in the legacy `company_scope` module. Their
+// connection discipline is what this repository needs — request-dedicated connection when
+// the composing service bound one, plain pool otherwise. The helper's legacy task-local
+// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
+use backbone_orm::company_scope::fetch_all_rows_scoped;
 
 use crate::domain::entity::PromoBundleComponent;
 
@@ -53,30 +57,26 @@ pub struct BundleComponentRow {
 /// Hand-written PromoBundleComponent SQL. Lives here (not in the write service) per the module's
 /// 4-layer rule: services orchestrate, repositories hold the SQL.
 impl PromoBundleComponentRepository {
-    /// Every component of the given bundles, in ONE round trip (`bundle_id = ANY($2)`) rather than a
+    /// Every component of the given bundles, in ONE round trip (`bundle_id = ANY($1)`) rather than a
     /// query per bundle.
     ///
-    /// RLS scope (ADR-0008): company on the cart — the caller wraps this in
-    /// `with_company_scope(Some(company_id))`. The explicit `company_id = $1` stays as
-    /// defense-in-depth.
+    /// Tenant-agnostic (ADR-0029): the module ships no row fence — row scoping is the composing
+    /// service's tenancy decorator.
     pub async fn find_for_bundles(
         &self,
         pool: &PgPool,
-        company_id: Uuid,
         bundle_ids: &[Uuid],
     ) -> Result<Vec<BundleComponentRow>, sqlx::Error> {
-        let rows = company_scope::fetch_all_rows_scoped(
+        let rows = fetch_all_rows_scoped(
             pool,
             sqlx::query(
                 r#"
                 SELECT bundle_id, apply_on::text AS apply_on, item_id, item_group_id, brand_id, min_qty
                 FROM promo.promo_bundle_components
-                WHERE company_id = $1
-                  AND bundle_id = ANY($2)
+                WHERE bundle_id = ANY($1)
                   AND (metadata->>'deleted_at') IS NULL
                 "#,
             )
-            .bind(company_id)
             .bind(bundle_ids),
         )
         .await?;

@@ -35,9 +35,6 @@ use crate::domain::entity::LoyaltyEntryType;
 #[serde(rename_all = "camelCase")]
 pub struct CreateLoyaltyPointEntryDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "loyalty_program_id")]
     pub loyalty_program_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -75,9 +72,6 @@ pub struct CreateLoyaltyPointEntryDto {
 #[cfg_attr(feature = "validation", derive(Validate))]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateLoyaltyPointEntryDto {
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(alias = "company_id")]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "loyalty_program_id")]
     pub loyalty_program_id: Uuid,
@@ -117,9 +111,6 @@ pub struct UpdateLoyaltyPointEntryDto {
 #[serde(rename_all = "camelCase")]
 pub struct PatchLoyaltyPointEntryDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    #[serde(skip_serializing_if = "Option::is_none", alias = "company_id")]
-    pub company_id: Option<Uuid>,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "loyalty_program_id")]
     pub loyalty_program_id: Option<Uuid>,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -148,7 +139,7 @@ pub struct PatchLoyaltyPointEntryDto {
 impl PatchLoyaltyPointEntryDto {
     /// Check if any field is set
     pub fn has_changes(&self) -> bool {
-        self.company_id.is_some() || self.loyalty_program_id.is_some() || self.customer_id.is_some() || self.entry_type.is_some() || self.points.is_some() || self.purchase_amount.is_some() || self.source_type.is_some() || self.source_id.is_some() || self.posting_date.is_some() || self.expiry_date.is_some()
+        self.loyalty_program_id.is_some() || self.customer_id.is_some() || self.entry_type.is_some() || self.points.is_some() || self.purchase_amount.is_some() || self.source_type.is_some() || self.source_id.is_some() || self.posting_date.is_some() || self.expiry_date.is_some()
     }
 }
 
@@ -166,8 +157,6 @@ impl PatchLoyaltyPointEntryDto {
 pub struct LoyaltyPointEntryResponseDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub id: Uuid,
-    #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
-    pub company_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     pub loyalty_program_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
@@ -239,9 +228,9 @@ impl LoyaltyPointEntryListResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct LoyaltyPointEntrySummaryDto {
     pub id: Uuid,
-    pub company_id: Uuid,
     pub loyalty_program_id: Uuid,
     pub customer_id: Uuid,
+    pub entry_type: LoyaltyEntryType,
     pub created_at: Option<DateTime<Utc>>,
 }
 
@@ -253,7 +242,6 @@ impl From<LoyaltyPointEntry> for LoyaltyPointEntryResponseDto {
     fn from(entity: LoyaltyPointEntry) -> Self {
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             loyalty_program_id: entity.loyalty_program_id,
             customer_id: entity.customer_id,
             entry_type: entity.entry_type,
@@ -273,9 +261,9 @@ impl From<LoyaltyPointEntry> for LoyaltyPointEntrySummaryDto {
         let created_at = backbone_core::PersistentEntity::created_at(&entity);
         Self {
             id: entity.id,
-            company_id: entity.company_id,
             loyalty_program_id: entity.loyalty_program_id,
             customer_id: entity.customer_id,
+            entry_type: entity.entry_type,
             created_at,
         }
     }
@@ -285,7 +273,6 @@ impl From<CreateLoyaltyPointEntryDto> for LoyaltyPointEntry {
     fn from(dto: CreateLoyaltyPointEntryDto) -> Self {
         Self {
             id: Uuid::new_v4(),
-            company_id: dto.company_id,
             loyalty_program_id: dto.loyalty_program_id,
             customer_id: dto.customer_id,
             entry_type: dto.entry_type,
@@ -304,7 +291,6 @@ impl From<&LoyaltyPointEntry> for LoyaltyPointEntryResponseDto {
     fn from(entity: &LoyaltyPointEntry) -> Self {
         Self {
             id: entity.id.clone(),
-            company_id: entity.company_id.clone(),
             loyalty_program_id: entity.loyalty_program_id.clone(),
             customer_id: entity.customer_id.clone(),
             entry_type: entity.entry_type.clone(),
@@ -327,7 +313,6 @@ impl backbone_core::FromCreateDto<CreateLoyaltyPointEntryDto> for LoyaltyPointEn
 
 impl backbone_core::ApplyUpdateDto<UpdateLoyaltyPointEntryDto> for LoyaltyPointEntry {
     fn apply_update(mut self, dto: UpdateLoyaltyPointEntryDto) -> backbone_core::ServiceResult<Self> {
-        self.company_id = dto.company_id;
         self.loyalty_program_id = dto.loyalty_program_id;
         self.customer_id = dto.customer_id;
         self.entry_type = dto.entry_type;
