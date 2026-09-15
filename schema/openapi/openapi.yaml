@@ -7,7 +7,7 @@ info:
     This API provides 11 standard CRUD endpoints for each model.
 
 servers:
-  - url: http://localhost:3000
+  - url: /
     description: Development server
 
 tags:
@@ -31,7 +31,7 @@ tags:
     description: PromoBundleGift management endpoints
 
 paths:
-  /api/v1/coupon_codes:
+  /api/v1/promo/coupon_codes:
     get:
       tags:
         - CouponCodes
@@ -77,7 +77,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/coupon_codes/{id}:
+  /api/v1/promo/coupon_codes/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -149,7 +149,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/coupon_codes/bulk:
+  /api/v1/promo/coupon_codes/bulk:
     post:
       tags:
         - CouponCodes
@@ -241,7 +241,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/coupon_codes/upsert:
+  /api/v1/promo/coupon_codes/upsert:
     post:
       tags:
         - CouponCodes
@@ -271,7 +271,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CouponCode'
 
-  /api/v1/coupon_codes/trash:
+  /api/v1/promo/coupon_codes/trash:
     get:
       tags:
         - CouponCodes
@@ -288,7 +288,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CouponCodeList'
 
-  /api/v1/coupon_codes/{id}/restore:
+  /api/v1/promo/coupon_codes/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -306,7 +306,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/coupon_codes/empty:
+  /api/v1/promo/coupon_codes/empty:
     delete:
       tags:
         - CouponCodes
@@ -323,7 +323,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/coupon_codes/delete/bulk:
+  /api/v1/promo/coupon_codes/delete/bulk:
     post:
       tags:
         - CouponCodes
@@ -343,7 +343,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/coupon_codes/restore/bulk:
+  /api/v1/promo/coupon_codes/restore/bulk:
     post:
       tags:
         - CouponCodes
@@ -361,7 +361,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/coupon_codes/restore/all:
+  /api/v1/promo/coupon_codes/restore/all:
     post:
       tags:
         - CouponCodes
@@ -377,7 +377,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/coupon_codes/trash/bulk:
+  /api/v1/promo/coupon_codes/trash/bulk:
     delete:
       tags:
         - CouponCodes
@@ -397,7 +397,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/coupon_redemptions:
+  /api/v1/promo/coupon_redemptions:
     get:
       tags:
         - CouponRedemptions
@@ -443,7 +443,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/coupon_redemptions/{id}:
+  /api/v1/promo/coupon_redemptions/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -515,7 +515,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/coupon_redemptions/bulk:
+  /api/v1/promo/coupon_redemptions/bulk:
     post:
       tags:
         - CouponRedemptions
@@ -607,7 +607,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/coupon_redemptions/upsert:
+  /api/v1/promo/coupon_redemptions/upsert:
     post:
       tags:
         - CouponRedemptions
@@ -637,7 +637,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CouponRedemption'
 
-  /api/v1/coupon_redemptions/trash:
+  /api/v1/promo/coupon_redemptions/trash:
     get:
       tags:
         - CouponRedemptions
@@ -654,7 +654,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CouponRedemptionList'
 
-  /api/v1/coupon_redemptions/{id}/restore:
+  /api/v1/promo/coupon_redemptions/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -672,7 +672,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/coupon_redemptions/empty:
+  /api/v1/promo/coupon_redemptions/empty:
     delete:
       tags:
         - CouponRedemptions
@@ -689,7 +689,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/coupon_redemptions/delete/bulk:
+  /api/v1/promo/coupon_redemptions/delete/bulk:
     post:
       tags:
         - CouponRedemptions
@@ -709,7 +709,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/coupon_redemptions/restore/bulk:
+  /api/v1/promo/coupon_redemptions/restore/bulk:
     post:
       tags:
         - CouponRedemptions
@@ -727,7 +727,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/coupon_redemptions/restore/all:
+  /api/v1/promo/coupon_redemptions/restore/all:
     post:
       tags:
         - CouponRedemptions
@@ -743,7 +743,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/coupon_redemptions/trash/bulk:
+  /api/v1/promo/coupon_redemptions/trash/bulk:
     delete:
       tags:
         - CouponRedemptions
@@ -763,7 +763,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_order_pointses:
+  /api/v1/promo/loyalty_order_pointses:
     get:
       tags:
         - LoyaltyOrderPointses
@@ -809,7 +809,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/loyalty_order_pointses/{id}:
+  /api/v1/promo/loyalty_order_pointses/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -881,7 +881,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/loyalty_order_pointses/bulk:
+  /api/v1/promo/loyalty_order_pointses/bulk:
     post:
       tags:
         - LoyaltyOrderPointses
@@ -973,7 +973,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_order_pointses/upsert:
+  /api/v1/promo/loyalty_order_pointses/upsert:
     post:
       tags:
         - LoyaltyOrderPointses
@@ -1003,7 +1003,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoyaltyOrderPoints'
 
-  /api/v1/loyalty_order_pointses/trash:
+  /api/v1/promo/loyalty_order_pointses/trash:
     get:
       tags:
         - LoyaltyOrderPointses
@@ -1020,7 +1020,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoyaltyOrderPointsList'
 
-  /api/v1/loyalty_order_pointses/{id}/restore:
+  /api/v1/promo/loyalty_order_pointses/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -1038,7 +1038,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/loyalty_order_pointses/empty:
+  /api/v1/promo/loyalty_order_pointses/empty:
     delete:
       tags:
         - LoyaltyOrderPointses
@@ -1055,7 +1055,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/loyalty_order_pointses/delete/bulk:
+  /api/v1/promo/loyalty_order_pointses/delete/bulk:
     post:
       tags:
         - LoyaltyOrderPointses
@@ -1075,7 +1075,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_order_pointses/restore/bulk:
+  /api/v1/promo/loyalty_order_pointses/restore/bulk:
     post:
       tags:
         - LoyaltyOrderPointses
@@ -1093,7 +1093,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_order_pointses/restore/all:
+  /api/v1/promo/loyalty_order_pointses/restore/all:
     post:
       tags:
         - LoyaltyOrderPointses
@@ -1109,7 +1109,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/loyalty_order_pointses/trash/bulk:
+  /api/v1/promo/loyalty_order_pointses/trash/bulk:
     delete:
       tags:
         - LoyaltyOrderPointses
@@ -1129,7 +1129,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_programs:
+  /api/v1/promo/loyalty_programs:
     get:
       tags:
         - LoyaltyPrograms
@@ -1175,7 +1175,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/loyalty_programs/{id}:
+  /api/v1/promo/loyalty_programs/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -1247,7 +1247,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/loyalty_programs/bulk:
+  /api/v1/promo/loyalty_programs/bulk:
     post:
       tags:
         - LoyaltyPrograms
@@ -1339,7 +1339,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_programs/upsert:
+  /api/v1/promo/loyalty_programs/upsert:
     post:
       tags:
         - LoyaltyPrograms
@@ -1369,7 +1369,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoyaltyProgram'
 
-  /api/v1/loyalty_programs/trash:
+  /api/v1/promo/loyalty_programs/trash:
     get:
       tags:
         - LoyaltyPrograms
@@ -1386,7 +1386,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoyaltyProgramList'
 
-  /api/v1/loyalty_programs/{id}/restore:
+  /api/v1/promo/loyalty_programs/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -1404,7 +1404,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/loyalty_programs/empty:
+  /api/v1/promo/loyalty_programs/empty:
     delete:
       tags:
         - LoyaltyPrograms
@@ -1421,7 +1421,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/loyalty_programs/delete/bulk:
+  /api/v1/promo/loyalty_programs/delete/bulk:
     post:
       tags:
         - LoyaltyPrograms
@@ -1441,7 +1441,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_programs/restore/bulk:
+  /api/v1/promo/loyalty_programs/restore/bulk:
     post:
       tags:
         - LoyaltyPrograms
@@ -1459,7 +1459,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_programs/restore/all:
+  /api/v1/promo/loyalty_programs/restore/all:
     post:
       tags:
         - LoyaltyPrograms
@@ -1475,7 +1475,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/loyalty_programs/trash/bulk:
+  /api/v1/promo/loyalty_programs/trash/bulk:
     delete:
       tags:
         - LoyaltyPrograms
@@ -1495,7 +1495,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_point_entries:
+  /api/v1/promo/loyalty_point_entries:
     get:
       tags:
         - LoyaltyPointEntries
@@ -1541,7 +1541,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/loyalty_point_entries/{id}:
+  /api/v1/promo/loyalty_point_entries/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -1613,7 +1613,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/loyalty_point_entries/bulk:
+  /api/v1/promo/loyalty_point_entries/bulk:
     post:
       tags:
         - LoyaltyPointEntries
@@ -1705,7 +1705,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_point_entries/upsert:
+  /api/v1/promo/loyalty_point_entries/upsert:
     post:
       tags:
         - LoyaltyPointEntries
@@ -1735,7 +1735,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoyaltyPointEntry'
 
-  /api/v1/loyalty_point_entries/trash:
+  /api/v1/promo/loyalty_point_entries/trash:
     get:
       tags:
         - LoyaltyPointEntries
@@ -1752,7 +1752,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoyaltyPointEntryList'
 
-  /api/v1/loyalty_point_entries/{id}/restore:
+  /api/v1/promo/loyalty_point_entries/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -1770,7 +1770,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/loyalty_point_entries/empty:
+  /api/v1/promo/loyalty_point_entries/empty:
     delete:
       tags:
         - LoyaltyPointEntries
@@ -1787,7 +1787,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/loyalty_point_entries/delete/bulk:
+  /api/v1/promo/loyalty_point_entries/delete/bulk:
     post:
       tags:
         - LoyaltyPointEntries
@@ -1807,7 +1807,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_point_entries/restore/bulk:
+  /api/v1/promo/loyalty_point_entries/restore/bulk:
     post:
       tags:
         - LoyaltyPointEntries
@@ -1825,7 +1825,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/loyalty_point_entries/restore/all:
+  /api/v1/promo/loyalty_point_entries/restore/all:
     post:
       tags:
         - LoyaltyPointEntries
@@ -1841,7 +1841,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/loyalty_point_entries/trash/bulk:
+  /api/v1/promo/loyalty_point_entries/trash/bulk:
     delete:
       tags:
         - LoyaltyPointEntries
@@ -1861,7 +1861,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/pricing_rules:
+  /api/v1/promo/pricing_rules:
     get:
       tags:
         - PricingRules
@@ -1907,7 +1907,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/pricing_rules/{id}:
+  /api/v1/promo/pricing_rules/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -1979,7 +1979,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/pricing_rules/bulk:
+  /api/v1/promo/pricing_rules/bulk:
     post:
       tags:
         - PricingRules
@@ -2071,7 +2071,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/pricing_rules/upsert:
+  /api/v1/promo/pricing_rules/upsert:
     post:
       tags:
         - PricingRules
@@ -2101,7 +2101,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PricingRule'
 
-  /api/v1/pricing_rules/trash:
+  /api/v1/promo/pricing_rules/trash:
     get:
       tags:
         - PricingRules
@@ -2118,7 +2118,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PricingRuleList'
 
-  /api/v1/pricing_rules/{id}/restore:
+  /api/v1/promo/pricing_rules/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -2136,7 +2136,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/pricing_rules/empty:
+  /api/v1/promo/pricing_rules/empty:
     delete:
       tags:
         - PricingRules
@@ -2153,7 +2153,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/pricing_rules/delete/bulk:
+  /api/v1/promo/pricing_rules/delete/bulk:
     post:
       tags:
         - PricingRules
@@ -2173,7 +2173,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/pricing_rules/restore/bulk:
+  /api/v1/promo/pricing_rules/restore/bulk:
     post:
       tags:
         - PricingRules
@@ -2191,7 +2191,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/pricing_rules/restore/all:
+  /api/v1/promo/pricing_rules/restore/all:
     post:
       tags:
         - PricingRules
@@ -2207,7 +2207,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/pricing_rules/trash/bulk:
+  /api/v1/promo/pricing_rules/trash/bulk:
     delete:
       tags:
         - PricingRules
@@ -2227,7 +2227,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundles:
+  /api/v1/promo/promo_bundles:
     get:
       tags:
         - PromoBundles
@@ -2273,7 +2273,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/promo_bundles/{id}:
+  /api/v1/promo/promo_bundles/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -2345,7 +2345,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/promo_bundles/bulk:
+  /api/v1/promo/promo_bundles/bulk:
     post:
       tags:
         - PromoBundles
@@ -2437,7 +2437,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundles/upsert:
+  /api/v1/promo/promo_bundles/upsert:
     post:
       tags:
         - PromoBundles
@@ -2467,7 +2467,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PromoBundle'
 
-  /api/v1/promo_bundles/trash:
+  /api/v1/promo/promo_bundles/trash:
     get:
       tags:
         - PromoBundles
@@ -2484,7 +2484,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PromoBundleList'
 
-  /api/v1/promo_bundles/{id}/restore:
+  /api/v1/promo/promo_bundles/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -2502,7 +2502,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/promo_bundles/empty:
+  /api/v1/promo/promo_bundles/empty:
     delete:
       tags:
         - PromoBundles
@@ -2519,7 +2519,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/promo_bundles/delete/bulk:
+  /api/v1/promo/promo_bundles/delete/bulk:
     post:
       tags:
         - PromoBundles
@@ -2539,7 +2539,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundles/restore/bulk:
+  /api/v1/promo/promo_bundles/restore/bulk:
     post:
       tags:
         - PromoBundles
@@ -2557,7 +2557,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundles/restore/all:
+  /api/v1/promo/promo_bundles/restore/all:
     post:
       tags:
         - PromoBundles
@@ -2573,7 +2573,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/promo_bundles/trash/bulk:
+  /api/v1/promo/promo_bundles/trash/bulk:
     delete:
       tags:
         - PromoBundles
@@ -2593,7 +2593,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_components:
+  /api/v1/promo/promo_bundle_components:
     get:
       tags:
         - PromoBundleComponents
@@ -2639,7 +2639,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/promo_bundle_components/{id}:
+  /api/v1/promo/promo_bundle_components/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -2711,7 +2711,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/promo_bundle_components/bulk:
+  /api/v1/promo/promo_bundle_components/bulk:
     post:
       tags:
         - PromoBundleComponents
@@ -2803,7 +2803,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_components/upsert:
+  /api/v1/promo/promo_bundle_components/upsert:
     post:
       tags:
         - PromoBundleComponents
@@ -2833,7 +2833,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PromoBundleComponent'
 
-  /api/v1/promo_bundle_components/trash:
+  /api/v1/promo/promo_bundle_components/trash:
     get:
       tags:
         - PromoBundleComponents
@@ -2850,7 +2850,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PromoBundleComponentList'
 
-  /api/v1/promo_bundle_components/{id}/restore:
+  /api/v1/promo/promo_bundle_components/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -2868,7 +2868,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/promo_bundle_components/empty:
+  /api/v1/promo/promo_bundle_components/empty:
     delete:
       tags:
         - PromoBundleComponents
@@ -2885,7 +2885,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/promo_bundle_components/delete/bulk:
+  /api/v1/promo/promo_bundle_components/delete/bulk:
     post:
       tags:
         - PromoBundleComponents
@@ -2905,7 +2905,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_components/restore/bulk:
+  /api/v1/promo/promo_bundle_components/restore/bulk:
     post:
       tags:
         - PromoBundleComponents
@@ -2923,7 +2923,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_components/restore/all:
+  /api/v1/promo/promo_bundle_components/restore/all:
     post:
       tags:
         - PromoBundleComponents
@@ -2939,7 +2939,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/promo_bundle_components/trash/bulk:
+  /api/v1/promo/promo_bundle_components/trash/bulk:
     delete:
       tags:
         - PromoBundleComponents
@@ -2959,7 +2959,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_gifts:
+  /api/v1/promo/promo_bundle_gifts:
     get:
       tags:
         - PromoBundleGifts
@@ -3005,7 +3005,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/v1/promo_bundle_gifts/{id}:
+  /api/v1/promo/promo_bundle_gifts/{id}:
     parameters:
       - $ref: '#/components/parameters/IdParam'
 
@@ -3077,7 +3077,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/promo_bundle_gifts/bulk:
+  /api/v1/promo/promo_bundle_gifts/bulk:
     post:
       tags:
         - PromoBundleGifts
@@ -3169,7 +3169,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_gifts/upsert:
+  /api/v1/promo/promo_bundle_gifts/upsert:
     post:
       tags:
         - PromoBundleGifts
@@ -3199,7 +3199,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PromoBundleGift'
 
-  /api/v1/promo_bundle_gifts/trash:
+  /api/v1/promo/promo_bundle_gifts/trash:
     get:
       tags:
         - PromoBundleGifts
@@ -3216,7 +3216,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PromoBundleGiftList'
 
-  /api/v1/promo_bundle_gifts/{id}/restore:
+  /api/v1/promo/promo_bundle_gifts/{id}/restore:
     parameters:
       - $ref: '#/components/parameters/IdParam'
     post:
@@ -3234,7 +3234,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/promo_bundle_gifts/empty:
+  /api/v1/promo/promo_bundle_gifts/empty:
     delete:
       tags:
         - PromoBundleGifts
@@ -3251,7 +3251,7 @@ paths:
                   deleted_count:
                     type: integer
 
-  /api/v1/promo_bundle_gifts/delete/bulk:
+  /api/v1/promo/promo_bundle_gifts/delete/bulk:
     post:
       tags:
         - PromoBundleGifts
@@ -3271,7 +3271,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_gifts/restore/bulk:
+  /api/v1/promo/promo_bundle_gifts/restore/bulk:
     post:
       tags:
         - PromoBundleGifts
@@ -3289,7 +3289,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/promo_bundle_gifts/restore/all:
+  /api/v1/promo/promo_bundle_gifts/restore/all:
     post:
       tags:
         - PromoBundleGifts
@@ -3305,7 +3305,7 @@ paths:
                 properties:
                   restored: { type: integer }
 
-  /api/v1/promo_bundle_gifts/trash/bulk:
+  /api/v1/promo/promo_bundle_gifts/trash/bulk:
     delete:
       tags:
         - PromoBundleGifts
