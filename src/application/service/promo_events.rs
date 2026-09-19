@@ -139,7 +139,14 @@ pub enum PromoEvent {
 }
 
 /// Sink the write path publishes to. A consuming service supplies its own (bus, outbox, …).
-pub trait PromoEventSink {
+///
+/// `Send + Sync` is part of the contract, not an implementation detail: every
+/// verb that publishes is `async`, so a `&dyn PromoEventSink` is held across an
+/// await point, and without these bounds the resulting future is not `Send`.
+/// A composing service then cannot spawn it, and has to wrap each verb in a
+/// shim to get the sink over the boundary. Any real sink (a bus, an outbox
+/// writer) is already both.
+pub trait PromoEventSink: Send + Sync {
     fn publish(&self, event: &PromoEvent);
 }
 
