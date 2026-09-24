@@ -1,6 +1,6 @@
 [package]
 name = "backbone-promo"
-version = "0.4.16"
+version = "0.4.17"
 edition = "2021"
 description = "Advertisements, promo campaigns, banners (extracted from bersihir)"
 
