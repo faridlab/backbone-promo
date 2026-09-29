@@ -191,6 +191,37 @@ impl CouponClaimRepository {
     /// Transition the cart's active claim to `released` (freed headroom + freed
     /// cart slot). Idempotent: zero rows touched when nothing is active.
     /// Returns the released claim's id when a row flipped.
+    /// Release every claim still `claimed` older than the horizon, returning
+    /// the released rows (claim id, coupon id, ref type, ref id) so the
+    /// caller can publish one release event each — the abandoned-cart sweep.
+    /// Mirrors `release_for_cart`'s write exactly, so a swept release is
+    /// indistinguishable from an explicit one downstream.
+    pub async fn release_stale_claimed(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        claimed_before: chrono::DateTime<chrono::Utc>,
+        at: chrono::DateTime<chrono::Utc>,
+        limit: i64,
+    ) -> Result<Vec<(uuid::Uuid, uuid::Uuid, String, uuid::Uuid)>, sqlx::Error> {
+        sqlx::query_as(
+            r#"UPDATE promo.coupon_claims
+               SET status = 'released', settled_at = $2
+               WHERE id IN (
+                   SELECT id FROM promo.coupon_claims
+                    WHERE status = 'claimed' AND claimed_at < $1
+                    ORDER BY claimed_at
+                    LIMIT $3
+                    FOR UPDATE SKIP LOCKED
+               )
+               RETURNING id, coupon_id, cart_ref_type, cart_ref_id"#,
+        )
+        .bind(claimed_before)
+        .bind(at)
+        .bind(limit)
+        .fetch_all(conn)
+        .await
+    }
+
     pub async fn release_for_cart(
         &self,
         conn: &mut sqlx::PgConnection,

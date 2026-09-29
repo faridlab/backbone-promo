@@ -208,6 +208,39 @@ impl PromoWriteService {
         Ok(released)
     }
 
+    /// The abandoned-claim sweep: release claims still `claimed` older than
+    /// `ttl`, publishing the same release event an explicit release does
+    /// (consumers recompute headroom identically). A cart nobody touches
+    /// again can never fire its own release, so a TTL is the only honest
+    /// policy for abandonment; the explicit release verb stays the
+    /// cart-close hook.
+    pub async fn sweep_stale_claims(
+        &self,
+        ttl: std::time::Duration,
+        sink: &dyn PromoEventSink,
+    ) -> Result<Vec<uuid::Uuid>, PricingError> {
+        let at = chrono::Utc::now();
+        let ttl_chrono = chrono::Duration::from_std(ttl).unwrap_or(chrono::Duration::hours(24));
+        let claimed_before = at - ttl_chrono;
+        let mut tx = self.pool.begin().await?;
+        crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
+        let released = self
+            .claims
+            .release_stale_claimed(&mut tx, claimed_before, at, 500)
+            .await?;
+        tx.commit().await?;
+        for (claim_id, coupon_id, cart_ref_type, cart_ref_id) in &released {
+            sink.publish(&PromoEvent::PromoCodeClaimReleased(PromoCodeClaimReleased {
+                claim_id: *claim_id,
+                company_id: legacy_twin(),
+                coupon_id: *coupon_id,
+                cart_ref_type: cart_ref_type.clone(),
+                cart_ref_id: *cart_ref_id,
+            }));
+        }
+        Ok(released.iter().map(|(id, ..)| *id).collect())
+    }
+
     /// The cart's claim history, every status, oldest first — the inspectable claim state.
     /// A pure read: the module ships no row fence (row scoping is the composing service's
     /// tenancy decorator, ADR-0029), and the verbs stay the only writers.
