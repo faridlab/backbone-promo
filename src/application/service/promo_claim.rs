@@ -224,6 +224,20 @@ impl PromoWriteService {
         let claimed_before = at - ttl_chrono;
         let mut tx = self.pool.begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
+        // The sweep runs as a background task with no ambient scope, and the
+        // claims table fences on the org-unit union — an unfenced sweep
+        // would see nothing. Bind the wide spine for this transaction (the
+        // established bus-task posture); it commits with the release.
+        let spine: String = sqlx::query_scalar(
+            "SELECT COALESCE(string_agg(id::text, ','), '') FROM organization.org_units",
+        )
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap_or_default();
+        sqlx::query("SELECT set_config('app.scope_unit_ids', $1, true)")
+            .bind(&spine)
+            .execute(&mut *tx)
+            .await?;
         let released = self
             .claims
             .release_stale_claimed(&mut tx, claimed_before, at, 500)
