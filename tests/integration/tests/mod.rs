@@ -17,7 +17,6 @@ pub mod promo_bundle_component_api_test;
 pub mod promo_bundle_gift_api_test;
 
 // Re-exports for convenience
-pub use crud_test_base::*;
 pub use coupon_code_api_test::*;
 pub use coupon_redemption_api_test::*;
 pub use loyalty_order_points_api_test::*;

@@ -309,6 +309,8 @@ impl backbone_orm::EntityRepoMeta for PromoBundle {
         m.insert("match_type".to_string(), "bundle_match".to_string());
         m.insert("reward".to_string(), "rate_or_discount".to_string());
         m.insert("status".to_string(), "promo_bundle_status".to_string());
+        m.insert("valid_from".to_string(), "timestamptz".to_string());
+        m.insert("valid_to".to_string(), "timestamptz".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {

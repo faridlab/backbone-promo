@@ -267,6 +267,8 @@ impl backbone_orm::EntityRepoMeta for LoyaltyOrderPoints {
         m.insert("customer_id".to_string(), "uuid".to_string());
         m.insert("order_ref_id".to_string(), "uuid".to_string());
         m.insert("coupon_code_id".to_string(), "uuid".to_string());
+        m.insert("granted_at".to_string(), "timestamptz".to_string());
+        m.insert("spent_at".to_string(), "timestamptz".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {

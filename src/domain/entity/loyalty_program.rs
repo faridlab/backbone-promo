@@ -247,6 +247,8 @@ impl backbone_orm::EntityRepoMeta for LoyaltyProgram {
         m.insert("id".to_string(), "uuid".to_string());
         m.insert("program_type".to_string(), "loyalty_program_type".to_string());
         m.insert("status".to_string(), "loyalty_program_status".to_string());
+        m.insert("from_date".to_string(), "timestamptz".to_string());
+        m.insert("to_date".to_string(), "timestamptz".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {

@@ -251,6 +251,8 @@ impl backbone_orm::EntityRepoMeta for CouponCode {
         m.insert("id".to_string(), "uuid".to_string());
         m.insert("pricing_rule_id".to_string(), "uuid".to_string());
         m.insert("status".to_string(), "coupon_code_status".to_string());
+        m.insert("valid_from".to_string(), "timestamptz".to_string());
+        m.insert("valid_upto".to_string(), "timestamptz".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {

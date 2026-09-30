@@ -242,6 +242,8 @@ impl backbone_orm::EntityRepoMeta for LoyaltyPointEntry {
         m.insert("customer_id".to_string(), "uuid".to_string());
         m.insert("source_id".to_string(), "uuid".to_string());
         m.insert("entry_type".to_string(), "loyalty_entry_type".to_string());
+        m.insert("posting_date".to_string(), "timestamptz".to_string());
+        m.insert("expiry_date".to_string(), "timestamptz".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {

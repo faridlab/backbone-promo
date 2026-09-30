@@ -208,6 +208,7 @@ impl backbone_orm::EntityRepoMeta for CouponRedemption {
         m.insert("coupon_id".to_string(), "uuid".to_string());
         m.insert("pricing_rule_id".to_string(), "uuid".to_string());
         m.insert("source_id".to_string(), "uuid".to_string());
+        m.insert("redeemed_at".to_string(), "timestamptz".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {

@@ -401,6 +401,8 @@ impl backbone_orm::EntityRepoMeta for PricingRule {
         m.insert("apply_on".to_string(), "apply_on".to_string());
         m.insert("rate_or_discount".to_string(), "rate_or_discount".to_string());
         m.insert("status".to_string(), "pricing_rule_status".to_string());
+        m.insert("valid_from".to_string(), "timestamptz".to_string());
+        m.insert("valid_to".to_string(), "timestamptz".to_string());
         m
     }
     fn search_fields() -> &'static [&'static str] {
