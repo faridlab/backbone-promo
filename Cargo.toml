@@ -97,5 +97,5 @@ rand = "0.8"
 # backbone-selling write path (a live Sales Order priced from it), and the loyalty seam consumes
 # backbone-pos's REAL `PosInvoicePaid` event to accrue points. Dev-dependencies ONLY — the shipped
 # promo library has ZERO normal edges (verify: `cargo tree -e normal -i backbone-selling` is empty).
-backbone-selling = { path = "../backbone-selling" }
-backbone-pos = { path = "../backbone-pos" }
+backbone-selling = { version = "0.13.19" }
+backbone-pos = { version = "0.5.32" }
