@@ -19,11 +19,13 @@
 //! Per the module's 4-layer rule the SQL lives here; the claim verbs in
 //! `application/service/promo_claim.rs` orchestrate.
 
-// The typed multi-row read twins live only in the legacy `company_scope` module. Their
-// connection discipline is what this repository needs — request-dedicated connection when
-// the composing service bound one, plain pool otherwise. The helper's legacy task-local
-// branch is never taken: this module sets no legacy scope of its own (ADR-0029).
-use backbone_orm::company_scope::{fetch_all_rows_scoped, fetch_one_scalar_scoped};
+// The optional-scalar read twin lives only in the legacy `company_scope` module — its
+// connection discipline is the request-dedicated connection when the composing service bound
+// one, plain pool otherwise, and the legacy task-local branch is never taken (this module
+// sets no legacy scope of its own, ADR-0029). The all-rows read twin rides the org-scope
+// module instead: same connection discipline, no scope invented.
+use backbone_orm::company_scope::fetch_one_scalar_scoped;
+use backbone_orm::org_scope::fetch_all_rows_scoped;
 use sqlx::Row;
 use uuid::Uuid;
 

@@ -38,4 +38,11 @@ pub fn create_guarded_promo_routes(m: &PromoModule, pool: sqlx::PgPool) -> Route
         .merge(create_promo_bundle_read_routes(m.promo_bundle_service.clone()))
         .merge(create_promo_bundle_component_read_routes(m.promo_bundle_component_service.clone()));
     Router::new().merge(reads)
+    // Bind the composer's request pool (ADR-0029 pool law) for the verbs:
+    // under a tenant mount the writes go to the tenant's database; without
+    // one the composed pool stays the fallback. Applied AFTER the routes —
+    // a Router layer only wraps what was registered before the call.
+    .layer(axum::middleware::from_fn(
+        crate::request_pool::bind_request_pool,
+    ))
 }

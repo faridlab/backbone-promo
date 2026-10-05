@@ -56,7 +56,7 @@ impl PromoWriteService {
 
         let row = self
             .entries
-            .claim_accrual(&self.pool, &NewAccrualRow {
+            .claim_accrual(&self.rpool(), &NewAccrualRow {
                 loyalty_program_id: req.loyalty_program_id,
                 customer_id: req.customer_id,
                 points,
@@ -102,7 +102,7 @@ impl PromoWriteService {
         if req.points <= Decimal::ZERO {
             return Err(PricingError::Invalid("points to redeem must be positive".into()));
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock 1 — program row (NOWAIT): the factor that prices this burn is the one the serialized
@@ -183,7 +183,7 @@ impl PromoWriteService {
         at: chrono::DateTime<chrono::Utc>,
     ) -> Result<(Decimal, Option<i32>), PricingError> {
         self.programs
-            .find_active_collection(&self.pool, program_id, at)
+            .find_active_collection(&self.rpool(), program_id, at)
             .await?
             .ok_or(PricingError::ProgramInvalid)
     }

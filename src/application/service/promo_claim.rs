@@ -82,7 +82,7 @@ impl PromoWriteService {
             return Err(PricingError::ClaimRefused);
         }
 
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Resolve + lock in ONE statement: the coupon row an active, in-window,
@@ -187,7 +187,7 @@ impl PromoWriteService {
         at: chrono::DateTime<chrono::Utc>,
         sink: &dyn PromoEventSink,
     ) -> Result<Option<Uuid>, PricingError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
         let released = self
             .claims
@@ -196,7 +196,7 @@ impl PromoWriteService {
         tx.commit().await?;
         if let Some(claim_id) = released {
             // The coupon id rides the event so consumers can recompute headroom without a join.
-            let coupon_id = self.claims.coupon_of_claim(&self.pool, claim_id).await?;
+            let coupon_id = self.claims.coupon_of_claim(&self.rpool(), claim_id).await?;
             sink.publish(&PromoEvent::PromoCodeClaimReleased(PromoCodeClaimReleased {
                 claim_id,
                 company_id: legacy_twin(),
@@ -222,7 +222,7 @@ impl PromoWriteService {
         let at = chrono::Utc::now();
         let ttl_chrono = chrono::Duration::from_std(ttl).unwrap_or(chrono::Duration::hours(24));
         let claimed_before = at - ttl_chrono;
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
         // The sweep runs as a background task with no ambient scope, and the
         // claims table fences on the org-unit union — an unfenced sweep
@@ -265,7 +265,7 @@ impl PromoWriteService {
     ) -> Result<Vec<CodeClaimView>, PricingError> {
         let rows = self
             .claims
-            .list_for_cart(&self.pool, cart_ref_type, cart_ref_id)
+            .list_for_cart(&self.rpool(), cart_ref_type, cart_ref_id)
             .await?;
         Ok(rows
             .into_iter()

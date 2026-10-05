@@ -40,6 +40,9 @@ user_owned:
   - "src/lib.rs"
   - "src/routes/mod.rs"
   - "tests/codegen_invariants.rs"
+  # The composer-installed request-pool shim the write service resolves its database
+  # through (ADR-0029 pool law): hand-written, never schema-derived.
+  - "src/request_pool.rs"
   # Own the hand-written promo SQL (the structural rule/bundle searches behind resolve, the coupon
   # lookup + its guarded redemption burn, and the loyalty accrual/balance/redemption ledger) that the
   # write service orchestrates. Declared here — not renamed with a `_custom` suffix — so the generator

@@ -112,6 +112,13 @@ impl PromoWriteService {
             claims,
         }
     }
+
+    /// The database this call runs on: the composer's request pool when one
+    /// is bound (a tenant mount, or a relay consumer wrapped by the host),
+    /// else the composed pool (ADR-0029 pool law).
+    pub(super) fn rpool(&self) -> PgPool {
+        crate::request_pool::current().unwrap_or_else(|| self.pool.clone())
+    }
 }
 
 /// Outcome of a loyalty accrual.

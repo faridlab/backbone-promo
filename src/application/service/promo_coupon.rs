@@ -59,7 +59,7 @@ impl PromoWriteService {
         source_id: Uuid,
         sink: &dyn PromoEventSink,
     ) -> Result<Uuid, PricingError> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock the coupon row first (NOWAIT). Ok(false) = no active row → fall through to the claim,

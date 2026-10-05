@@ -551,7 +551,7 @@ impl PromoWriteService {
         let rows = self
             .rules
             .find_order_candidates(
-                &self.pool,
+                &self.rpool(),
                 cart.at,
                 cart.customer_id,
                 cart.customer_group_id,
@@ -596,7 +596,7 @@ impl PromoWriteService {
     ) -> Result<Vec<BundleCand>, PricingError> {
         let brows = self
             .bundles
-            .find_active(&self.pool, cart.at, subtotal)
+            .find_active(&self.rpool(), cart.at, subtotal)
             .await?;
         if brows.is_empty() {
             return Ok(Vec::new());
@@ -605,12 +605,12 @@ impl PromoWriteService {
         let bundle_ids: Vec<Uuid> = brows.iter().map(|r| r.id).collect();
         let crows = self
             .bundle_components
-            .find_for_bundles(&self.pool, &bundle_ids)
+            .find_for_bundles(&self.rpool(), &bundle_ids)
             .await?;
 
         let grows = self
             .bundle_gifts
-            .find_for_bundles(&self.pool, &bundle_ids)
+            .find_for_bundles(&self.rpool(), &bundle_ids)
             .await?;
 
         let mut bundles: Vec<BundleCand> = brows

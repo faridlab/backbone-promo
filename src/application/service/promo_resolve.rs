@@ -73,7 +73,7 @@ impl PromoWriteService {
         let rows = self
             .rules
             .find_line_candidates(
-                &self.pool,
+                &self.rpool(),
                 &LineRuleQuery {
                     at: q.at,
                     item_id: q.item_id,
@@ -165,7 +165,7 @@ impl PromoWriteService {
     ) -> Result<Option<(Uuid, Uuid)>, PricingError> {
         Ok(self
             .coupons
-            .find_usable(&self.pool, &code.to_uppercase(), at)
+            .find_usable(&self.rpool(), &code.to_uppercase(), at)
             .await?)
     }
 }

@@ -71,7 +71,7 @@ impl PromoWriteService {
         }
         let expiry = expiry_days.map(|d| req.at + chrono::Duration::days(d as i64));
 
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Member serialization: the anchor exists/was locked before any balance-affecting write.
@@ -196,7 +196,7 @@ impl PromoWriteService {
         if req.order_ref_type.is_empty() || req.order_ref_type.len() > 40 {
             return Err(PricingError::Invalid("order_ref_type must be 1..=40 chars".into()));
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock order: the program row pins conversion_factor against admin edits (fail-fast over
@@ -359,7 +359,7 @@ impl PromoWriteService {
         if req.reversal_ref_type.is_empty() || req.reversal_ref_type.len() > 40 {
             return Err(PricingError::Invalid("reversal_ref_type must be 1..=40 chars".into()));
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.rpool().begin().await?;
         crate::infrastructure::persistence::relay_ambient_scope(&mut tx).await?;
 
         // Lock order: program row → member anchor (same as spend). Deliberately NOT
