@@ -1,6 +1,6 @@
 [package]
 name = "backbone-promo"
-version = "0.4.25"
+version = "0.5.0"
 edition = "2021"
 description = "Advertisements, promo campaigns, banners (extracted from bersihir)"
 license = "MIT OR Apache-2.0"
@@ -12,10 +12,10 @@ path = "src/lib.rs"
 
 [dependencies]
 # Backbone Framework CORE dependencies
-backbone-core = { version = "2.7.35", features = ["postgres"] }
-backbone-orm = { version = "2.7.35" }
-backbone-auth = { version = "2.7.35", features = ["axum"] }
-backbone-messaging = { version = "2.7.35" }
+backbone-core = { version = "3.0.0", features = ["postgres"] }
+backbone-orm = { version = "3.0.0" }
+backbone-auth = { version = "3.0.0", features = ["axum"] }
+backbone-messaging = { version = "3.0.0" }
 
 # Core dependencies
 tokio = { version = "1.0", features = ["full"] }
@@ -97,5 +97,5 @@ rand = "0.8"
 # backbone-selling write path (a live Sales Order priced from it), and the loyalty seam consumes
 # backbone-pos's REAL `PosInvoicePaid` event to accrue points. Dev-dependencies ONLY — the shipped
 # promo library has ZERO normal edges (verify: `cargo tree -e normal -i backbone-selling` is empty).
-backbone-selling = { version = "0.13.19" }
-backbone-pos = { version = "0.5.32" }
+backbone-selling = { version = "0.14.0" }
+backbone-pos = { version = "0.6.0" }
