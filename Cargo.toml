@@ -1,6 +1,6 @@
 [package]
 name = "backbone-promo"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "Advertisements, promo campaigns, banners (extracted from bersihir)"
 license = "MIT OR Apache-2.0"
@@ -98,4 +98,4 @@ rand = "0.8"
 # backbone-pos's REAL `PosInvoicePaid` event to accrue points. Dev-dependencies ONLY — the shipped
 # promo library has ZERO normal edges (verify: `cargo tree -e normal -i backbone-selling` is empty).
 backbone-selling = { version = "0.14.0" }
-backbone-pos = { version = "0.6.0" }
+backbone-pos = { version = "0.7.0" }
