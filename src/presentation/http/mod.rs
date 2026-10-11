@@ -16,7 +16,6 @@ pub mod promo_bundle_component_handler;
 pub mod promo_bundle_gift_handler;
 
 // <<< CUSTOM
-pub mod guarded_routes;
 // END CUSTOM
 
 // Re-exports
@@ -30,5 +29,7 @@ pub use promo_bundle_handler::{create_promo_bundle_routes, create_promo_bundle_r
 pub use promo_bundle_component_handler::{create_promo_bundle_component_routes, create_promo_bundle_component_read_routes, create_promo_bundle_component_write_routes};
 pub use promo_bundle_gift_handler::{create_promo_bundle_gift_routes, create_promo_bundle_gift_read_routes, create_promo_bundle_gift_write_routes};
 // <<< CUSTOM
-pub use guarded_routes::create_guarded_promo_routes;
 // END CUSTOM
+
+// This directory's extension (hand-written; ADR-0031).
+include!("mod.ext.rs");
