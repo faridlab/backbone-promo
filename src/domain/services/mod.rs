@@ -22,5 +22,3 @@ pub use promo_bundle_domain_policy::PromoBundleDomainPolicy;
 pub use promo_bundle_component_domain_policy::PromoBundleComponentDomainPolicy;
 pub use promo_bundle_gift_domain_policy::PromoBundleGiftDomainPolicy;
 
-// <<< CUSTOM
-// END CUSTOM

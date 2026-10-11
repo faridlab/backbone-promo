@@ -11,8 +11,6 @@ use crate::domain::entity::LoyaltyOrderPoints;
 /// enum containing a `Crud(CrudEvent<LoyaltyOrderPoints>)` variant.
 pub type LoyaltyOrderPointsEvent = CrudEvent<LoyaltyOrderPoints>;
 
-// <<< CUSTOM
-// END CUSTOM
 
 use backbone_messaging::{CrudEventPublisher, NoOpCrudEventPublisher};
 use std::sync::Arc;

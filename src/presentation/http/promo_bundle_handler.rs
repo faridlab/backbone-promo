@@ -188,3 +188,4 @@ pub fn create_protected_promo_bundle_routes<A: AuthMiddleware + Send + Sync + 's
             }
         }))
 }
+

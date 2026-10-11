@@ -32,5 +32,3 @@ pub type PricingRuleService = GenericCrudService<
     PricingRuleRepository,
 >;
 
-// <<< CUSTOM
-// END CUSTOM

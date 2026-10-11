@@ -188,3 +188,4 @@ pub fn create_protected_pricing_rule_routes<A: AuthMiddleware + Send + Sync + 's
             }
         }))
 }
+

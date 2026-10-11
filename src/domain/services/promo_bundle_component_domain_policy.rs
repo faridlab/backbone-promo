@@ -18,5 +18,3 @@ use crate::domain::entity::PromoBundleComponent;
 /// service. `PermitAllPolicy` is the safe default until then.
 pub type PromoBundleComponentDomainPolicy = PermitAllPolicy<PromoBundleComponent>;
 
-// <<< CUSTOM
-// END CUSTOM

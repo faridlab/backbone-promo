@@ -360,7 +360,7 @@ impl backbone_core::ApplyUpdateDto<UpdateLoyaltyOrderPointsDto> for LoyaltyOrder
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to LoyaltyOrderPoints here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+

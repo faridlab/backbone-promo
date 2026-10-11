@@ -15,10 +15,6 @@ pub type PromoBundleGiftValidator = EntityValidator<PromoBundleGift>;
 /// Build a validator for PromoBundleGift with all schema-defined field rules.
 pub fn promo_bundle_gift_validator() -> PromoBundleGiftValidator {
     EntityValidator::new()
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
         // No schema-derived rules — add custom rules above.
 }
 
-// <<< CUSTOM
-// END CUSTOM

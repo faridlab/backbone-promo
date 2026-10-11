@@ -18,5 +18,3 @@ use crate::domain::entity::LoyaltyOrderPoints;
 /// service. `PermitAllPolicy` is the safe default until then.
 pub type LoyaltyOrderPointsDomainPolicy = PermitAllPolicy<LoyaltyOrderPoints>;
 
-// <<< CUSTOM
-// END CUSTOM

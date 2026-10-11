@@ -286,7 +286,7 @@ impl backbone_core::ApplyUpdateDto<UpdateCouponRedemptionDto> for CouponRedempti
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to CouponRedemption here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+

@@ -32,5 +32,3 @@ pub type CouponCodeService = GenericCrudService<
     CouponCodeRepository,
 >;
 
-// <<< CUSTOM
-// END CUSTOM

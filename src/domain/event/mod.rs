@@ -40,5 +40,3 @@ pub use promo_bundle_component_event_handlers::PromoBundleComponentEventHandler;
 pub use promo_bundle_gift_events::{PromoBundleGiftEvent, PromoBundleGiftEventPublisher, NoopPromoBundleGiftEventPublisher};
 pub use promo_bundle_gift_event_handlers::PromoBundleGiftEventHandler;
 
-// <<< CUSTOM
-// END CUSTOM

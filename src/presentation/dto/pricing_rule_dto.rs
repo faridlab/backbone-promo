@@ -503,7 +503,7 @@ impl backbone_core::ApplyUpdateDto<UpdatePricingRuleDto> for PricingRule {
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to PricingRule here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+

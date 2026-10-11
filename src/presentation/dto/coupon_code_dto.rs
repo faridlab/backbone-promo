@@ -315,7 +315,7 @@ impl backbone_core::ApplyUpdateDto<UpdateCouponCodeDto> for CouponCode {
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to CouponCode here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+

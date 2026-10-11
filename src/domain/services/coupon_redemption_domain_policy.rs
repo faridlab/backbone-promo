@@ -18,5 +18,3 @@ use crate::domain::entity::CouponRedemption;
 /// service. `PermitAllPolicy` is the safe default until then.
 pub type CouponRedemptionDomainPolicy = PermitAllPolicy<CouponRedemption>;
 
-// <<< CUSTOM
-// END CUSTOM

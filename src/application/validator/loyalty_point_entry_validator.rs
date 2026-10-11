@@ -16,9 +16,5 @@ pub type LoyaltyPointEntryValidator = EntityValidator<LoyaltyPointEntry>;
 pub fn loyalty_point_entry_validator() -> LoyaltyPointEntryValidator {
     EntityValidator::new()
         .rule(RequiredString::new("source_type", |e: &LoyaltyPointEntry| &e.source_type))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

@@ -25,5 +25,3 @@ pub use promo_bundle_validator::{PromoBundleValidator, promo_bundle_validator};
 pub use promo_bundle_component_validator::{PromoBundleComponentValidator, promo_bundle_component_validator};
 pub use promo_bundle_gift_validator::{PromoBundleGiftValidator, promo_bundle_gift_validator};
 
-// <<< CUSTOM
-// END CUSTOM

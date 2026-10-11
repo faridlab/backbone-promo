@@ -125,6 +125,4 @@ mod tests {
 // CUSTOM TESTS
 // ============================================================================
 
-// <<< CUSTOM TESTS START >>>
 // Add LoyaltyPointEntry specific tests here
-// <<< CUSTOM TESTS END >>>

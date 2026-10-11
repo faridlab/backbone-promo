@@ -32,5 +32,3 @@ pub type LoyaltyProgramService = GenericCrudService<
     LoyaltyProgramRepository,
 >;
 
-// <<< CUSTOM
-// END CUSTOM

@@ -188,3 +188,4 @@ pub fn create_protected_loyalty_program_routes<A: AuthMiddleware + Send + Sync +
             }
         }))
 }
+

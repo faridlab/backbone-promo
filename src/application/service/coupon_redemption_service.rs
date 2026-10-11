@@ -32,5 +32,3 @@ pub type CouponRedemptionService = GenericCrudService<
     CouponRedemptionRepository,
 >;
 
-// <<< CUSTOM
-// END CUSTOM

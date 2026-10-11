@@ -16,9 +16,5 @@ pub type LoyaltyProgramValidator = EntityValidator<LoyaltyProgram>;
 pub fn loyalty_program_validator() -> LoyaltyProgramValidator {
     EntityValidator::new()
         .rule(RequiredString::new("program_name", |e: &LoyaltyProgram| &e.program_name))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

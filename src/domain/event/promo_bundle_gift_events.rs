@@ -11,8 +11,6 @@ use crate::domain::entity::PromoBundleGift;
 /// enum containing a `Crud(CrudEvent<PromoBundleGift>)` variant.
 pub type PromoBundleGiftEvent = CrudEvent<PromoBundleGift>;
 
-// <<< CUSTOM
-// END CUSTOM
 
 use backbone_messaging::{CrudEventPublisher, NoOpCrudEventPublisher};
 use std::sync::Arc;

@@ -188,3 +188,4 @@ pub fn create_protected_loyalty_point_entry_routes<A: AuthMiddleware + Send + Sy
             }
         }))
 }
+

@@ -18,9 +18,5 @@ pub fn promo_bundle_validator() -> PromoBundleValidator {
         .rule(RequiredString::new("title", |e: &PromoBundle| &e.title))
         .rule(NonNegative::new("priority", |e: &PromoBundle| e.priority as i64))
         .rule(RequiredString::new("currency", |e: &PromoBundle| &e.currency))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

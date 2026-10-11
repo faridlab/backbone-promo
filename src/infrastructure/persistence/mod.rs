@@ -15,8 +15,6 @@ mod promo_bundle_component_repository;
 mod promo_bundle_gift_repository;
 
 // Custom persistence modules
-// <<< CUSTOM
-// END CUSTOM
 
 // Re-exports
 pub use coupon_code_repository::CouponCodeRepository;
@@ -37,8 +35,6 @@ pub use backbone_orm::repository::{
 };
 
 // Re-export custom persistence types
-// <<< CUSTOM
-// END CUSTOM
 
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");

@@ -18,9 +18,5 @@ pub fn coupon_code_validator() -> CouponCodeValidator {
         .rule(RequiredString::new("code", |e: &CouponCode| &e.code))
         .rule(OptionalNotBlank::new("description", |e: &CouponCode| e.description.as_deref()))
         .rule(NonNegative::new("used_count", |e: &CouponCode| e.used_count as i64))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

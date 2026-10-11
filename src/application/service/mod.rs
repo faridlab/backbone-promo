@@ -17,8 +17,6 @@ pub mod promo_bundle_service;
 pub mod promo_bundle_component_service;
 pub mod promo_bundle_gift_service;
 
-// <<< CUSTOM
-// END CUSTOM
 
 pub use coupon_code_service::CouponCodeService;
 pub use coupon_redemption_service::CouponRedemptionService;
@@ -29,8 +27,6 @@ pub use pricing_rule_service::PricingRuleService;
 pub use promo_bundle_service::PromoBundleService;
 pub use promo_bundle_component_service::PromoBundleComponentService;
 pub use promo_bundle_gift_service::PromoBundleGiftService;
-// <<< CUSTOM
-// END CUSTOM
 
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");

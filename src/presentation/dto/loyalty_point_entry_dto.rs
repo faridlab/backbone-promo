@@ -330,7 +330,7 @@ impl backbone_core::ApplyUpdateDto<UpdateLoyaltyPointEntryDto> for LoyaltyPointE
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to LoyaltyPointEntry here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+

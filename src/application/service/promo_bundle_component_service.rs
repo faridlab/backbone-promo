@@ -32,5 +32,3 @@ pub type PromoBundleComponentService = GenericCrudService<
     PromoBundleComponentRepository,
 >;
 
-// <<< CUSTOM
-// END CUSTOM

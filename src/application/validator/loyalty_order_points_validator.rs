@@ -16,9 +16,5 @@ pub type LoyaltyOrderPointsValidator = EntityValidator<LoyaltyOrderPoints>;
 pub fn loyalty_order_points_validator() -> LoyaltyOrderPointsValidator {
     EntityValidator::new()
         .rule(RequiredString::new("order_ref_type", |e: &LoyaltyOrderPoints| &e.order_ref_type))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

@@ -18,9 +18,5 @@ pub fn pricing_rule_validator() -> PricingRuleValidator {
         .rule(RequiredString::new("title", |e: &PricingRule| &e.title))
         .rule(NonNegative::new("priority", |e: &PricingRule| e.priority as i64))
         .rule(RequiredString::new("currency", |e: &PricingRule| &e.currency))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

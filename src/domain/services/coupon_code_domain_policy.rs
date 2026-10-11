@@ -18,5 +18,3 @@ use crate::domain::entity::CouponCode;
 /// service. `PermitAllPolicy` is the safe default until then.
 pub type CouponCodeDomainPolicy = PermitAllPolicy<CouponCode>;
 
-// <<< CUSTOM
-// END CUSTOM

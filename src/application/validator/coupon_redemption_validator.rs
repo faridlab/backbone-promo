@@ -16,9 +16,5 @@ pub type CouponRedemptionValidator = EntityValidator<CouponRedemption>;
 pub fn coupon_redemption_validator() -> CouponRedemptionValidator {
     EntityValidator::new()
         .rule(RequiredString::new("source_type", |e: &CouponRedemption| &e.source_type))
-    // <<< CUSTOM RULES
-    // END CUSTOM RULES
 }
 
-// <<< CUSTOM
-// END CUSTOM

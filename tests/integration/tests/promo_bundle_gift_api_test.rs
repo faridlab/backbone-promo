@@ -110,6 +110,4 @@ mod tests {
 // CUSTOM TESTS
 // ============================================================================
 
-// <<< CUSTOM TESTS START >>>
 // Add PromoBundleGift specific tests here
-// <<< CUSTOM TESTS END >>>

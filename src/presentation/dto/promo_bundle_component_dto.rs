@@ -280,7 +280,7 @@ impl backbone_core::ApplyUpdateDto<UpdatePromoBundleComponentDto> for PromoBundl
 // Custom DTOs
 // =============================================================================
 
-// <<< CUSTOM DTOs
 // Add custom DTOs specific to PromoBundleComponent here.
 // This section will be preserved during regeneration.
 // >>> END CUSTOM DTOs
+
