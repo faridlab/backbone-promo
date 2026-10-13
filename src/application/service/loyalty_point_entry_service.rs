@@ -32,3 +32,57 @@ pub type LoyaltyPointEntryService = GenericCrudService<
     LoyaltyPointEntryRepository,
 >;
 
+/// The rules the schema declares for LoyaltyPointEntry, checked against the row a create or update
+/// would store. The generated build attaches it to [`LoyaltyPointEntryService`]. A refusing rule's
+/// break answers 422; a rule in shadow is logged under `backbone::write_guard` and the
+/// write goes ahead.
+pub struct LoyaltyPointEntryRowRules;
+
+#[async_trait::async_trait]
+impl backbone_core::write_guard::WriteGuard<LoyaltyPointEntry> for LoyaltyPointEntryRowRules {
+    async fn check(
+        &self,
+        ctx: &backbone_core::write_guard::WriteCtx<'_, LoyaltyPointEntry>,
+    ) -> backbone_core::write_guard::GuardOutcome {
+        use backbone_core::row_rule as r;
+        use backbone_core::violation::Violation;
+        use backbone_core::write_guard::{GuardOutcome, WriteKind};
+        let (create, update) = (ctx.kind == WriteKind::Create, ctx.kind == WriteKind::Update);
+        let Some(after) = ctx.after.filter(|_| create || update) else {
+            return GuardOutcome::allow();
+        };
+        let Ok(row) = serde_json::to_value(after) else {
+            return GuardOutcome::allow();
+        };
+        let row = &row;
+        let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
+        let mut shadow = Vec::new();
+        let mut refuse = Vec::new();
+        // `loyalty_program_id_required` (@required on LoyaltyPointEntry.loyalty_program_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["loyalty_program_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "loyalty_program_id")), r::not(r::is_empty(r::trim(r::field(row, "loyalty_program_id")))))) {
+            refuse.push(Violation::new("loyalty_program_id", "required", "loyalty_program_id is required"));
+        }
+        // `customer_id_required` (@required on LoyaltyPointEntry.customer_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["customer_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "customer_id")), r::not(r::is_empty(r::trim(r::field(row, "customer_id")))))) {
+            refuse.push(Violation::new("customer_id", "required", "customer_id is required"));
+        }
+        // `purchase_amount_non_negative` (@non_negative on LoyaltyPointEntry.purchase_amount)
+        if (create || (update && r::changed(old.as_ref(), row, &["purchase_amount"]))) && !r::holds(&r::ge(r::field(row, "purchase_amount"), r::Val::Num(0.0_f64))) {
+            shadow.push(Violation::new("purchase_amount", "non_negative", "purchase_amount must not be negative"));
+        }
+        // `source_type_required` (@required on LoyaltyPointEntry.source_type)
+        if (create || (update && r::changed(old.as_ref(), row, &["source_type"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "source_type")), r::not(r::is_empty(r::trim(r::field(row, "source_type")))))) {
+            refuse.push(Violation::new("source_type", "required", "source_type is required"));
+        }
+        // `source_type_max_length` (@max(40) on LoyaltyPointEntry.source_type)
+        if (create || (update && r::changed(old.as_ref(), row, &["source_type"]))) && !r::holds(&r::le(r::length(r::field(row, "source_type")), r::Val::Num(40.0_f64))) {
+            shadow.push(Violation::new("source_type", "max_length", "source_type must be at most 40 characters").with_param("max", 40_i64));
+        }
+        // `source_id_required` (@required on LoyaltyPointEntry.source_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["source_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "source_id")), r::not(r::is_empty(r::trim(r::field(row, "source_id")))))) {
+            refuse.push(Violation::new("source_id", "required", "source_id is required"));
+        }
+        GuardOutcome { refuse, shadow }
+    }
+}
+

@@ -32,3 +32,45 @@ pub type PromoBundleGiftService = GenericCrudService<
     PromoBundleGiftRepository,
 >;
 
+/// The rules the schema declares for PromoBundleGift, checked against the row a create or update
+/// would store. The generated build attaches it to [`PromoBundleGiftService`]. A refusing rule's
+/// break answers 422; a rule in shadow is logged under `backbone::write_guard` and the
+/// write goes ahead.
+pub struct PromoBundleGiftRowRules;
+
+#[async_trait::async_trait]
+impl backbone_core::write_guard::WriteGuard<PromoBundleGift> for PromoBundleGiftRowRules {
+    async fn check(
+        &self,
+        ctx: &backbone_core::write_guard::WriteCtx<'_, PromoBundleGift>,
+    ) -> backbone_core::write_guard::GuardOutcome {
+        use backbone_core::row_rule as r;
+        use backbone_core::violation::Violation;
+        use backbone_core::write_guard::{GuardOutcome, WriteKind};
+        let (create, update) = (ctx.kind == WriteKind::Create, ctx.kind == WriteKind::Update);
+        let Some(after) = ctx.after.filter(|_| create || update) else {
+            return GuardOutcome::allow();
+        };
+        let Ok(row) = serde_json::to_value(after) else {
+            return GuardOutcome::allow();
+        };
+        let row = &row;
+        let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
+        let mut shadow = Vec::new();
+        let mut refuse = Vec::new();
+        // `bundle_id_required` (@required on PromoBundleGift.bundle_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["bundle_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "bundle_id")), r::not(r::is_empty(r::trim(r::field(row, "bundle_id")))))) {
+            refuse.push(Violation::new("bundle_id", "required", "bundle_id is required"));
+        }
+        // `gift_item_id_required` (@required on PromoBundleGift.gift_item_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["gift_item_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "gift_item_id")), r::not(r::is_empty(r::trim(r::field(row, "gift_item_id")))))) {
+            refuse.push(Violation::new("gift_item_id", "required", "gift_item_id is required"));
+        }
+        // `gift_qty_non_negative` (@non_negative on PromoBundleGift.gift_qty)
+        if (create || (update && r::changed(old.as_ref(), row, &["gift_qty"]))) && !r::holds(&r::ge(r::field(row, "gift_qty"), r::Val::Num(0.0_f64))) {
+            shadow.push(Violation::new("gift_qty", "non_negative", "gift_qty must not be negative"));
+        }
+        GuardOutcome { refuse, shadow }
+    }
+}
+

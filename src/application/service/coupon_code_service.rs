@@ -32,3 +32,57 @@ pub type CouponCodeService = GenericCrudService<
     CouponCodeRepository,
 >;
 
+/// The rules the schema declares for CouponCode, checked against the row a create or update
+/// would store. The generated build attaches it to [`CouponCodeService`]. A refusing rule's
+/// break answers 422; a rule in shadow is logged under `backbone::write_guard` and the
+/// write goes ahead.
+pub struct CouponCodeRowRules;
+
+#[async_trait::async_trait]
+impl backbone_core::write_guard::WriteGuard<CouponCode> for CouponCodeRowRules {
+    async fn check(
+        &self,
+        ctx: &backbone_core::write_guard::WriteCtx<'_, CouponCode>,
+    ) -> backbone_core::write_guard::GuardOutcome {
+        use backbone_core::row_rule as r;
+        use backbone_core::violation::Violation;
+        use backbone_core::write_guard::{GuardOutcome, WriteKind};
+        let (create, update) = (ctx.kind == WriteKind::Create, ctx.kind == WriteKind::Update);
+        let Some(after) = ctx.after.filter(|_| create || update) else {
+            return GuardOutcome::allow();
+        };
+        let Ok(row) = serde_json::to_value(after) else {
+            return GuardOutcome::allow();
+        };
+        let row = &row;
+        let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
+        let mut shadow = Vec::new();
+        let mut refuse = Vec::new();
+        // `code_required` (@required on CouponCode.code)
+        if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "code")), r::not(r::is_empty(r::trim(r::field(row, "code")))))) {
+            refuse.push(Violation::new("code", "required", "code is required"));
+        }
+        // `code_max_length` (@max(40) on CouponCode.code)
+        if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::le(r::length(r::field(row, "code")), r::Val::Num(40.0_f64))) {
+            shadow.push(Violation::new("code", "max_length", "code must be at most 40 characters").with_param("max", 40_i64));
+        }
+        // `pricing_rule_id_required` (@required on CouponCode.pricing_rule_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["pricing_rule_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "pricing_rule_id")), r::not(r::is_empty(r::trim(r::field(row, "pricing_rule_id")))))) {
+            refuse.push(Violation::new("pricing_rule_id", "required", "pricing_rule_id is required"));
+        }
+        // `description_max_length` (@max(280) on CouponCode.description)
+        if (create || (update && r::changed(old.as_ref(), row, &["description"]))) && !r::holds(&r::le(r::length(r::field(row, "description")), r::Val::Num(280.0_f64))) {
+            shadow.push(Violation::new("description", "max_length", "description must be at most 280 characters").with_param("max", 280_i64));
+        }
+        // `max_use_positive` (@positive on CouponCode.max_use)
+        if (create || (update && r::changed(old.as_ref(), row, &["max_use"]))) && !r::holds(&r::gt(r::field(row, "max_use"), r::Val::Num(0.0_f64))) {
+            shadow.push(Violation::new("max_use", "positive", "max_use must be positive"));
+        }
+        // `used_count_non_negative` (@non_negative on CouponCode.used_count)
+        if (create || (update && r::changed(old.as_ref(), row, &["used_count"]))) && !r::holds(&r::ge(r::field(row, "used_count"), r::Val::Num(0.0_f64))) {
+            shadow.push(Violation::new("used_count", "non_negative", "used_count must not be negative"));
+        }
+        GuardOutcome { refuse, shadow }
+    }
+}
+

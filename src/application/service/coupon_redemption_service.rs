@@ -32,3 +32,53 @@ pub type CouponRedemptionService = GenericCrudService<
     CouponRedemptionRepository,
 >;
 
+/// The rules the schema declares for CouponRedemption, checked against the row a create or update
+/// would store. The generated build attaches it to [`CouponRedemptionService`]. A refusing rule's
+/// break answers 422; a rule in shadow is logged under `backbone::write_guard` and the
+/// write goes ahead.
+pub struct CouponRedemptionRowRules;
+
+#[async_trait::async_trait]
+impl backbone_core::write_guard::WriteGuard<CouponRedemption> for CouponRedemptionRowRules {
+    async fn check(
+        &self,
+        ctx: &backbone_core::write_guard::WriteCtx<'_, CouponRedemption>,
+    ) -> backbone_core::write_guard::GuardOutcome {
+        use backbone_core::row_rule as r;
+        use backbone_core::violation::Violation;
+        use backbone_core::write_guard::{GuardOutcome, WriteKind};
+        let (create, update) = (ctx.kind == WriteKind::Create, ctx.kind == WriteKind::Update);
+        let Some(after) = ctx.after.filter(|_| create || update) else {
+            return GuardOutcome::allow();
+        };
+        let Ok(row) = serde_json::to_value(after) else {
+            return GuardOutcome::allow();
+        };
+        let row = &row;
+        let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
+        let mut shadow = Vec::new();
+        let mut refuse = Vec::new();
+        // `coupon_id_required` (@required on CouponRedemption.coupon_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["coupon_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "coupon_id")), r::not(r::is_empty(r::trim(r::field(row, "coupon_id")))))) {
+            refuse.push(Violation::new("coupon_id", "required", "coupon_id is required"));
+        }
+        // `pricing_rule_id_required` (@required on CouponRedemption.pricing_rule_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["pricing_rule_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "pricing_rule_id")), r::not(r::is_empty(r::trim(r::field(row, "pricing_rule_id")))))) {
+            refuse.push(Violation::new("pricing_rule_id", "required", "pricing_rule_id is required"));
+        }
+        // `source_type_required` (@required on CouponRedemption.source_type)
+        if (create || (update && r::changed(old.as_ref(), row, &["source_type"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "source_type")), r::not(r::is_empty(r::trim(r::field(row, "source_type")))))) {
+            refuse.push(Violation::new("source_type", "required", "source_type is required"));
+        }
+        // `source_type_max_length` (@max(40) on CouponRedemption.source_type)
+        if (create || (update && r::changed(old.as_ref(), row, &["source_type"]))) && !r::holds(&r::le(r::length(r::field(row, "source_type")), r::Val::Num(40.0_f64))) {
+            shadow.push(Violation::new("source_type", "max_length", "source_type must be at most 40 characters").with_param("max", 40_i64));
+        }
+        // `source_id_required` (@required on CouponRedemption.source_id)
+        if (create || (update && r::changed(old.as_ref(), row, &["source_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "source_id")), r::not(r::is_empty(r::trim(r::field(row, "source_id")))))) {
+            refuse.push(Violation::new("source_id", "required", "source_id is required"));
+        }
+        GuardOutcome { refuse, shadow }
+    }
+}
+

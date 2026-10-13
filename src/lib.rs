@@ -190,39 +190,39 @@ impl PromoModuleBuilder {
 
         // CouponCode service
         let coupon_code_repository = Arc::new(CouponCodeRepository::new(db_pool.clone()));
-        let coupon_code_service = Arc::new(CouponCodeService::with_repository(coupon_code_repository.clone()));
+        let coupon_code_service = Arc::new(CouponCodeService::with_repository(coupon_code_repository.clone()).with_guard(Arc::new(crate::application::service::CouponCodeRowRules)));
 
         // CouponRedemption service
         let coupon_redemption_repository = Arc::new(CouponRedemptionRepository::new(db_pool.clone()));
-        let coupon_redemption_service = Arc::new(CouponRedemptionService::with_repository(coupon_redemption_repository.clone()));
+        let coupon_redemption_service = Arc::new(CouponRedemptionService::with_repository(coupon_redemption_repository.clone()).with_guard(Arc::new(crate::application::service::CouponRedemptionRowRules)));
 
         // LoyaltyOrderPoints service
         let loyalty_order_points_repository = Arc::new(LoyaltyOrderPointsRepository::new(db_pool.clone()));
-        let loyalty_order_points_service = Arc::new(LoyaltyOrderPointsService::with_repository(loyalty_order_points_repository.clone()));
+        let loyalty_order_points_service = Arc::new(LoyaltyOrderPointsService::with_repository(loyalty_order_points_repository.clone()).with_guard(Arc::new(crate::application::service::LoyaltyOrderPointsRowRules)));
 
         // LoyaltyProgram service
         let loyalty_program_repository = Arc::new(LoyaltyProgramRepository::new(db_pool.clone()));
-        let loyalty_program_service = Arc::new(LoyaltyProgramService::with_repository(loyalty_program_repository.clone()));
+        let loyalty_program_service = Arc::new(LoyaltyProgramService::with_repository(loyalty_program_repository.clone()).with_guard(Arc::new(crate::application::service::LoyaltyProgramRowRules)));
 
         // LoyaltyPointEntry service
         let loyalty_point_entry_repository = Arc::new(LoyaltyPointEntryRepository::new(db_pool.clone()));
-        let loyalty_point_entry_service = Arc::new(LoyaltyPointEntryService::with_repository(loyalty_point_entry_repository.clone()));
+        let loyalty_point_entry_service = Arc::new(LoyaltyPointEntryService::with_repository(loyalty_point_entry_repository.clone()).with_guard(Arc::new(crate::application::service::LoyaltyPointEntryRowRules)));
 
         // PricingRule service
         let pricing_rule_repository = Arc::new(PricingRuleRepository::new(db_pool.clone()));
-        let pricing_rule_service = Arc::new(PricingRuleService::with_repository(pricing_rule_repository.clone()));
+        let pricing_rule_service = Arc::new(PricingRuleService::with_repository(pricing_rule_repository.clone()).with_guard(Arc::new(crate::application::service::PricingRuleRowRules)));
 
         // PromoBundle service
         let promo_bundle_repository = Arc::new(PromoBundleRepository::new(db_pool.clone()));
-        let promo_bundle_service = Arc::new(PromoBundleService::with_repository(promo_bundle_repository.clone()));
+        let promo_bundle_service = Arc::new(PromoBundleService::with_repository(promo_bundle_repository.clone()).with_guard(Arc::new(crate::application::service::PromoBundleRowRules)));
 
         // PromoBundleComponent service
         let promo_bundle_component_repository = Arc::new(PromoBundleComponentRepository::new(db_pool.clone()));
-        let promo_bundle_component_service = Arc::new(PromoBundleComponentService::with_repository(promo_bundle_component_repository.clone()));
+        let promo_bundle_component_service = Arc::new(PromoBundleComponentService::with_repository(promo_bundle_component_repository.clone()).with_guard(Arc::new(crate::application::service::PromoBundleComponentRowRules)));
 
         // PromoBundleGift service
         let promo_bundle_gift_repository = Arc::new(PromoBundleGiftRepository::new(db_pool.clone()));
-        let promo_bundle_gift_service = Arc::new(PromoBundleGiftService::with_repository(promo_bundle_gift_repository.clone()));
+        let promo_bundle_gift_service = Arc::new(PromoBundleGiftService::with_repository(promo_bundle_gift_repository.clone()).with_guard(Arc::new(crate::application::service::PromoBundleGiftRowRules)));
 
         // <<< CUSTOM
         // END CUSTOM

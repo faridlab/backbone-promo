@@ -27,6 +27,15 @@ pub use pricing_rule_service::PricingRuleService;
 pub use promo_bundle_service::PromoBundleService;
 pub use promo_bundle_component_service::PromoBundleComponentService;
 pub use promo_bundle_gift_service::PromoBundleGiftService;
+pub use coupon_code_service::CouponCodeRowRules;
+pub use coupon_redemption_service::CouponRedemptionRowRules;
+pub use loyalty_order_points_service::LoyaltyOrderPointsRowRules;
+pub use loyalty_program_service::LoyaltyProgramRowRules;
+pub use loyalty_point_entry_service::LoyaltyPointEntryRowRules;
+pub use pricing_rule_service::PricingRuleRowRules;
+pub use promo_bundle_service::PromoBundleRowRules;
+pub use promo_bundle_component_service::PromoBundleComponentRowRules;
+pub use promo_bundle_gift_service::PromoBundleGiftRowRules;
 
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");
