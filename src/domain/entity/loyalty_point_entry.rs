@@ -247,6 +247,9 @@ impl backbone_orm::EntityRepoMeta for LoyaltyPointEntry {
     fn search_fields() -> &'static [&'static str] {
         &["source_type"]
     }
+    fn relations() -> &'static [(&'static str, &'static str, &'static str)] {
+        &[("loyaltyProgram", "loyalty_programs", "loyaltyProgramId")]
+    }
 }
 
 /// Builder for LoyaltyPointEntry entity

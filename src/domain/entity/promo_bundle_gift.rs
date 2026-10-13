@@ -201,6 +201,9 @@ impl backbone_orm::EntityRepoMeta for PromoBundleGift {
     fn search_fields() -> &'static [&'static str] {
         &[]
     }
+    fn relations() -> &'static [(&'static str, &'static str, &'static str)] {
+        &[("bundle", "promo_bundles", "bundleId")]
+    }
 }
 
 /// Builder for PromoBundleGift entity

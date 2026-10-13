@@ -1,0 +1,9 @@
+-- Down: drop the declared foreign keys for promo module
+ALTER TABLE IF EXISTS promo.promo_bundle_gifts DROP CONSTRAINT IF EXISTS fk_promo_bundle_gifts_bundle_id;
+ALTER TABLE IF EXISTS promo.promo_bundle_components DROP CONSTRAINT IF EXISTS fk_promo_bundle_components_bundle_id;
+ALTER TABLE IF EXISTS promo.loyalty_point_entries DROP CONSTRAINT IF EXISTS fk_loyalty_point_entries_loyalty_program_id;
+ALTER TABLE IF EXISTS promo.loyalty_order_points DROP CONSTRAINT IF EXISTS fk_loyalty_order_points_coupon_code_id;
+ALTER TABLE IF EXISTS promo.loyalty_order_points DROP CONSTRAINT IF EXISTS fk_loyalty_order_points_loyalty_program_id;
+ALTER TABLE IF EXISTS promo.coupon_redemptions DROP CONSTRAINT IF EXISTS fk_coupon_redemptions_pricing_rule_id;
+ALTER TABLE IF EXISTS promo.coupon_redemptions DROP CONSTRAINT IF EXISTS fk_coupon_redemptions_coupon_id;
+ALTER TABLE IF EXISTS promo.coupon_codes DROP CONSTRAINT IF EXISTS fk_coupon_codes_pricing_rule_id;

@@ -272,6 +272,9 @@ impl backbone_orm::EntityRepoMeta for LoyaltyOrderPoints {
     fn search_fields() -> &'static [&'static str] {
         &["order_ref_type"]
     }
+    fn relations() -> &'static [(&'static str, &'static str, &'static str)] {
+        &[("loyaltyProgram", "loyalty_programs", "loyaltyProgramId"), ("couponCode", "coupon_codes", "couponCodeId")]
+    }
 }
 
 /// Builder for LoyaltyOrderPoints entity
