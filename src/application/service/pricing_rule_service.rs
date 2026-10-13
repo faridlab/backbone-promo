@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<PricingRule> for PricingRuleRowRules
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `title_required` (@required on PricingRule.title)
         if (create || (update && r::changed(old.as_ref(), row, &["title"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "title")), r::not(r::is_empty(r::trim(r::field(row, "title")))))) {
@@ -64,51 +64,51 @@ impl backbone_core::write_guard::WriteGuard<PricingRule> for PricingRuleRowRules
         }
         // `title_max_length` (@max(140) on PricingRule.title)
         if (create || (update && r::changed(old.as_ref(), row, &["title"]))) && !r::holds(&r::le(r::length(r::field(row, "title")), r::Val::Num(140.0_f64))) {
-            shadow.push(Violation::new("title", "max_length", "title must be at most 140 characters").with_param("max", 140_i64));
+            refuse.push(Violation::new("title", "max_length", "title must be at most 140 characters").with_param("max", 140_i64));
         }
         // `priority_non_negative` (@non_negative on PricingRule.priority)
         if (create || (update && r::changed(old.as_ref(), row, &["priority"]))) && !r::holds(&r::ge(r::field(row, "priority"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("priority", "non_negative", "priority must not be negative"));
+            refuse.push(Violation::new("priority", "non_negative", "priority must not be negative"));
         }
         // `min_order_amount_non_negative` (@non_negative on PricingRule.min_order_amount)
         if (create || (update && r::changed(old.as_ref(), row, &["min_order_amount"]))) && !r::holds(&r::ge(r::field(row, "min_order_amount"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("min_order_amount", "non_negative", "min_order_amount must not be negative"));
+            refuse.push(Violation::new("min_order_amount", "non_negative", "min_order_amount must not be negative"));
         }
         // `min_order_qty_non_negative` (@non_negative on PricingRule.min_order_qty)
         if (create || (update && r::changed(old.as_ref(), row, &["min_order_qty"]))) && !r::holds(&r::ge(r::field(row, "min_order_qty"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("min_order_qty", "non_negative", "min_order_qty must not be negative"));
+            refuse.push(Violation::new("min_order_qty", "non_negative", "min_order_qty must not be negative"));
         }
         // `min_qty_non_negative` (@non_negative on PricingRule.min_qty)
         if (create || (update && r::changed(old.as_ref(), row, &["min_qty"]))) && !r::holds(&r::ge(r::field(row, "min_qty"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("min_qty", "non_negative", "min_qty must not be negative"));
+            refuse.push(Violation::new("min_qty", "non_negative", "min_qty must not be negative"));
         }
         // `max_qty_non_negative` (@non_negative on PricingRule.max_qty)
         if (create || (update && r::changed(old.as_ref(), row, &["max_qty"]))) && !r::holds(&r::ge(r::field(row, "max_qty"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("max_qty", "non_negative", "max_qty must not be negative"));
+            refuse.push(Violation::new("max_qty", "non_negative", "max_qty must not be negative"));
         }
         // `min_amount_non_negative` (@non_negative on PricingRule.min_amount)
         if (create || (update && r::changed(old.as_ref(), row, &["min_amount"]))) && !r::holds(&r::ge(r::field(row, "min_amount"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("min_amount", "non_negative", "min_amount must not be negative"));
+            refuse.push(Violation::new("min_amount", "non_negative", "min_amount must not be negative"));
         }
         // `rate_non_negative` (@non_negative on PricingRule.rate)
         if (create || (update && r::changed(old.as_ref(), row, &["rate"]))) && !r::holds(&r::ge(r::field(row, "rate"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("rate", "non_negative", "rate must not be negative"));
+            refuse.push(Violation::new("rate", "non_negative", "rate must not be negative"));
         }
         // `discount_percentage_non_negative` (@non_negative on PricingRule.discount_percentage)
         if (create || (update && r::changed(old.as_ref(), row, &["discount_percentage"]))) && !r::holds(&r::ge(r::field(row, "discount_percentage"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("discount_percentage", "non_negative", "discount_percentage must not be negative"));
+            refuse.push(Violation::new("discount_percentage", "non_negative", "discount_percentage must not be negative"));
         }
         // `discount_amount_non_negative` (@non_negative on PricingRule.discount_amount)
         if (create || (update && r::changed(old.as_ref(), row, &["discount_amount"]))) && !r::holds(&r::ge(r::field(row, "discount_amount"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("discount_amount", "non_negative", "discount_amount must not be negative"));
+            refuse.push(Violation::new("discount_amount", "non_negative", "discount_amount must not be negative"));
         }
         // `discount_upto_non_negative` (@non_negative on PricingRule.discount_upto)
         if (create || (update && r::changed(old.as_ref(), row, &["discount_upto"]))) && !r::holds(&r::ge(r::field(row, "discount_upto"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("discount_upto", "non_negative", "discount_upto must not be negative"));
+            refuse.push(Violation::new("discount_upto", "non_negative", "discount_upto must not be negative"));
         }
         // `currency_length` (@length(3) on PricingRule.currency)
         if (create || (update && r::changed(old.as_ref(), row, &["currency"]))) && !r::holds(&r::eq(r::length(r::field(row, "currency")), r::Val::Num(3.0_f64))) {
-            shadow.push(Violation::new("currency", "length", "currency must be exactly 3 characters").with_param("length", 3_i64));
+            refuse.push(Violation::new("currency", "length", "currency must be exactly 3 characters").with_param("length", 3_i64));
         }
         GuardOutcome { refuse, shadow }
     }

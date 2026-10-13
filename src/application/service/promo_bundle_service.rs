@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<PromoBundle> for PromoBundleRowRules
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `title_required` (@required on PromoBundle.title)
         if (create || (update && r::changed(old.as_ref(), row, &["title"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "title")), r::not(r::is_empty(r::trim(r::field(row, "title")))))) {
@@ -64,35 +64,35 @@ impl backbone_core::write_guard::WriteGuard<PromoBundle> for PromoBundleRowRules
         }
         // `title_max_length` (@max(140) on PromoBundle.title)
         if (create || (update && r::changed(old.as_ref(), row, &["title"]))) && !r::holds(&r::le(r::length(r::field(row, "title")), r::Val::Num(140.0_f64))) {
-            shadow.push(Violation::new("title", "max_length", "title must be at most 140 characters").with_param("max", 140_i64));
+            refuse.push(Violation::new("title", "max_length", "title must be at most 140 characters").with_param("max", 140_i64));
         }
         // `priority_non_negative` (@non_negative on PromoBundle.priority)
         if (create || (update && r::changed(old.as_ref(), row, &["priority"]))) && !r::holds(&r::ge(r::field(row, "priority"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("priority", "non_negative", "priority must not be negative"));
+            refuse.push(Violation::new("priority", "non_negative", "priority must not be negative"));
         }
         // `required_distinct_positive` (@positive on PromoBundle.required_distinct)
         if (create || (update && r::changed(old.as_ref(), row, &["required_distinct"]))) && !r::holds(&r::gt(r::field(row, "required_distinct"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("required_distinct", "positive", "required_distinct must be positive"));
+            refuse.push(Violation::new("required_distinct", "positive", "required_distinct must be positive"));
         }
         // `discount_percentage_non_negative` (@non_negative on PromoBundle.discount_percentage)
         if (create || (update && r::changed(old.as_ref(), row, &["discount_percentage"]))) && !r::holds(&r::ge(r::field(row, "discount_percentage"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("discount_percentage", "non_negative", "discount_percentage must not be negative"));
+            refuse.push(Violation::new("discount_percentage", "non_negative", "discount_percentage must not be negative"));
         }
         // `discount_amount_non_negative` (@non_negative on PromoBundle.discount_amount)
         if (create || (update && r::changed(old.as_ref(), row, &["discount_amount"]))) && !r::holds(&r::ge(r::field(row, "discount_amount"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("discount_amount", "non_negative", "discount_amount must not be negative"));
+            refuse.push(Violation::new("discount_amount", "non_negative", "discount_amount must not be negative"));
         }
         // `reward_qty_non_negative` (@non_negative on PromoBundle.reward_qty)
         if (create || (update && r::changed(old.as_ref(), row, &["reward_qty"]))) && !r::holds(&r::ge(r::field(row, "reward_qty"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("reward_qty", "non_negative", "reward_qty must not be negative"));
+            refuse.push(Violation::new("reward_qty", "non_negative", "reward_qty must not be negative"));
         }
         // `currency_length` (@length(3) on PromoBundle.currency)
         if (create || (update && r::changed(old.as_ref(), row, &["currency"]))) && !r::holds(&r::eq(r::length(r::field(row, "currency")), r::Val::Num(3.0_f64))) {
-            shadow.push(Violation::new("currency", "length", "currency must be exactly 3 characters").with_param("length", 3_i64));
+            refuse.push(Violation::new("currency", "length", "currency must be exactly 3 characters").with_param("length", 3_i64));
         }
         // `min_order_amount_non_negative` (@non_negative on PromoBundle.min_order_amount)
         if (create || (update && r::changed(old.as_ref(), row, &["min_order_amount"]))) && !r::holds(&r::ge(r::field(row, "min_order_amount"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("min_order_amount", "non_negative", "min_order_amount must not be negative"));
+            refuse.push(Violation::new("min_order_amount", "non_negative", "min_order_amount must not be negative"));
         }
         GuardOutcome { refuse, shadow }
     }

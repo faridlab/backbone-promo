@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<LoyaltyOrderPoints> for LoyaltyOrder
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `loyalty_program_id_required` (@required on LoyaltyOrderPoints.loyalty_program_id)
         if (create || (update && r::changed(old.as_ref(), row, &["loyalty_program_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "loyalty_program_id")), r::not(r::is_empty(r::trim(r::field(row, "loyalty_program_id")))))) {
@@ -72,7 +72,7 @@ impl backbone_core::write_guard::WriteGuard<LoyaltyOrderPoints> for LoyaltyOrder
         }
         // `order_ref_type_max_length` (@max(40) on LoyaltyOrderPoints.order_ref_type)
         if (create || (update && r::changed(old.as_ref(), row, &["order_ref_type"]))) && !r::holds(&r::le(r::length(r::field(row, "order_ref_type")), r::Val::Num(40.0_f64))) {
-            shadow.push(Violation::new("order_ref_type", "max_length", "order_ref_type must be at most 40 characters").with_param("max", 40_i64));
+            refuse.push(Violation::new("order_ref_type", "max_length", "order_ref_type must be at most 40 characters").with_param("max", 40_i64));
         }
         // `order_ref_id_required` (@required on LoyaltyOrderPoints.order_ref_id)
         if (create || (update && r::changed(old.as_ref(), row, &["order_ref_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "order_ref_id")), r::not(r::is_empty(r::trim(r::field(row, "order_ref_id")))))) {
@@ -80,23 +80,23 @@ impl backbone_core::write_guard::WriteGuard<LoyaltyOrderPoints> for LoyaltyOrder
         }
         // `grant_base_amount_non_negative` (@non_negative on LoyaltyOrderPoints.grant_base_amount)
         if (create || (update && r::changed(old.as_ref(), row, &["grant_base_amount"]))) && !r::holds(&r::ge(r::field(row, "grant_base_amount"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("grant_base_amount", "non_negative", "grant_base_amount must not be negative"));
+            refuse.push(Violation::new("grant_base_amount", "non_negative", "grant_base_amount must not be negative"));
         }
         // `granted_points_non_negative` (@non_negative on LoyaltyOrderPoints.granted_points)
         if (create || (update && r::changed(old.as_ref(), row, &["granted_points"]))) && !r::holds(&r::ge(r::field(row, "granted_points"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("granted_points", "non_negative", "granted_points must not be negative"));
+            refuse.push(Violation::new("granted_points", "non_negative", "granted_points must not be negative"));
         }
         // `spent_points_non_negative` (@non_negative on LoyaltyOrderPoints.spent_points)
         if (create || (update && r::changed(old.as_ref(), row, &["spent_points"]))) && !r::holds(&r::ge(r::field(row, "spent_points"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("spent_points", "non_negative", "spent_points must not be negative"));
+            refuse.push(Violation::new("spent_points", "non_negative", "spent_points must not be negative"));
         }
         // `granted_reversed_points_non_negative` (@non_negative on LoyaltyOrderPoints.granted_reversed_points)
         if (create || (update && r::changed(old.as_ref(), row, &["granted_reversed_points"]))) && !r::holds(&r::ge(r::field(row, "granted_reversed_points"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("granted_reversed_points", "non_negative", "granted_reversed_points must not be negative"));
+            refuse.push(Violation::new("granted_reversed_points", "non_negative", "granted_reversed_points must not be negative"));
         }
         // `spent_reversed_points_non_negative` (@non_negative on LoyaltyOrderPoints.spent_reversed_points)
         if (create || (update && r::changed(old.as_ref(), row, &["spent_reversed_points"]))) && !r::holds(&r::ge(r::field(row, "spent_reversed_points"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("spent_reversed_points", "non_negative", "spent_reversed_points must not be negative"));
+            refuse.push(Violation::new("spent_reversed_points", "non_negative", "spent_reversed_points must not be negative"));
         }
         GuardOutcome { refuse, shadow }
     }

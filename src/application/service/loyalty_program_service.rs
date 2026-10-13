@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<LoyaltyProgram> for LoyaltyProgramRo
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `program_name_required` (@required on LoyaltyProgram.program_name)
         if (create || (update && r::changed(old.as_ref(), row, &["program_name"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "program_name")), r::not(r::is_empty(r::trim(r::field(row, "program_name")))))) {
@@ -64,19 +64,19 @@ impl backbone_core::write_guard::WriteGuard<LoyaltyProgram> for LoyaltyProgramRo
         }
         // `program_name_max_length` (@max(140) on LoyaltyProgram.program_name)
         if (create || (update && r::changed(old.as_ref(), row, &["program_name"]))) && !r::holds(&r::le(r::length(r::field(row, "program_name")), r::Val::Num(140.0_f64))) {
-            shadow.push(Violation::new("program_name", "max_length", "program_name must be at most 140 characters").with_param("max", 140_i64));
+            refuse.push(Violation::new("program_name", "max_length", "program_name must be at most 140 characters").with_param("max", 140_i64));
         }
         // `collection_factor_non_negative` (@non_negative on LoyaltyProgram.collection_factor)
         if (create || (update && r::changed(old.as_ref(), row, &["collection_factor"]))) && !r::holds(&r::ge(r::field(row, "collection_factor"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("collection_factor", "non_negative", "collection_factor must not be negative"));
+            refuse.push(Violation::new("collection_factor", "non_negative", "collection_factor must not be negative"));
         }
         // `conversion_factor_non_negative` (@non_negative on LoyaltyProgram.conversion_factor)
         if (create || (update && r::changed(old.as_ref(), row, &["conversion_factor"]))) && !r::holds(&r::ge(r::field(row, "conversion_factor"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("conversion_factor", "non_negative", "conversion_factor must not be negative"));
+            refuse.push(Violation::new("conversion_factor", "non_negative", "conversion_factor must not be negative"));
         }
         // `expiry_duration_days_positive` (@positive on LoyaltyProgram.expiry_duration_days)
         if (create || (update && r::changed(old.as_ref(), row, &["expiry_duration_days"]))) && !r::holds(&r::gt(r::field(row, "expiry_duration_days"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("expiry_duration_days", "positive", "expiry_duration_days must be positive"));
+            refuse.push(Violation::new("expiry_duration_days", "positive", "expiry_duration_days must be positive"));
         }
         GuardOutcome { refuse, shadow }
     }

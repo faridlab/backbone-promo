@@ -56,7 +56,7 @@ impl backbone_core::write_guard::WriteGuard<CouponCode> for CouponCodeRowRules {
         };
         let row = &row;
         let old = ctx.before.and_then(|b| serde_json::to_value(b).ok());
-        let mut shadow = Vec::new();
+        let shadow = Vec::new();
         let mut refuse = Vec::new();
         // `code_required` (@required on CouponCode.code)
         if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "code")), r::not(r::is_empty(r::trim(r::field(row, "code")))))) {
@@ -64,7 +64,7 @@ impl backbone_core::write_guard::WriteGuard<CouponCode> for CouponCodeRowRules {
         }
         // `code_max_length` (@max(40) on CouponCode.code)
         if (create || (update && r::changed(old.as_ref(), row, &["code"]))) && !r::holds(&r::le(r::length(r::field(row, "code")), r::Val::Num(40.0_f64))) {
-            shadow.push(Violation::new("code", "max_length", "code must be at most 40 characters").with_param("max", 40_i64));
+            refuse.push(Violation::new("code", "max_length", "code must be at most 40 characters").with_param("max", 40_i64));
         }
         // `pricing_rule_id_required` (@required on CouponCode.pricing_rule_id)
         if (create || (update && r::changed(old.as_ref(), row, &["pricing_rule_id"]))) && !r::holds(&r::and(r::is_not_null(r::field(row, "pricing_rule_id")), r::not(r::is_empty(r::trim(r::field(row, "pricing_rule_id")))))) {
@@ -72,15 +72,15 @@ impl backbone_core::write_guard::WriteGuard<CouponCode> for CouponCodeRowRules {
         }
         // `description_max_length` (@max(280) on CouponCode.description)
         if (create || (update && r::changed(old.as_ref(), row, &["description"]))) && !r::holds(&r::le(r::length(r::field(row, "description")), r::Val::Num(280.0_f64))) {
-            shadow.push(Violation::new("description", "max_length", "description must be at most 280 characters").with_param("max", 280_i64));
+            refuse.push(Violation::new("description", "max_length", "description must be at most 280 characters").with_param("max", 280_i64));
         }
         // `max_use_positive` (@positive on CouponCode.max_use)
         if (create || (update && r::changed(old.as_ref(), row, &["max_use"]))) && !r::holds(&r::gt(r::field(row, "max_use"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("max_use", "positive", "max_use must be positive"));
+            refuse.push(Violation::new("max_use", "positive", "max_use must be positive"));
         }
         // `used_count_non_negative` (@non_negative on CouponCode.used_count)
         if (create || (update && r::changed(old.as_ref(), row, &["used_count"]))) && !r::holds(&r::ge(r::field(row, "used_count"), r::Val::Num(0.0_f64))) {
-            shadow.push(Violation::new("used_count", "non_negative", "used_count must not be negative"));
+            refuse.push(Violation::new("used_count", "non_negative", "used_count must not be negative"));
         }
         GuardOutcome { refuse, shadow }
     }
