@@ -37,5 +37,77 @@ pub use promo_bundle_service::PromoBundleRowRules;
 pub use promo_bundle_component_service::PromoBundleComponentRowRules;
 pub use promo_bundle_gift_service::PromoBundleGiftRowRules;
 
+/// A `CouponCodeService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_coupon_code_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::CouponCodeRepository>,
+) -> CouponCodeService {
+    CouponCodeService::with_repository(repository).with_guard(std::sync::Arc::new(CouponCodeRowRules))
+}
+
+/// A `CouponRedemptionService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_coupon_redemption_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::CouponRedemptionRepository>,
+) -> CouponRedemptionService {
+    CouponRedemptionService::with_repository(repository).with_guard(std::sync::Arc::new(CouponRedemptionRowRules))
+}
+
+/// A `LoyaltyOrderPointsService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_loyalty_order_points_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::LoyaltyOrderPointsRepository>,
+) -> LoyaltyOrderPointsService {
+    LoyaltyOrderPointsService::with_repository(repository).with_guard(std::sync::Arc::new(LoyaltyOrderPointsRowRules))
+}
+
+/// A `LoyaltyProgramService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_loyalty_program_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::LoyaltyProgramRepository>,
+) -> LoyaltyProgramService {
+    LoyaltyProgramService::with_repository(repository).with_guard(std::sync::Arc::new(LoyaltyProgramRowRules))
+}
+
+/// A `LoyaltyPointEntryService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_loyalty_point_entry_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::LoyaltyPointEntryRepository>,
+) -> LoyaltyPointEntryService {
+    LoyaltyPointEntryService::with_repository(repository).with_guard(std::sync::Arc::new(LoyaltyPointEntryRowRules))
+}
+
+/// A `PricingRuleService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_pricing_rule_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::PricingRuleRepository>,
+) -> PricingRuleService {
+    PricingRuleService::with_repository(repository).with_guard(std::sync::Arc::new(PricingRuleRowRules))
+}
+
+/// A `PromoBundleService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_promo_bundle_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::PromoBundleRepository>,
+) -> PromoBundleService {
+    PromoBundleService::with_repository(repository).with_guard(std::sync::Arc::new(PromoBundleRowRules))
+}
+
+/// A `PromoBundleComponentService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_promo_bundle_component_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::PromoBundleComponentRepository>,
+) -> PromoBundleComponentService {
+    PromoBundleComponentService::with_repository(repository).with_guard(std::sync::Arc::new(PromoBundleComponentRowRules))
+}
+
+/// A `PromoBundleGiftService` over `repository` with its write guard attached: the way to build it, so its writes are
+/// served only with the rules the schema declares.
+pub fn build_promo_bundle_gift_service(
+    repository: std::sync::Arc<crate::infrastructure::persistence::PromoBundleGiftRepository>,
+) -> PromoBundleGiftService {
+    PromoBundleGiftService::with_repository(repository).with_guard(std::sync::Arc::new(PromoBundleGiftRowRules))
+}
+
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");
