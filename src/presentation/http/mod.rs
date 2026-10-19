@@ -17,15 +17,15 @@ pub mod promo_bundle_gift_handler;
 
 
 // Re-exports
-pub use coupon_code_handler::{create_coupon_code_routes, create_coupon_code_read_routes, create_coupon_code_write_routes};
-pub use coupon_redemption_handler::{create_coupon_redemption_routes, create_coupon_redemption_read_routes, create_coupon_redemption_write_routes};
-pub use loyalty_order_points_handler::{create_loyalty_order_points_routes, create_loyalty_order_points_read_routes, create_loyalty_order_points_write_routes};
-pub use loyalty_program_handler::{create_loyalty_program_routes, create_loyalty_program_read_routes, create_loyalty_program_write_routes};
-pub use loyalty_point_entry_handler::{create_loyalty_point_entry_routes, create_loyalty_point_entry_read_routes, create_loyalty_point_entry_write_routes};
-pub use pricing_rule_handler::{create_pricing_rule_routes, create_pricing_rule_read_routes, create_pricing_rule_write_routes};
-pub use promo_bundle_handler::{create_promo_bundle_routes, create_promo_bundle_read_routes, create_promo_bundle_write_routes};
-pub use promo_bundle_component_handler::{create_promo_bundle_component_routes, create_promo_bundle_component_read_routes, create_promo_bundle_component_write_routes};
-pub use promo_bundle_gift_handler::{create_promo_bundle_gift_routes, create_promo_bundle_gift_read_routes, create_promo_bundle_gift_write_routes};
+pub use coupon_code_handler::{create_coupon_code_routes, create_coupon_code_read_routes, create_coupon_code_write_routes, coupon_code_permissions};
+pub use coupon_redemption_handler::{create_coupon_redemption_routes, create_coupon_redemption_read_routes, create_coupon_redemption_write_routes, coupon_redemption_permissions};
+pub use loyalty_order_points_handler::{create_loyalty_order_points_routes, create_loyalty_order_points_read_routes, create_loyalty_order_points_write_routes, loyalty_order_points_permissions};
+pub use loyalty_program_handler::{create_loyalty_program_routes, create_loyalty_program_read_routes, create_loyalty_program_write_routes, loyalty_program_permissions};
+pub use loyalty_point_entry_handler::{create_loyalty_point_entry_routes, create_loyalty_point_entry_read_routes, create_loyalty_point_entry_write_routes, loyalty_point_entry_permissions};
+pub use pricing_rule_handler::{create_pricing_rule_routes, create_pricing_rule_read_routes, create_pricing_rule_write_routes, pricing_rule_permissions};
+pub use promo_bundle_handler::{create_promo_bundle_routes, create_promo_bundle_read_routes, create_promo_bundle_write_routes, promo_bundle_permissions};
+pub use promo_bundle_component_handler::{create_promo_bundle_component_routes, create_promo_bundle_component_read_routes, create_promo_bundle_component_write_routes, promo_bundle_component_permissions};
+pub use promo_bundle_gift_handler::{create_promo_bundle_gift_routes, create_promo_bundle_gift_read_routes, create_promo_bundle_gift_write_routes, promo_bundle_gift_permissions};
 
 // This directory's extension (hand-written; ADR-0031).
 include!("mod.ext.rs");

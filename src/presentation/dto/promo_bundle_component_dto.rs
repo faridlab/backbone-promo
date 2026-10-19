@@ -33,7 +33,7 @@ pub struct CreatePromoBundleComponentDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "bundle_id")]
     pub bundle_id: Uuid,
-    #[serde(alias = "apply_on")]
+    #[serde(default = "default_create_promo_bundle_component_apply_on", alias = "apply_on")]
     pub apply_on: ApplyOn,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "item_id")]
     pub item_id: Option<Uuid>,
@@ -41,8 +41,16 @@ pub struct CreatePromoBundleComponentDto {
     pub item_group_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "brand_id")]
     pub brand_id: Option<Uuid>,
-    #[serde(alias = "min_qty")]
+    #[serde(default = "default_create_promo_bundle_component_min_qty", alias = "min_qty")]
     pub min_qty: Decimal,
+}
+
+fn default_create_promo_bundle_component_apply_on() -> ApplyOn {
+    ApplyOn::Item
+}
+
+fn default_create_promo_bundle_component_min_qty() -> Decimal {
+    Decimal::from(1_i64)
 }
 
 // =============================================================================
@@ -89,12 +97,12 @@ pub struct PatchPromoBundleComponentDto {
     pub bundle_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "apply_on")]
     pub apply_on: Option<ApplyOn>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "item_id")]
-    pub item_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "item_group_id")]
-    pub item_group_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "brand_id")]
-    pub brand_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "item_id")]
+    pub item_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "item_group_id")]
+    pub item_group_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "brand_id")]
+    pub brand_id: Option<Option<Uuid>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "min_qty")]
     pub min_qty: Option<Decimal>,
 }
@@ -269,12 +277,4 @@ impl backbone_core::ApplyUpdateDto<UpdatePromoBundleComponentDto> for PromoBundl
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to PromoBundleComponent here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

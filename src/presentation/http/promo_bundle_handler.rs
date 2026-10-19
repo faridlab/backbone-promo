@@ -82,6 +82,13 @@ impl axum::response::IntoResponse for PromoBundleError {
 // Route Configuration
 // =============================================================================
 
+/// The permissions this entity's generic routes require: `promo_bundle:<action>` for `read`, `create`,
+/// `update`, `delete`, `restore` and `purge`, with any rename the schema's `requires:` declares.
+pub fn promo_bundle_permissions() -> backbone_core::http::CrudPermissions {
+    backbone_core::http::CrudPermissions::new("promo_bundle")
+        .in_module("promo")
+}
+
 /// Create Axum router with all 16 Backbone endpoints for PromoBundle.
 ///
 /// # Routes
@@ -111,21 +118,23 @@ impl axum::response::IntoResponse for PromoBundleError {
 /// let router = create_promo_bundle_routes(service);
 /// ```
 pub fn create_promo_bundle_routes(service: Arc<PromoBundleService>) -> Router {
-    BackboneCrudHandler::<PromoBundleService, PromoBundle, CreatePromoBundleDto, UpdatePromoBundleDto, PromoBundleResponseDto>::routes(
+    BackboneCrudHandler::<PromoBundleService, PromoBundle, CreatePromoBundleDto, UpdatePromoBundleDto, PromoBundleResponseDto>::routes_guarded(
         service,
         "/promo_bundles",
+        promo_bundle_permissions(),
     )
 }
 
 /// Create Axum router with only the read (GET) endpoints for PromoBundle.
 ///
-/// Safe for public, unauthenticated exposure (e.g., reference data).
+/// Each route requires the entity's `read` permission, so it needs an authenticated caller.
 /// Mutations must be served separately via `create_promo_bundle_write_routes`,
 /// typically wrapped in an auth middleware layer.
 pub fn create_promo_bundle_read_routes(service: Arc<PromoBundleService>) -> Router {
-    BackboneCrudHandler::<PromoBundleService, PromoBundle, CreatePromoBundleDto, UpdatePromoBundleDto, PromoBundleResponseDto>::read_routes(
+    BackboneCrudHandler::<PromoBundleService, PromoBundle, CreatePromoBundleDto, UpdatePromoBundleDto, PromoBundleResponseDto>::read_routes_guarded(
         service,
         "/promo_bundles",
+        promo_bundle_permissions(),
     )
 }
 
@@ -141,9 +150,10 @@ pub fn create_promo_bundle_read_routes(service: Arc<PromoBundleService>) -> Rout
 /// service (e.g. a command router over its domain engine), serve THAT instead
 /// for any mutation that must respect domain rules.
 pub fn create_promo_bundle_write_routes(service: Arc<PromoBundleService>) -> Router {
-    BackboneCrudHandler::<PromoBundleService, PromoBundle, CreatePromoBundleDto, UpdatePromoBundleDto, PromoBundleResponseDto>::write_routes(
+    BackboneCrudHandler::<PromoBundleService, PromoBundle, CreatePromoBundleDto, UpdatePromoBundleDto, PromoBundleResponseDto>::write_routes_guarded(
         service,
         "/promo_bundles",
+        promo_bundle_permissions(),
     )
 }
 

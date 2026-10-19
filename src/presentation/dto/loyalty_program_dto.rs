@@ -34,7 +34,7 @@ pub struct CreateLoyaltyProgramDto {
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(alias = "program_name")]
     pub program_name: String,
-    #[serde(alias = "program_type")]
+    #[serde(default = "default_create_loyalty_program_program_type", alias = "program_type")]
     pub program_type: LoyaltyProgramType,
     #[serde(alias = "collection_factor")]
     pub collection_factor: Decimal,
@@ -47,7 +47,16 @@ pub struct CreateLoyaltyProgramDto {
     pub from_date: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "to_date")]
     pub to_date: Option<DateTime<Utc>>,
+    #[serde(default = "default_create_loyalty_program_status")]
     pub status: LoyaltyProgramStatus,
+}
+
+fn default_create_loyalty_program_program_type() -> LoyaltyProgramType {
+    LoyaltyProgramType::SingleTier
+}
+
+fn default_create_loyalty_program_status() -> LoyaltyProgramStatus {
+    LoyaltyProgramStatus::Active
 }
 
 // =============================================================================
@@ -102,13 +111,13 @@ pub struct PatchLoyaltyProgramDto {
     pub collection_factor: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "conversion_factor")]
     pub conversion_factor: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "expiry_duration_days")]
-    pub expiry_duration_days: Option<i32>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "expiry_duration_days")]
+    pub expiry_duration_days: Option<Option<i32>>,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "from_date")]
     pub from_date: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "to_date")]
-    pub to_date: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "to_date")]
+    pub to_date: Option<Option<DateTime<Utc>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<LoyaltyProgramStatus>,
 }
@@ -294,12 +303,4 @@ impl backbone_core::ApplyUpdateDto<UpdateLoyaltyProgramDto> for LoyaltyProgram {
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to LoyaltyProgram here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

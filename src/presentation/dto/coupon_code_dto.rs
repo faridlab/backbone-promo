@@ -39,14 +39,19 @@ pub struct CreateCouponCodeDto {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_use")]
     pub max_use: Option<i32>,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
-    #[serde(alias = "used_count")]
+    #[serde(default, alias = "used_count")]
     pub used_count: i32,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(alias = "valid_from")]
     pub valid_from: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "valid_upto")]
     pub valid_upto: Option<DateTime<Utc>>,
+    #[serde(default = "default_create_coupon_code_status")]
     pub status: CouponCodeStatus,
+}
+
+fn default_create_coupon_code_status() -> CouponCodeStatus {
+    CouponCodeStatus::Active
 }
 
 // =============================================================================
@@ -99,18 +104,18 @@ pub struct PatchCouponCodeDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "pricing_rule_id")]
     pub pricing_rule_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "max_use")]
-    pub max_use: Option<i32>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option")]
+    pub description: Option<Option<String>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "max_use")]
+    pub max_use: Option<Option<i32>>,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "used_count")]
     pub used_count: Option<i32>,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "valid_from")]
     pub valid_from: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "valid_upto")]
-    pub valid_upto: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "valid_upto")]
+    pub valid_upto: Option<Option<DateTime<Utc>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<CouponCodeStatus>,
 }
@@ -298,12 +303,4 @@ impl backbone_core::ApplyUpdateDto<UpdateCouponCodeDto> for CouponCode {
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to CouponCode here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

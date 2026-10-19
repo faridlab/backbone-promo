@@ -36,15 +36,18 @@ pub struct CreatePricingRuleDto {
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
+    #[serde(default)]
     pub priority: i32,
+    #[serde(default = "default_create_pricing_rule_scope")]
     pub scope: RuleScope,
-    #[serde(alias = "min_order_amount")]
+    #[serde(default, alias = "min_order_amount")]
     pub min_order_amount: Decimal,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "min_order_qty")]
     pub min_order_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
+    #[serde(default)]
     pub stackable: bool,
-    #[serde(alias = "apply_on")]
+    #[serde(default = "default_create_pricing_rule_apply_on", alias = "apply_on")]
     pub apply_on: ApplyOn,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "item_id")]
     pub item_id: Option<Uuid>,
@@ -56,13 +59,13 @@ pub struct CreatePricingRuleDto {
     pub customer_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "customer_group_id")]
     pub customer_group_id: Option<Uuid>,
-    #[serde(alias = "min_qty")]
+    #[serde(default, alias = "min_qty")]
     pub min_qty: Decimal,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "max_qty")]
     pub max_qty: Option<Decimal>,
-    #[serde(alias = "min_amount")]
+    #[serde(default, alias = "min_amount")]
     pub min_amount: Decimal,
-    #[serde(alias = "rate_or_discount")]
+    #[serde(default = "default_create_pricing_rule_rate_or_discount", alias = "rate_or_discount")]
     pub rate_or_discount: RateOrDiscount,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate: Option<Decimal>,
@@ -73,6 +76,7 @@ pub struct CreatePricingRuleDto {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_upto")]
     pub discount_upto: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
+    #[serde(default = "default_create_pricing_rule_currency")]
     pub currency: String,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(alias = "valid_from")]
@@ -80,9 +84,30 @@ pub struct CreatePricingRuleDto {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "valid_to")]
     pub valid_to: Option<DateTime<Utc>>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
-    #[serde(alias = "coupon_required")]
+    #[serde(default, alias = "coupon_required")]
     pub coupon_required: bool,
+    #[serde(default = "default_create_pricing_rule_status")]
     pub status: PricingRuleStatus,
+}
+
+fn default_create_pricing_rule_scope() -> RuleScope {
+    RuleScope::Line
+}
+
+fn default_create_pricing_rule_apply_on() -> ApplyOn {
+    ApplyOn::Item
+}
+
+fn default_create_pricing_rule_rate_or_discount() -> RateOrDiscount {
+    RateOrDiscount::DiscountPercentage
+}
+
+fn default_create_pricing_rule_currency() -> String {
+    "IDR".to_string()
+}
+
+fn default_create_pricing_rule_status() -> PricingRuleStatus {
+    PricingRuleStatus::Active
 }
 
 // =============================================================================
@@ -171,47 +196,47 @@ pub struct PatchPricingRuleDto {
     pub scope: Option<RuleScope>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "min_order_amount")]
     pub min_order_amount: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "min_order_qty")]
-    pub min_order_qty: Option<Decimal>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "min_order_qty")]
+    pub min_order_qty: Option<Option<Decimal>>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stackable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "apply_on")]
     pub apply_on: Option<ApplyOn>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "item_id")]
-    pub item_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "item_group_id")]
-    pub item_group_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "brand_id")]
-    pub brand_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "customer_id")]
-    pub customer_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "customer_group_id")]
-    pub customer_group_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "item_id")]
+    pub item_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "item_group_id")]
+    pub item_group_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "brand_id")]
+    pub brand_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "customer_id")]
+    pub customer_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "customer_group_id")]
+    pub customer_group_id: Option<Option<Uuid>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "min_qty")]
     pub min_qty: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "max_qty")]
-    pub max_qty: Option<Decimal>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "max_qty")]
+    pub max_qty: Option<Option<Decimal>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "min_amount")]
     pub min_amount: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "rate_or_discount")]
     pub rate_or_discount: Option<RateOrDiscount>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rate: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "discount_percentage")]
-    pub discount_percentage: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "discount_amount")]
-    pub discount_amount: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "discount_upto")]
-    pub discount_upto: Option<Decimal>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option")]
+    pub rate: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "discount_percentage")]
+    pub discount_percentage: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "discount_amount")]
+    pub discount_amount: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "discount_upto")]
+    pub discount_upto: Option<Option<Decimal>>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "valid_from")]
     pub valid_from: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "valid_to")]
-    pub valid_to: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "valid_to")]
+    pub valid_to: Option<Option<DateTime<Utc>>>,
     #[cfg_attr(feature = "openapi", schema(example = true))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "coupon_required")]
     pub coupon_required: Option<bool>,
@@ -489,12 +514,4 @@ impl backbone_core::ApplyUpdateDto<UpdatePricingRuleDto> for PricingRule {
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to PricingRule here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

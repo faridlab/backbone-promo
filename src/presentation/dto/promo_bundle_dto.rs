@@ -35,11 +35,13 @@ pub struct CreatePromoBundleDto {
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     pub title: String,
     #[cfg_attr(feature = "openapi", schema(example = 42))]
+    #[serde(default)]
     pub priority: i32,
-    #[serde(alias = "match_type")]
+    #[serde(default = "default_create_promo_bundle_match_type", alias = "match_type")]
     pub match_type: BundleMatch,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "required_distinct")]
     pub required_distinct: Option<i32>,
+    #[serde(default = "default_create_promo_bundle_reward")]
     pub reward: RateOrDiscount,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "discount_percentage")]
     pub discount_percentage: Option<Decimal>,
@@ -50,17 +52,36 @@ pub struct CreatePromoBundleDto {
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "reward_qty")]
     pub reward_qty: Option<Decimal>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
+    #[serde(default = "default_create_promo_bundle_currency")]
     pub currency: String,
-    #[serde(alias = "min_order_amount")]
+    #[serde(default, alias = "min_order_amount")]
     pub min_order_amount: Decimal,
     #[cfg_attr(feature = "openapi", schema(example = true))]
+    #[serde(default)]
     pub stackable: bool,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(alias = "valid_from")]
     pub valid_from: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "valid_to")]
     pub valid_to: Option<DateTime<Utc>>,
+    #[serde(default = "default_create_promo_bundle_status")]
     pub status: PromoBundleStatus,
+}
+
+fn default_create_promo_bundle_match_type() -> BundleMatch {
+    BundleMatch::AllOf
+}
+
+fn default_create_promo_bundle_reward() -> RateOrDiscount {
+    RateOrDiscount::DiscountPercentage
+}
+
+fn default_create_promo_bundle_currency() -> String {
+    "IDR".to_string()
+}
+
+fn default_create_promo_bundle_status() -> PromoBundleStatus {
+    PromoBundleStatus::Active
 }
 
 // =============================================================================
@@ -126,18 +147,18 @@ pub struct PatchPromoBundleDto {
     pub priority: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "match_type")]
     pub match_type: Option<BundleMatch>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "required_distinct")]
-    pub required_distinct: Option<i32>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "required_distinct")]
+    pub required_distinct: Option<Option<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reward: Option<RateOrDiscount>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "discount_percentage")]
-    pub discount_percentage: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "discount_amount")]
-    pub discount_amount: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "reward_item_id")]
-    pub reward_item_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "reward_qty")]
-    pub reward_qty: Option<Decimal>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "discount_percentage")]
+    pub discount_percentage: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "discount_amount")]
+    pub discount_amount: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "reward_item_id")]
+    pub reward_item_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "reward_qty")]
+    pub reward_qty: Option<Option<Decimal>>,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
@@ -149,8 +170,8 @@ pub struct PatchPromoBundleDto {
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "valid_from")]
     pub valid_from: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "valid_to")]
-    pub valid_to: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "valid_to")]
+    pub valid_to: Option<Option<DateTime<Utc>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<PromoBundleStatus>,
 }
@@ -374,12 +395,4 @@ impl backbone_core::ApplyUpdateDto<UpdatePromoBundleDto> for PromoBundle {
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to PromoBundle here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

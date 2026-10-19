@@ -204,6 +204,12 @@ impl super::Entity for LoyaltyPointEntry {
 }
 
 impl backbone_core::PersistentEntity for LoyaltyPointEntry {
+    fn references() -> &'static [backbone_core::Reference] {
+        const REFERENCES: &[backbone_core::Reference] = &[
+            backbone_core::Reference::new("loyalty_program_id", "promo.loyalty_programs", "id"),
+        ];
+        REFERENCES
+    }
     fn entity_id(&self) -> String {
         self.id.to_string()
     }

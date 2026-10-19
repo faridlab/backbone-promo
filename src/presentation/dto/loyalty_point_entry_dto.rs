@@ -39,7 +39,7 @@ pub struct CreateLoyaltyPointEntryDto {
     #[serde(alias = "entry_type")]
     pub entry_type: LoyaltyEntryType,
     pub points: Decimal,
-    #[serde(alias = "purchase_amount")]
+    #[serde(default, alias = "purchase_amount")]
     pub purchase_amount: Decimal,
     #[cfg_attr(feature = "openapi", schema(example = "example"))]
     #[serde(alias = "source_type")]
@@ -123,8 +123,8 @@ pub struct PatchLoyaltyPointEntryDto {
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "posting_date")]
     pub posting_date: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "expiry_date")]
-    pub expiry_date: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "expiry_date")]
+    pub expiry_date: Option<Option<DateTime<Utc>>>,
 }
 
 impl PatchLoyaltyPointEntryDto {
@@ -316,12 +316,4 @@ impl backbone_core::ApplyUpdateDto<UpdateLoyaltyPointEntryDto> for LoyaltyPointE
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to LoyaltyPointEntry here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

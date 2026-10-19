@@ -41,8 +41,12 @@ pub struct CreateCouponRedemptionDto {
     #[serde(alias = "source_id")]
     pub source_id: Uuid,
     #[cfg_attr(feature = "openapi", schema(example = "2024-01-01T00:00:00Z"))]
-    #[serde(alias = "redeemed_at")]
+    #[serde(default = "default_create_coupon_redemption_redeemed_at", alias = "redeemed_at")]
     pub redeemed_at: DateTime<Utc>,
+}
+
+fn default_create_coupon_redemption_redeemed_at() -> DateTime<Utc> {
+    Utc::now()
 }
 
 // =============================================================================
@@ -272,12 +276,4 @@ impl backbone_core::ApplyUpdateDto<UpdateCouponRedemptionDto> for CouponRedempti
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to CouponRedemption here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

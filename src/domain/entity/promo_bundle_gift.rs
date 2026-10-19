@@ -162,6 +162,12 @@ impl super::Entity for PromoBundleGift {
 }
 
 impl backbone_core::PersistentEntity for PromoBundleGift {
+    fn references() -> &'static [backbone_core::Reference] {
+        const REFERENCES: &[backbone_core::Reference] = &[
+            backbone_core::Reference::new("bundle_id", "promo.promo_bundles", "id"),
+        ];
+        REFERENCES
+    }
     fn entity_id(&self) -> String {
         self.id.to_string()
     }

@@ -82,6 +82,13 @@ impl axum::response::IntoResponse for LoyaltyOrderPointsError {
 // Route Configuration
 // =============================================================================
 
+/// The permissions this entity's generic routes require: `loyalty_order_points:<action>` for `read`, `create`,
+/// `update`, `delete`, `restore` and `purge`, with any rename the schema's `requires:` declares.
+pub fn loyalty_order_points_permissions() -> backbone_core::http::CrudPermissions {
+    backbone_core::http::CrudPermissions::new("loyalty_order_points")
+        .in_module("promo")
+}
+
 /// Create Axum router with all 16 Backbone endpoints for LoyaltyOrderPoints.
 ///
 /// # Routes
@@ -111,21 +118,23 @@ impl axum::response::IntoResponse for LoyaltyOrderPointsError {
 /// let router = create_loyalty_order_points_routes(service);
 /// ```
 pub fn create_loyalty_order_points_routes(service: Arc<LoyaltyOrderPointsService>) -> Router {
-    BackboneCrudHandler::<LoyaltyOrderPointsService, LoyaltyOrderPoints, CreateLoyaltyOrderPointsDto, UpdateLoyaltyOrderPointsDto, LoyaltyOrderPointsResponseDto>::routes(
+    BackboneCrudHandler::<LoyaltyOrderPointsService, LoyaltyOrderPoints, CreateLoyaltyOrderPointsDto, UpdateLoyaltyOrderPointsDto, LoyaltyOrderPointsResponseDto>::routes_guarded(
         service,
         "/loyalty_order_pointses",
+        loyalty_order_points_permissions(),
     )
 }
 
 /// Create Axum router with only the read (GET) endpoints for LoyaltyOrderPoints.
 ///
-/// Safe for public, unauthenticated exposure (e.g., reference data).
+/// Each route requires the entity's `read` permission, so it needs an authenticated caller.
 /// Mutations must be served separately via `create_loyalty_order_points_write_routes`,
 /// typically wrapped in an auth middleware layer.
 pub fn create_loyalty_order_points_read_routes(service: Arc<LoyaltyOrderPointsService>) -> Router {
-    BackboneCrudHandler::<LoyaltyOrderPointsService, LoyaltyOrderPoints, CreateLoyaltyOrderPointsDto, UpdateLoyaltyOrderPointsDto, LoyaltyOrderPointsResponseDto>::read_routes(
+    BackboneCrudHandler::<LoyaltyOrderPointsService, LoyaltyOrderPoints, CreateLoyaltyOrderPointsDto, UpdateLoyaltyOrderPointsDto, LoyaltyOrderPointsResponseDto>::read_routes_guarded(
         service,
         "/loyalty_order_pointses",
+        loyalty_order_points_permissions(),
     )
 }
 
@@ -141,9 +150,10 @@ pub fn create_loyalty_order_points_read_routes(service: Arc<LoyaltyOrderPointsSe
 /// service (e.g. a command router over its domain engine), serve THAT instead
 /// for any mutation that must respect domain rules.
 pub fn create_loyalty_order_points_write_routes(service: Arc<LoyaltyOrderPointsService>) -> Router {
-    BackboneCrudHandler::<LoyaltyOrderPointsService, LoyaltyOrderPoints, CreateLoyaltyOrderPointsDto, UpdateLoyaltyOrderPointsDto, LoyaltyOrderPointsResponseDto>::write_routes(
+    BackboneCrudHandler::<LoyaltyOrderPointsService, LoyaltyOrderPoints, CreateLoyaltyOrderPointsDto, UpdateLoyaltyOrderPointsDto, LoyaltyOrderPointsResponseDto>::write_routes_guarded(
         service,
         "/loyalty_order_pointses",
+        loyalty_order_points_permissions(),
     )
 }
 

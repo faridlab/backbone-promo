@@ -82,6 +82,13 @@ impl axum::response::IntoResponse for PricingRuleError {
 // Route Configuration
 // =============================================================================
 
+/// The permissions this entity's generic routes require: `pricing_rule:<action>` for `read`, `create`,
+/// `update`, `delete`, `restore` and `purge`, with any rename the schema's `requires:` declares.
+pub fn pricing_rule_permissions() -> backbone_core::http::CrudPermissions {
+    backbone_core::http::CrudPermissions::new("pricing_rule")
+        .in_module("promo")
+}
+
 /// Create Axum router with all 16 Backbone endpoints for PricingRule.
 ///
 /// # Routes
@@ -111,21 +118,23 @@ impl axum::response::IntoResponse for PricingRuleError {
 /// let router = create_pricing_rule_routes(service);
 /// ```
 pub fn create_pricing_rule_routes(service: Arc<PricingRuleService>) -> Router {
-    BackboneCrudHandler::<PricingRuleService, PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto, PricingRuleResponseDto>::routes(
+    BackboneCrudHandler::<PricingRuleService, PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto, PricingRuleResponseDto>::routes_guarded(
         service,
         "/pricing_rules",
+        pricing_rule_permissions(),
     )
 }
 
 /// Create Axum router with only the read (GET) endpoints for PricingRule.
 ///
-/// Safe for public, unauthenticated exposure (e.g., reference data).
+/// Each route requires the entity's `read` permission, so it needs an authenticated caller.
 /// Mutations must be served separately via `create_pricing_rule_write_routes`,
 /// typically wrapped in an auth middleware layer.
 pub fn create_pricing_rule_read_routes(service: Arc<PricingRuleService>) -> Router {
-    BackboneCrudHandler::<PricingRuleService, PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto, PricingRuleResponseDto>::read_routes(
+    BackboneCrudHandler::<PricingRuleService, PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto, PricingRuleResponseDto>::read_routes_guarded(
         service,
         "/pricing_rules",
+        pricing_rule_permissions(),
     )
 }
 
@@ -141,9 +150,10 @@ pub fn create_pricing_rule_read_routes(service: Arc<PricingRuleService>) -> Rout
 /// service (e.g. a command router over its domain engine), serve THAT instead
 /// for any mutation that must respect domain rules.
 pub fn create_pricing_rule_write_routes(service: Arc<PricingRuleService>) -> Router {
-    BackboneCrudHandler::<PricingRuleService, PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto, PricingRuleResponseDto>::write_routes(
+    BackboneCrudHandler::<PricingRuleService, PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto, PricingRuleResponseDto>::write_routes_guarded(
         service,
         "/pricing_rules",
+        pricing_rule_permissions(),
     )
 }
 

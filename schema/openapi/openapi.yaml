@@ -3388,10 +3388,7 @@ components:
       required:
         - code
         - pricing_rule_id
-        - used_count
         - valid_from
-        - status
-        - metadata
       properties:
         code:
           type: string
@@ -3419,8 +3416,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     UpdateCouponCodeRequest:
       type: object
@@ -3430,7 +3425,6 @@ components:
         - used_count
         - valid_from
         - status
-        - metadata
       properties:
         code:
           type: string
@@ -3458,8 +3452,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     PatchCouponCodeRequest:
       type: object
@@ -3490,8 +3482,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     CouponCodeList:
       type: object
@@ -3555,8 +3545,6 @@ components:
         - pricing_rule_id
         - source_type
         - source_id
-        - redeemed_at
-        - metadata
       properties:
         coupon_id:
           type: string
@@ -3573,8 +3561,6 @@ components:
         redeemed_at:
           type: string
           format: date-time
-        metadata:
-          type: object
 
     UpdateCouponRedemptionRequest:
       type: object
@@ -3584,7 +3570,6 @@ components:
         - source_type
         - source_id
         - redeemed_at
-        - metadata
       properties:
         coupon_id:
           type: string
@@ -3601,8 +3586,6 @@ components:
         redeemed_at:
           type: string
           format: date-time
-        metadata:
-          type: object
 
     PatchCouponRedemptionRequest:
       type: object
@@ -3622,8 +3605,6 @@ components:
         redeemed_at:
           type: string
           format: date-time
-        metadata:
-          type: object
 
     CouponRedemptionList:
       type: object
@@ -3710,12 +3691,6 @@ components:
         - customer_id
         - order_ref_type
         - order_ref_id
-        - grant_base_amount
-        - granted_points
-        - spent_points
-        - granted_reversed_points
-        - spent_reversed_points
-        - metadata
       properties:
         loyalty_program_id:
           type: string
@@ -3751,8 +3726,6 @@ components:
           nullable: true
           type: string
           format: date-time
-        metadata:
-          type: object
 
     UpdateLoyaltyOrderPointsRequest:
       type: object
@@ -3766,7 +3739,6 @@ components:
         - spent_points
         - granted_reversed_points
         - spent_reversed_points
-        - metadata
       properties:
         loyalty_program_id:
           type: string
@@ -3802,8 +3774,6 @@ components:
           nullable: true
           type: string
           format: date-time
-        metadata:
-          type: object
 
     PatchLoyaltyOrderPointsRequest:
       type: object
@@ -3842,8 +3812,6 @@ components:
           nullable: true
           type: string
           format: date-time
-        metadata:
-          type: object
 
     LoyaltyOrderPointsList:
       type: object
@@ -3912,12 +3880,9 @@ components:
       type: object
       required:
         - program_name
-        - program_type
         - collection_factor
         - conversion_factor
         - from_date
-        - status
-        - metadata
       properties:
         program_name:
           type: string
@@ -3941,8 +3906,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     UpdateLoyaltyProgramRequest:
       type: object
@@ -3953,7 +3916,6 @@ components:
         - conversion_factor
         - from_date
         - status
-        - metadata
       properties:
         program_name:
           type: string
@@ -3977,8 +3939,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     PatchLoyaltyProgramRequest:
       type: object
@@ -4005,8 +3965,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     LoyaltyProgramList:
       type: object
@@ -4083,11 +4041,9 @@ components:
         - customer_id
         - entry_type
         - points
-        - purchase_amount
         - source_type
         - source_id
         - posting_date
-        - metadata
       properties:
         loyalty_program_id:
           type: string
@@ -4114,8 +4070,6 @@ components:
           nullable: true
           type: string
           format: date-time
-        metadata:
-          type: object
 
     UpdateLoyaltyPointEntryRequest:
       type: object
@@ -4128,7 +4082,6 @@ components:
         - source_type
         - source_id
         - posting_date
-        - metadata
       properties:
         loyalty_program_id:
           type: string
@@ -4155,8 +4108,6 @@ components:
           nullable: true
           type: string
           format: date-time
-        metadata:
-          type: object
 
     PatchLoyaltyPointEntryRequest:
       type: object
@@ -4186,8 +4137,6 @@ components:
           nullable: true
           type: string
           format: date-time
-        metadata:
-          type: object
 
     LoyaltyPointEntryList:
       type: object
@@ -4312,19 +4261,7 @@ components:
       type: object
       required:
         - title
-        - priority
-        - scope
-        - min_order_amount
-        - stackable
-        - apply_on
-        - min_qty
-        - min_amount
-        - rate_or_discount
-        - currency
         - valid_from
-        - coupon_required
-        - status
-        - metadata
       properties:
         title:
           type: string
@@ -4397,8 +4334,6 @@ components:
           type: boolean
         status:
           type: string
-        metadata:
-          type: object
 
     UpdatePricingRuleRequest:
       type: object
@@ -4416,7 +4351,6 @@ components:
         - valid_from
         - coupon_required
         - status
-        - metadata
       properties:
         title:
           type: string
@@ -4489,8 +4423,6 @@ components:
           type: boolean
         status:
           type: string
-        metadata:
-          type: object
 
     PatchPricingRuleRequest:
       type: object
@@ -4566,8 +4498,6 @@ components:
           type: boolean
         status:
           type: string
-        metadata:
-          type: object
 
     PricingRuleList:
       type: object
@@ -4659,15 +4589,7 @@ components:
       type: object
       required:
         - title
-        - priority
-        - match_type
-        - reward
-        - currency
-        - min_order_amount
-        - stackable
         - valid_from
-        - status
-        - metadata
       properties:
         title:
           type: string
@@ -4711,8 +4633,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     UpdatePromoBundleRequest:
       type: object
@@ -4726,7 +4646,6 @@ components:
         - stackable
         - valid_from
         - status
-        - metadata
       properties:
         title:
           type: string
@@ -4770,8 +4689,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     PatchPromoBundleRequest:
       type: object
@@ -4818,8 +4735,6 @@ components:
           format: date-time
         status:
           type: string
-        metadata:
-          type: object
 
     PromoBundleList:
       type: object
@@ -4882,9 +4797,6 @@ components:
       type: object
       required:
         - bundle_id
-        - apply_on
-        - min_qty
-        - metadata
       properties:
         bundle_id:
           type: string
@@ -4905,8 +4817,6 @@ components:
           format: uuid
         min_qty:
           type: string
-        metadata:
-          type: object
 
     UpdatePromoBundleComponentRequest:
       type: object
@@ -4914,7 +4824,6 @@ components:
         - bundle_id
         - apply_on
         - min_qty
-        - metadata
       properties:
         bundle_id:
           type: string
@@ -4935,8 +4844,6 @@ components:
           format: uuid
         min_qty:
           type: string
-        metadata:
-          type: object
 
     PatchPromoBundleComponentRequest:
       type: object
@@ -4960,8 +4867,6 @@ components:
           format: uuid
         min_qty:
           type: string
-        metadata:
-          type: object
 
     PromoBundleComponentList:
       type: object
@@ -5014,8 +4919,6 @@ components:
       required:
         - bundle_id
         - gift_item_id
-        - gift_qty
-        - metadata
       properties:
         bundle_id:
           type: string
@@ -5025,8 +4928,6 @@ components:
           format: uuid
         gift_qty:
           type: string
-        metadata:
-          type: object
 
     UpdatePromoBundleGiftRequest:
       type: object
@@ -5034,7 +4935,6 @@ components:
         - bundle_id
         - gift_item_id
         - gift_qty
-        - metadata
       properties:
         bundle_id:
           type: string
@@ -5044,8 +4944,6 @@ components:
           format: uuid
         gift_qty:
           type: string
-        metadata:
-          type: object
 
     PatchPromoBundleGiftRequest:
       type: object
@@ -5058,8 +4956,6 @@ components:
           format: uuid
         gift_qty:
           type: string
-        metadata:
-          type: object
 
     PromoBundleGiftList:
       type: object

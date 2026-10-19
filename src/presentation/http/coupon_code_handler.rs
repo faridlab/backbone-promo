@@ -81,6 +81,13 @@ impl axum::response::IntoResponse for CouponCodeError {
 // Route Configuration
 // =============================================================================
 
+/// The permissions this entity's generic routes require: `coupon_code:<action>` for `read`, `create`,
+/// `update`, `delete`, `restore` and `purge`, with any rename the schema's `requires:` declares.
+pub fn coupon_code_permissions() -> backbone_core::http::CrudPermissions {
+    backbone_core::http::CrudPermissions::new("coupon_code")
+        .in_module("promo")
+}
+
 /// Create Axum router with all 16 Backbone endpoints for CouponCode.
 ///
 /// # Routes
@@ -110,21 +117,23 @@ impl axum::response::IntoResponse for CouponCodeError {
 /// let router = create_coupon_code_routes(service);
 /// ```
 pub fn create_coupon_code_routes(service: Arc<CouponCodeService>) -> Router {
-    BackboneCrudHandler::<CouponCodeService, CouponCode, CreateCouponCodeDto, UpdateCouponCodeDto, CouponCodeResponseDto>::routes(
+    BackboneCrudHandler::<CouponCodeService, CouponCode, CreateCouponCodeDto, UpdateCouponCodeDto, CouponCodeResponseDto>::routes_guarded(
         service,
         "/coupon_codes",
+        coupon_code_permissions(),
     )
 }
 
 /// Create Axum router with only the read (GET) endpoints for CouponCode.
 ///
-/// Safe for public, unauthenticated exposure (e.g., reference data).
+/// Each route requires the entity's `read` permission, so it needs an authenticated caller.
 /// Mutations must be served separately via `create_coupon_code_write_routes`,
 /// typically wrapped in an auth middleware layer.
 pub fn create_coupon_code_read_routes(service: Arc<CouponCodeService>) -> Router {
-    BackboneCrudHandler::<CouponCodeService, CouponCode, CreateCouponCodeDto, UpdateCouponCodeDto, CouponCodeResponseDto>::read_routes(
+    BackboneCrudHandler::<CouponCodeService, CouponCode, CreateCouponCodeDto, UpdateCouponCodeDto, CouponCodeResponseDto>::read_routes_guarded(
         service,
         "/coupon_codes",
+        coupon_code_permissions(),
     )
 }
 
@@ -140,9 +149,10 @@ pub fn create_coupon_code_read_routes(service: Arc<CouponCodeService>) -> Router
 /// service (e.g. a command router over its domain engine), serve THAT instead
 /// for any mutation that must respect domain rules.
 pub fn create_coupon_code_write_routes(service: Arc<CouponCodeService>) -> Router {
-    BackboneCrudHandler::<CouponCodeService, CouponCode, CreateCouponCodeDto, UpdateCouponCodeDto, CouponCodeResponseDto>::write_routes(
+    BackboneCrudHandler::<CouponCodeService, CouponCode, CreateCouponCodeDto, UpdateCouponCodeDto, CouponCodeResponseDto>::write_routes_guarded(
         service,
         "/coupon_codes",
+        coupon_code_permissions(),
     )
 }
 

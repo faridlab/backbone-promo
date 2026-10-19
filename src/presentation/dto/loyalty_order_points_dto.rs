@@ -43,15 +43,15 @@ pub struct CreateLoyaltyOrderPointsDto {
     pub order_ref_id: Uuid,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "coupon_code_id")]
     pub coupon_code_id: Option<Uuid>,
-    #[serde(alias = "grant_base_amount")]
+    #[serde(default, alias = "grant_base_amount")]
     pub grant_base_amount: Decimal,
-    #[serde(alias = "granted_points")]
+    #[serde(default, alias = "granted_points")]
     pub granted_points: Decimal,
-    #[serde(alias = "spent_points")]
+    #[serde(default, alias = "spent_points")]
     pub spent_points: Decimal,
-    #[serde(alias = "granted_reversed_points")]
+    #[serde(default, alias = "granted_reversed_points")]
     pub granted_reversed_points: Decimal,
-    #[serde(alias = "spent_reversed_points")]
+    #[serde(default, alias = "spent_reversed_points")]
     pub spent_reversed_points: Decimal,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "granted_at")]
     pub granted_at: Option<DateTime<Utc>>,
@@ -125,8 +125,8 @@ pub struct PatchLoyaltyOrderPointsDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(skip_serializing_if = "Option::is_none", alias = "order_ref_id")]
     pub order_ref_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "coupon_code_id")]
-    pub coupon_code_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "coupon_code_id")]
+    pub coupon_code_id: Option<Option<Uuid>>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "grant_base_amount")]
     pub grant_base_amount: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "granted_points")]
@@ -137,10 +137,10 @@ pub struct PatchLoyaltyOrderPointsDto {
     pub granted_reversed_points: Option<Decimal>,
     #[serde(skip_serializing_if = "Option::is_none", alias = "spent_reversed_points")]
     pub spent_reversed_points: Option<Decimal>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "granted_at")]
-    pub granted_at: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "spent_at")]
-    pub spent_at: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "granted_at")]
+    pub granted_at: Option<Option<DateTime<Utc>>>,
+    #[serde(default, deserialize_with = "crate::presentation::dto::double_option", alias = "spent_at")]
+    pub spent_at: Option<Option<DateTime<Utc>>>,
 }
 
 impl PatchLoyaltyOrderPointsDto {
@@ -346,12 +346,4 @@ impl backbone_core::ApplyUpdateDto<UpdateLoyaltyOrderPointsDto> for LoyaltyOrder
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to LoyaltyOrderPoints here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

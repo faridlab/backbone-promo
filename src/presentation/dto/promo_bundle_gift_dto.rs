@@ -35,8 +35,12 @@ pub struct CreatePromoBundleGiftDto {
     #[cfg_attr(feature = "openapi", schema(example = "550e8400-e29b-41d4-a716-446655440000"))]
     #[serde(alias = "gift_item_id")]
     pub gift_item_id: Uuid,
-    #[serde(alias = "gift_qty")]
+    #[serde(default = "default_create_promo_bundle_gift_gift_qty", alias = "gift_qty")]
     pub gift_qty: Decimal,
+}
+
+fn default_create_promo_bundle_gift_gift_qty() -> Decimal {
+    Decimal::from(1_i64)
 }
 
 // =============================================================================
@@ -239,12 +243,4 @@ impl backbone_core::ApplyUpdateDto<UpdatePromoBundleGiftDto> for PromoBundleGift
         Ok(self)
     }
 }
-
-// =============================================================================
-// Custom DTOs
-// =============================================================================
-
-// Add custom DTOs specific to PromoBundleGift here.
-// This section will be preserved during regeneration.
-// >>> END CUSTOM DTOs
 

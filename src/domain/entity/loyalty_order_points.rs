@@ -229,6 +229,13 @@ impl super::Entity for LoyaltyOrderPoints {
 }
 
 impl backbone_core::PersistentEntity for LoyaltyOrderPoints {
+    fn references() -> &'static [backbone_core::Reference] {
+        const REFERENCES: &[backbone_core::Reference] = &[
+            backbone_core::Reference::new("loyalty_program_id", "promo.loyalty_programs", "id"),
+            backbone_core::Reference::new("coupon_code_id", "promo.coupon_codes", "id"),
+        ];
+        REFERENCES
+    }
     fn entity_id(&self) -> String {
         self.id.to_string()
     }
